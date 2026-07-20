@@ -7,36 +7,51 @@ Upload a PDF. Get a plain-language summary with re-visualized charts.
 ## Quick Start
 
 ```bash
-# 1. Prerequisites: Go 1.22+, Node.js 18+, npm 9+
-# 2. Get a Gemini API key: https://aistudio.google.com/apikey
+# Prerequisites: Go 1.24+, Node.js 18+, npm 9+
+# Get a Gemini API key: https://aistudio.google.com/apikey
 
-# 3. Configure
+# 1. Configure
 cp .env.example .env
 # Edit .env — set GEMINI_API_KEY=your-key
 
-# 4. Install deps
+# 2. Install deps
 go mod tidy
 cd frontend && npm install && cd ..
 
-# 5. Run (two terminals)
+# 3. Run (two terminals)
 # Terminal 1 — backend:
 export $(grep -v '^#' .env | xargs) && go run ./cmd/server
-
 # Terminal 2 — frontend dev server:
 cd frontend && npm run dev
 ```
 
-Open `http://localhost:5173` (Vite default, proxies API to backend).
+Open `http://localhost:5173`.
 
-## Production Build
+## Build & Run (production)
+
+```bash
+make build    # builds frontend + Go binary
+make run      # runs ./server with .env vars
+```
+
+Or manually:
 
 ```bash
 cd frontend && npm run build && cd ..
-go build -o server ./cmd/server
+CGO_ENABLED=0 go build -o server ./cmd/server
 export $(grep -v '^#' .env | xargs) && ./server
 ```
 
-Single binary serves API + built frontend on `http://localhost:8080` (override via `PORT` in `.env`).
+Single binary serves API + built frontend on port 8080 (set via `PORT` in `.env`).
+
+## Run with Podman
+
+```bash
+make container IMAGE=paperviz TAG=latest            # build image
+make container-run IMAGE=paperviz GEMINI_API_KEY=... # run container
+```
+
+Volume `paperviz-data` persists the SQLite database across restarts.
 
 ## How It Works
 
@@ -48,10 +63,31 @@ Single binary serves API + built frontend on `http://localhost:8080` (override v
 
 ## Tech Stack
 
-- **Backend:** Go 1.22+, chi router, modernc.org/sqlite (pure Go, no CGO)
+- **Backend:** Go 1.24+, chi router, modernc.org/sqlite (pure Go, no CGO)
 - **Frontend:** React 19, Vite 8, Tailwind CSS v4, Recharts
 - **LLM:** Google Gemini API (direct HTTP client, no SDK)
 - **PDF:** pdfcpu + ledongthuc/pdf (in-memory, no disk writes)
+
+## Deployment
+
+PaperViz is a **single Go binary + SQLite** — no Docker required, but container-friendly.
+
+### Netlify
+
+**Not suitable** for the backend. Netlify hosts static sites and serverless functions, but PaperViz runs a long-lived Go server with persistent SQLite and background goroutines. The frontend (`frontend/dist`) *could* be deployed to Netlify, but the backend must run elsewhere.
+
+### Recommended platforms
+
+Any service that runs Docker containers or Go binaries:
+
+| Platform | Notes |
+|---|---|
+| **Railway** / **Fly.io** | Container-native, easy DB volume setup |
+| **Render** | Deploy from Git, supports Go natively |
+| **Heroku** | Use Container Registry + podman push |
+| **VPS** (DigitalOcean, Linux, etc.) | Run the binary or container directly |
+
+All require `GEMINI_API_KEY` set as an environment variable.
 
 ## Documentation
 
