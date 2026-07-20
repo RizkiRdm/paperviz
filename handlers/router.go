@@ -1,0 +1,41 @@
+package handlers
+
+import (
+	"database/sql"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"paperviz/external"
+)
+
+// NewRouter builds the full chi router: the two unversioned API endpoints
+// (ARCHITECTURE.md Section E) plus static file serving for the built React
+// SPA. staticDir is the frontend's built assets directory (frontend/dist),
+// served directly by this Go binary — no separate frontend server in
+// production, per ARCHITECTURE.md's "single binary" architecture style.
+func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http.Handler {
+	r := chi.NewRouter()
+
+	// Recoverer converts a panic in any handler into a 500 response instead
+	// of crashing the whole server process — this is standard chi
+	// middleware, not a new dependency (chi ships it).
+	r.Use(middleware.Recoverer)
+
+	docHandler := NewDocumentHandler(db, gemini)
+	r.Route("/api/documents", func(r chi.Router) {
+		r.Post("/", docHandler.Create)
+		r.Get("/{id}", docHandler.Get)
+	})
+
+	// Serve the built SPA for everything else. Any unmatched path falls
+	// back to index.html so client-side routing (if the frontend adds any)
+	// still works on a hard refresh.
+	fileServer := http.FileServer(http.Dir(staticDir))
+	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
+		fileServer.ServeHTTP(w, req)
+	})
+
+	return r
+}

@@ -1,0 +1,109 @@
+/*
+ * PaperViz global styles and design tokens.
+ *
+ * Every color, font, spacing, and radius value below comes directly from
+ * DESIGN.md — this file is a literal translation of that spec into
+ * Tailwind v4's CSS-native @theme syntax (v4 no longer uses
+ * tailwind.config.js for design tokens; see vite.config.js comment).
+ *
+ * If a design value needs to change, DESIGN.md is the source of truth —
+ * update it there first, then mirror the change here.
+ */
+@import "tailwindcss";
+
+@theme {
+  /* --- Color: base & surfaces (DESIGN.md "Colors > Base & Tokens") --- */
+  --color-surface-base: #FAFAF9;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-inverse: #14171F;
+  --color-ink-primary: #1B1F27;
+  --color-ink-secondary: #5B6472;
+  --color-border-default: #E4E7EC;
+
+  /* --- Color: accent & states (DESIGN.md "Colors > Accent & States") --- */
+  --color-accent-verified: #2F6F5E;
+  --color-accent-verified-soft: #E7F2EE;
+  --color-state-warning: #B5710B;
+  --color-state-error: #C4453B;
+  --color-state-warning-soft: #FBF2E3;
+  --color-state-error-soft: #FCEEEC;
+
+  /* --- Typography faces (DESIGN.md "Typography") ---
+   * Loaded via Google Fonts in index.html — see that file for the actual
+   * <link> tags. These theme vars just name the stacks. */
+  --font-ui: "Inter", system-ui, sans-serif;
+  --font-reading: "Source Serif 4", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* --- Typography scale (DESIGN.md "Typography Scale") ---
+   * Tailwind v4's --text-* namespace generates text-{name} utilities. Each
+   * entry below is declared as a font-size/line-height pair via the
+   * "--text-{name}--line-height" companion variable, which is how v4
+   * attaches a line-height to a named text size (not just a bare number).
+   * Font WEIGHT is not part of this namespace — apply DESIGN.md's stated
+   * weight separately via font-normal/font-medium/font-semibold at each
+   * call site (see components for examples). */
+  --text-hero: 40px;
+  --text-hero--line-height: 1.15;
+  --text-h2: 24px;
+  --text-h2--line-height: 1.25;
+  --text-h3: 18px;
+  --text-h3--line-height: 1.3;
+  --text-reading: 18px;
+  --text-reading--line-height: 1.7;
+  --text-body: 15px;
+  --text-body--line-height: 1.5;
+  --text-caption: 13px;
+  --text-caption--line-height: 1.4;
+  --text-mono: 13px;
+  --text-mono--line-height: 1.5;
+
+  /* --- Border radius (DESIGN.md "Border Radius & Elevation") --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  /* --- Spacing scale (DESIGN.md "Spacing"). Tailwind's default spacing
+   * scale is already 4px-based and covers these exact values (space-1=4px
+   * is Tailwind's `1`, space-2=8px is `2`, etc. at the default 4px unit),
+   * so no override is needed — utilities like p-4 (16px), gap-8 (32px)
+   * already match DESIGN.md's space-3/space-5 directly. Documented here
+   * so a future reader doesn't go looking for a spacing override that
+   * deliberately doesn't exist. */
+}
+
+/* Dark mode tokens (DESIGN.md "Dark Mode Tokens"). Tailwind v4 activates
+ * `dark:` variants off a `.dark` class or `prefers-color-scheme` depending
+ * on configuration; PaperViz uses the media-query default (no manual
+ * toggle in this MVP — see PLAN.md, dark mode toggle UI is not a listed
+ * Phase 5 task), so this block overrides the same CSS variables when the
+ * OS is in dark mode. */
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-surface-base: #14171F;
+    --color-surface-raised: #1C202A;
+    --color-ink-primary: #F0F1F3;
+    --color-ink-secondary: #9AA3B1;
+    --color-border-default: #2A2F3A;
+    --color-accent-verified: #4A9684;
+    --color-state-warning: #D89440;
+    --color-state-error: #E37168;
+  }
+}
+
+body {
+  background-color: var(--color-surface-base);
+  color: var(--color-ink-primary);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* DESIGN.md "Elevation > Focus States": every focusable element gets a
+ * 2px accent-verified ring with 2px offset — set once globally instead of
+ * repeating this on every interactive component. */
+:focus-visible {
+  outline: 2px solid var(--color-accent-verified);
+  outline-offset: 2px;
+}
