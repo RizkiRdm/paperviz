@@ -14,7 +14,7 @@ import (
 const geminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent"
 
 // geminiCallTimeout is the MAX_LIMIT per Gemini call (ARCHITECTURE.md Section 4).
-const geminiCallTimeout = 30 * time.Second
+const geminiCallTimeout = 60 * time.Second
 
 // GeminiClient is a direct HTTP client for the Gemini API. No SDK, no
 // gateway — per ARCHITECTURE.md Context Lock and AGENTS.md Quick Rules.
@@ -102,6 +102,7 @@ func (c *GeminiClient) generateOnce(ctx context.Context, prompt string, asJSON b
 	}
 
 	url := fmt.Sprintf(geminiEndpoint, c.model)
+	slog.Info("gemini debug", "model", c.model, "url", url)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return "", fmt.Errorf("build gemini request: %w", err)

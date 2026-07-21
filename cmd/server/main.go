@@ -35,7 +35,9 @@ func main() {
 
 	geminiModel := os.Getenv("GEMINI_MODEL")
 	if geminiModel == "" {
-		geminiModel = "gemini-2.5-flash" // sane MVP default: fast + cheap, sufficient for text tasks
+		// Current fast + cheap default, good for text-only tasks. Valid
+		// stable models as of 2026-07: gemini-3.5-flash, gemini-2.5-flash-lite.
+		geminiModel = "gemini-2.5-flash-lite"
 	}
 
 	dbPath := os.Getenv("DATABASE_PATH")

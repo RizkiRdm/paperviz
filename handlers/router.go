@@ -18,10 +18,18 @@ import (
 func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http.Handler {
 	r := chi.NewRouter()
 
+	// RequestID injects a unique request ID into every request context so
+	// log lines belonging to the same request can be correlated.
+	r.Use(middleware.RequestID)
+
 	// Recoverer converts a panic in any handler into a 500 response instead
 	// of crashing the whole server process — this is standard chi
 	// middleware, not a new dependency (chi ships it).
 	r.Use(middleware.Recoverer)
+
+	// slogRequestLogger logs every request with method, path, status,
+	// duration, and request ID — structured JSON output via slog.
+	r.Use(slogRequestLogger)
 
 	docHandler := NewDocumentHandler(db, gemini)
 	r.Route("/api/documents", func(r chi.Router) {

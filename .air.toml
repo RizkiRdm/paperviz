@@ -1,0 +1,26 @@
+root = "."
+testdata_dir = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/server ./cmd/server"
+  entrypoint = "tmp/server"
+  full_bin = "bash -c 'export $(grep -v \"^#\" .env | xargs) && tmp/server'"
+  include_ext = ["go"]
+  exclude_dir = ["frontend", "tmp", "vendor", "migrations"]
+  exclude_regex = ["_test.go"]
+  exclude_unchanged = true
+  follow_symlink = false
+  log = "air.log"
+
+[log]
+  time = true
+
+[color]
+  main = "magenta"
+  watcher = "cyan"
+  build = "yellow"
+  runner = "green"
+
+[misc]
+  clean_on_exit = true

@@ -1,4 +1,4 @@
-.PHONY: build run clean container container-run
+.PHONY: build run dev install-air clean container container-run
 
 build: frontend/dist
 	CGO_ENABLED=0 go build -o server ./cmd/server
@@ -8,6 +8,12 @@ frontend/dist:
 
 run: build
 	export $$(grep -v '^#' .env | xargs) && ./server
+
+dev:
+	PATH="$$(go env GOPATH)/bin:$$PATH" air
+
+install-air:
+	go install github.com/air-verse/air@latest
 
 clean:
 	rm -f server
