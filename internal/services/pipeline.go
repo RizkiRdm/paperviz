@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"paperviz/external"
+	"paperviz/internal/external"
 )
 
 // PipelineInput is everything the pipeline needs to process one document.

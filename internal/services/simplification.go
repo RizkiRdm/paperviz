@@ -9,7 +9,7 @@ import (
 	"context"
 	"fmt"
 
-	"paperviz/external"
+	"paperviz/internal/external"
 )
 
 // simplifiedPrompt and eli5Prompt are the two reading-level prompt templates

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"paperviz/external"
+	"paperviz/internal/external"
 )
 
 // claimExtractionPrompt asks Gemini to list factual claims (numbers, named

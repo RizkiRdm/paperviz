@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"net/http"
 	"time"
 )
@@ -14,7 +16,7 @@ import (
 const geminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent"
 
 // geminiCallTimeout is the MAX_LIMIT per Gemini call (ARCHITECTURE.md Section 4).
-const geminiCallTimeout = 60 * time.Second
+const geminiCallTimeout = 120 * time.Second
 
 // GeminiClient is a direct HTTP client for the Gemini API. No SDK, no
 // gateway — per ARCHITECTURE.md Context Lock and AGENTS.md Quick Rules.
@@ -63,13 +65,17 @@ type geminiResponse struct {
 // If asJSON is true, the model is instructed to return only valid JSON
 // (used by claim-extraction and chart-data-extraction prompts).
 //
-// Retries once on failure per ARCHITECTURE.md Section 4 Error Handling
-// Policy. Each attempt is bounded by geminiCallTimeout.
+// Retries up to maxRetries times with exponential backoff for transient
+// failures (503, 429, timeout). Client errors (400/401/403) return immediately.
+const maxRetries = 4
+
 func (c *GeminiClient) Generate(ctx context.Context, prompt string, asJSON bool) (string, error) {
 	var lastErr error
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		attemptCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 		start := time.Now()
-		text, err := c.generateOnce(ctx, prompt, asJSON)
+		text, err := c.generateOnce(attemptCtx, prompt, asJSON)
+		cancel()
 		duration := time.Since(start).Milliseconds()
 
 		slog.Info("gemini call",
@@ -83,9 +89,38 @@ func (c *GeminiClient) Generate(ctx context.Context, prompt string, asJSON bool)
 		if err == nil {
 			return text, nil
 		}
-		lastErr = err
+
+		if errors.Is(err, context.DeadlineExceeded) {
+			slog.Error("Gemini call timeout (client-side, not rate limit)",
+				"stage", "gemini_generate", "attempt", attempt+1)
+			lastErr = fmt.Errorf("gemini client timeout: %w", err)
+		} else {
+			lastErr = err
+		}
+
+		// Non-retryable errors (4xx client errors, parse failures) → give up.
+		if !isRetryable(lastErr) {
+			return "", lastErr
+		}
+
+		if attempt < maxRetries-1 {
+			backoff := time.Duration(2<<attempt) * time.Second // 2s, 4s, 8s
+			slog.Info("gemini retry backoff", "attempt", attempt+1, "wait_s", int(backoff.Seconds()))
+			time.Sleep(backoff)
+		}
 	}
-	return "", fmt.Errorf("gemini generate failed after retry: %w", lastErr)
+	return "", fmt.Errorf("gemini generate failed after %d attempts: %w", maxRetries, lastErr)
+}
+
+// isRetryable reports whether a Gemini error is worth retrying.
+// 503 (server overload), 429 (rate limit), and timeouts are retryable.
+// 4xx client errors (400, 401, 403) are not — retrying won't help.
+func isRetryable(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "status 503") || strings.Contains(errStr, "429")
 }
 
 func (c *GeminiClient) generateOnce(ctx context.Context, prompt string, asJSON bool) (string, error) {
@@ -121,6 +156,10 @@ func (c *GeminiClient) generateOnce(ctx context.Context, prompt string, asJSON b
 		return "", fmt.Errorf("read gemini response: %w", err)
 	}
 
+	if resp.StatusCode == http.StatusTooManyRequests {
+		slog.Error("Gemini rate limited by server", "stage", "gemini_generate")
+		return "", fmt.Errorf("gemini rate limited (429): status=%d", resp.StatusCode)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("gemini returned status %d", resp.StatusCode)
 	}

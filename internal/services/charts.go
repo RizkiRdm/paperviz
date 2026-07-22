@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"paperviz/external"
+	"paperviz/internal/external"
 )
 
 // Chart source-method values. Mirrors repository's CHECK-constrained enum

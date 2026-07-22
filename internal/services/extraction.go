@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"paperviz/external"
+	"paperviz/internal/external"
 )
 
 // ExtractFromPDF extracts body text and candidate chart images from PDF

@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"paperviz/external"
+	"paperviz/internal/external"
 )
 
 // NewRouter builds the full chi router: the two unversioned API endpoints

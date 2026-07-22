@@ -12,10 +12,10 @@ import (
 	"net/http"
 	"os"
 
-	"paperviz/external"
-	"paperviz/handlers"
-	"paperviz/repository"
-	"paperviz/services"
+	"paperviz/internal/external"
+	"paperviz/internal/handlers"
+	"paperviz/internal/repository"
+	"paperviz/internal/services"
 )
 
 func main() {

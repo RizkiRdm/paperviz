@@ -20,9 +20,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"paperviz/external"
-	"paperviz/repository"
-	"paperviz/services"
+	"paperviz/internal/external"
+	"paperviz/internal/repository"
+	"paperviz/internal/services"
 )
 
 // maxUploadBytes is the MAX_LIMIT file size from ARCHITECTURE.md Section 4

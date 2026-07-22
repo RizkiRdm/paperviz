@@ -22,7 +22,7 @@ clean:
 container:
 	@echo "Usage: make container IMAGE=paperviz TAG=latest"
 	@echo "       make container IMAGE=paperviz TAG=v1"
-	podman build -t $(if $(IMAGE),$(IMAGE),paperviz):$(if $(TAG),$(TAG),latest) -f Containerfile .
+	podman build -t $(if $(IMAGE),$(IMAGE),paperviz):$(if $(TAG),$(TAG),latest) -f build/Containerfile .
 
 container-run:
 	@test -n "$(PORT)" || PORT=8080; \
