@@ -122,6 +122,8 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 			chartCtx, cancel := context.WithTimeout(ctx, stageTimeout)
 			charts = ReVisualizeCharts(chartCtx, gemini, extracted.Charts, pages)
 			cancel()
+		} else {
+			slog.Error("chart extraction from PDF failed", "stage", "chart", "error", err)
 		}
 		// A chart extraction failure here does not fail the whole document —
 		// per ARCHITECTURE.md Non-goals, chart processing is best-effort;

@@ -21,17 +21,33 @@ const (
 	chartSourceOmitted       = "omitted"
 )
 
-// chartDataExtractionPrompt asks Gemini to find a data table in the raw
-// extracted text and structure it as JSON labels/values. This is the
-// PRIMARY path (ARCHITECTURE.md: "Primary path: extract underlying data
-// points ... re-render as a new, annotated chart"). If no table is found,
-// the model is instructed to return null so the caller can fall back.
-const chartDataExtractionPrompt = `The text below is extracted from one page of an academic paper. If it
-contains a data table (rows/columns of numbers with labels), extract it as
-JSON in this exact shape:
-{"labels": ["label1", "label2", ...], "values": [number1, number2, ...], "title": "short descriptive title"}
+// chartDataExtractionPrompt asks Gemini to determine whether the page text
+// contains data suitable for visualization (numbers, comparisons, trends,
+// percentages, or tables), and if so, to return it as structured JSON with a
+// recommended chart type. This is the PRIMARY path (ARCHITECTURE.md: "Primary
+// path: extract underlying data points ... re-render as a new, annotated
+// chart"). When no chart-worthy data is found the model returns has_chart
+// false, so the caller can fall back to the image-annotation path.
+const chartDataExtractionPrompt = `Based on the content of the following page text from an academic paper,
+determine whether there is any data suitable for visualization as a chart
+(numbers, comparisons, trends, percentages, or experimental results in the
+form of tables/numbers).
 
-If the page text does NOT contain a clear data table, respond with exactly: null
+If there IS suitable data, return ONLY JSON in the following format:
+{
+  "has_chart": true,
+  "chart_type": "bar",
+  "title": "short descriptive title",
+  "labels": ["label1", "label2", ...],
+  "values": [number1, number2, ...]
+}
+
+chart_type must be one of: "bar", "line", "pie", "scatter".
+
+If there is NO data suitable for visualization, return ONLY:
+{"has_chart": false}
+
+Do not return any explanatory text outside of this JSON. Use the specified format exactly.
 
 Page text:
 %s`
@@ -135,6 +151,10 @@ func tryExtractChartData(ctx context.Context, client *external.GeminiClient, tex
 		return "", false
 	}
 
+	// Strip markdown code fences — smaller models sometimes wrap JSON in
+	// ```json … ``` blocks that would cause json.Unmarshal to fail.
+	trimmed = stripJSONFences(trimmed)
+
 	var parsed chartDataJSON
 	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
 		return "", false
@@ -144,6 +164,27 @@ func tryExtractChartData(ctx context.Context, client *external.GeminiClient, tex
 	}
 
 	return trimmed, true
+}
+
+// stripJSONFences removes markdown code fences (```json … ``` or ``` … ```)
+// surrounding a JSON string, which smaller LLMs sometimes add even when
+// instructed not to.
+func stripJSONFences(s string) string {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "```") {
+		return s
+	}
+	// Skip the opening fence line (```json or ```)
+	nl := strings.Index(s, "\n")
+	if nl < 0 {
+		return s
+	}
+	s = s[nl+1:]
+	// Remove closing fence if present
+	if idx := strings.LastIndex(s, "```"); idx >= 0 {
+		s = s[:idx]
+	}
+	return strings.TrimSpace(s)
 }
 
 // annotateImage calls Gemini to write a short plain-language caption for a
