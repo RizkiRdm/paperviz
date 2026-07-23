@@ -104,33 +104,44 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 		}
 	}
 
-	// Stage 3: Chart re-visualization. Only runs for PDF sources — pasted
-	// text has no page images/tables to work with (PRD.md Acceptance
-	// Scenario 2).
+	// Stage 3: Chart re-visualization.
+	//
+	// Primary path: scan the full paper text for chart-worthy data — works
+	// for ALL input types (PDF and pasted text), independent of embedded
+	// images. Most academic PDFs render charts as vector graphics rather
+	// than embedded image streams, so the old image-only path produced
+	// zero results for real papers.
+	//
+	// Supplemental path: for PDFs that DO have embedded chart images,
+	// run per-image data extraction on top of the text scan.
 	var charts []Chart
+	{
+		chartCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+		textCharts := ExtractChartsFromText(chartCtx, gemini, in.OriginalText)
+		cancel()
+		charts = textCharts
+	}
+
+	// Supplemental: image-based extraction (PDFs with embedded chart images).
 	if in.SourceType == "pdf" && len(in.PDFBytes) > 0 {
 		extracted, err := ExtractFromPDF(in.PDFBytes)
 		if err == nil {
 			pages := pageText(extracted.Pages)
 			if pages == nil {
-				// Per-page split failed but body text extraction succeeded
-				// earlier — fall back to whole-document text as page 1's
-				// context so chart prompts still have something to work
-				// with, rather than getting no context at all.
 				pages = pageText{1: extracted.Text}
 			}
 			chartCtx, cancel := context.WithTimeout(ctx, stageTimeout)
-			charts = ReVisualizeCharts(chartCtx, gemini, extracted.Charts, pages)
+			imageCharts := ReVisualizeCharts(chartCtx, gemini, extracted.Charts, pages)
 			cancel()
+			// Offset display order to append after text-scan charts.
+			offset := len(charts)
+			for i := range imageCharts {
+				imageCharts[i].DisplayOrder = offset + i
+			}
+			charts = append(charts, imageCharts...)
 		} else {
 			slog.Error("chart extraction from PDF failed", "stage", "chart", "error", err)
 		}
-		// A chart extraction failure here does not fail the whole document —
-		// per ARCHITECTURE.md Non-goals, chart processing is best-effort;
-		// text simplification is the primary deliverable. Falling through
-		// with charts == nil means the result page shows "No charts
-		// detected" (PRD.md Edge Case), which is an honest outcome, not a
-		// silent data loss.
 	}
 
 	return PipelineOutput{

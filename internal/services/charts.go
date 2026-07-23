@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"paperviz/internal/external"
@@ -51,6 +52,44 @@ Do not return any explanatory text outside of this JSON. Use the specified forma
 
 Page text:
 %s`
+
+// fullTextChartPrompt scans the entire paper text for any data suitable for
+// visualization — tables, numerical comparisons, trends, stats. Unlike the
+// per-page chartDataExtractionPrompt (which fires per extracted image), this
+// prompt runs once on the full text and returns an array of chart objects.
+// This is the PRIMARY path for chart generation, works for ALL input types
+// (PDF and pasted text), not just PDFs with embedded images.
+const fullTextChartPrompt = `Scan the following academic paper text for data suitable for visualization
+as charts. Look for tables, numerical comparisons, trends, percentages,
+statistics, experimental results, or any structured data with labels and
+values.
+
+Return ONLY a JSON array. Each element must be:
+{
+  "chart_type": "bar",
+  "title": "short descriptive title",
+  "labels": ["label1", "label2", ...],
+  "values": [number1, number2, ...]
+}
+
+chart_type must be one of: "bar", "line", "pie", "scatter".
+
+If no chart-worthy data exists, return an empty array [].
+
+Do not return any explanatory text. Use the specified format exactly.
+
+Paper text:
+%s`
+
+// textChartElem is the per-element struct for parsing the JSON array returned
+// by the fullTextChartPrompt. Unexported — only used inside this file for
+// validation before constructing Chart values.
+type textChartElem struct {
+	ChartType string    `json:"chart_type"`
+	Labels    []string  `json:"labels"`
+	Values    []float64 `json:"values"`
+	Title     string    `json:"title"`
+}
 
 // imageAnnotationPrompt asks Gemini to write a plain-language caption for a
 // chart image that couldn't be converted to structured data. This is the
@@ -164,6 +203,56 @@ func tryExtractChartData(ctx context.Context, client *external.GeminiClient, tex
 	}
 
 	return trimmed, true
+}
+
+// ExtractChartsFromText scans the full paper text for chart-worthy data
+// (tables, stats, numerical comparisons) using Gemini and returns a slice
+// of Chart structs. Always runs, independent of PDF image extraction.
+// Returns nil when no chart-worthy data exists or the AI call fails.
+func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, text string) []Chart {
+	prompt := fmt.Sprintf(fullTextChartPrompt, text)
+	raw, err := client.Generate(ctx, prompt, true, 2048)
+	if err != nil {
+		slog.Error("text chart extraction failed", "stage", "chart", "error", err)
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(raw)
+	trimmed = stripJSONFences(trimmed)
+	if trimmed == "" || trimmed == "[]" || trimmed == "null" {
+		return nil
+	}
+
+	var parsed []textChartElem
+	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
+		slog.Error("text chart JSON parse failed", "stage", "chart", "error", err)
+		return nil
+	}
+
+	if len(parsed) == 0 {
+		return nil
+	}
+
+	charts := make([]Chart, 0, len(parsed))
+	for i, elem := range parsed {
+		if len(elem.Labels) == 0 || len(elem.Values) == 0 {
+			continue
+		}
+		dataRaw, err := json.Marshal(elem)
+		if err != nil {
+			continue
+		}
+		charts = append(charts, Chart{
+			SourceMethod: chartSourceDataExtracted,
+			ChartData:    string(dataRaw),
+			DisplayOrder: i,
+		})
+	}
+
+	if len(charts) == 0 {
+		return nil
+	}
+	return charts
 }
 
 // stripJSONFences removes markdown code fences (```json … ``` or ``` … ```)
