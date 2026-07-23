@@ -79,7 +79,7 @@ type geminiResponse struct {
 // Retries up to maxRetries times with exponential backoff for transient
 // failures (503, 429, timeout, connection reset). Client errors (400/401/403)
 // return immediately.
-const maxRetries = 4
+const maxRetries = 10
 
 func (c *GeminiClient) Generate(ctx context.Context, prompt string, asJSON bool, maxTokens int) (string, error) {
 	var lastErr error
@@ -116,7 +116,10 @@ func (c *GeminiClient) Generate(ctx context.Context, prompt string, asJSON bool,
 		}
 
 		if attempt < maxRetries-1 {
-			backoff := time.Duration(2<<attempt) * time.Second // 2s, 4s, 8s
+			backoff := time.Duration(2<<attempt) * time.Second // 2s, 4s, 8s…
+			if backoff > 32*time.Second {
+				backoff = 32 * time.Second
+			}
 			slog.Info("gemini retry backoff", "attempt", attempt+1, "wait_s", int(backoff.Seconds()))
 			time.Sleep(backoff)
 		}

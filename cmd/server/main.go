@@ -8,6 +8,7 @@
 package main
 
 import (
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,10 +20,19 @@ import (
 )
 
 func main() {
-	// Structured JSON logging to stdout, per ARCHITECTURE.md Section 4
-	// Logging Policy. Using this as the default logger (not just for one
-	// package) so every log line across the app has consistent shape.
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+	logFile := os.Getenv("LOG_FILE")
+	if logFile == "" {
+		logFile = "paperviz.log.jsonl"
+	}
+
+	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		slog.Error("failed to open log file", "error", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
+	slog.SetDefault(slog.New(external.NewJSONLHandler(io.MultiWriter(os.Stdout, f))))
 
 	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
 	if geminiAPIKey == "" {

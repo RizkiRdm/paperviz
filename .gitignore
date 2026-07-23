@@ -22,6 +22,9 @@ frontend/dist/
 tmp/
 air.log
 
+# JSONL log files (runtime data, not source)
+*.jsonl
+
 # OS/editor noise
 .DS_Store
 *.swp

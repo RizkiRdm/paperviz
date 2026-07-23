@@ -76,10 +76,13 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	}
 
 	// Stage 2: Verify. Runs BEFORE chart processing (ARCHITECTURE.md
-	// Section 6 sequence diagram) — a document that fails claim-diff never
-	// reaches the chart pipeline, since it won't be published as complete
-	// regardless of chart quality.
-	verifyCtx, cancel := context.WithTimeout(ctx, stageTimeout)
+		// Section 6 sequence diagram) — a document that fails claim-diff never
+		// reaches the chart pipeline, since it won't be published as complete
+		// regardless of chart quality.
+		//
+		// Stagger between Gemini-heavy stages so free-tier rate limits recover.
+		time.Sleep(3 * time.Second)
+		verifyCtx, cancel := context.WithTimeout(ctx, stageTimeout)
 	verifyResult, err := DiffClaims(verifyCtx, gemini, in.OriginalText, simplifiedText)
 	cancel()
 	if err != nil {
@@ -114,6 +117,7 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	//
 	// Supplemental path: for PDFs that DO have embedded chart images,
 	// run per-image data extraction on top of the text scan.
+	time.Sleep(3 * time.Second)
 	var charts []Chart
 	if in.OriginalText != "" {
 		chartCtx, cancel := context.WithTimeout(ctx, stageTimeout)
