@@ -26,13 +26,21 @@ type GeminiClient struct {
 	httpClient *http.Client
 }
 
-// NewGeminiClient constructs a client. apiKey MUST come from an environment
-// variable at the call site — never hardcoded (ARCHITECTURE.md Section 5).
+// NewGeminiClient constructs a client with explicit transport timeouts so
+// long-running generations don't hang on stale TCP connections. apiKey MUST
+// come from an environment variable — never hardcoded (ARCHITECTURE.md §5).
 func NewGeminiClient(apiKey, model string) *GeminiClient {
 	return &GeminiClient{
-		apiKey:     apiKey,
-		model:      model,
-		httpClient: &http.Client{Timeout: geminiCallTimeout},
+		apiKey: apiKey,
+		model:  model,
+		httpClient: &http.Client{
+			Timeout:   geminiCallTimeout, // > per-attempt context (90s)
+			Transport: &http.Transport{
+				IdleConnTimeout:       90 * time.Second,
+				ResponseHeaderTimeout: 100 * time.Second,
+				DisableKeepAlives:     false,
+			},
+		},
 	}
 }
 
@@ -51,6 +59,7 @@ type geminiPart struct {
 
 type generationConfig struct {
 	ResponseMIMEType string `json:"responseMimeType,omitempty"`
+	MaxOutputTokens  *int   `json:"maxOutputTokens,omitempty"`
 }
 
 type geminiResponse struct {
@@ -64,17 +73,20 @@ type geminiResponse struct {
 // Generate sends a single prompt and returns the model's text response.
 // If asJSON is true, the model is instructed to return only valid JSON
 // (used by claim-extraction and chart-data-extraction prompts).
+// If maxTokens > 0, the response is capped at that many output tokens
+// (used by ELI5 mode to prevent connection resets on long generations).
 //
 // Retries up to maxRetries times with exponential backoff for transient
-// failures (503, 429, timeout). Client errors (400/401/403) return immediately.
+// failures (503, 429, timeout, connection reset). Client errors (400/401/403)
+// return immediately.
 const maxRetries = 4
 
-func (c *GeminiClient) Generate(ctx context.Context, prompt string, asJSON bool) (string, error) {
+func (c *GeminiClient) Generate(ctx context.Context, prompt string, asJSON bool, maxTokens int) (string, error) {
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		attemptCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 		start := time.Now()
-		text, err := c.generateOnce(attemptCtx, prompt, asJSON)
+		text, err := c.generateOnce(attemptCtx, prompt, asJSON, maxTokens)
 		cancel()
 		duration := time.Since(start).Milliseconds()
 
@@ -113,22 +125,41 @@ func (c *GeminiClient) Generate(ctx context.Context, prompt string, asJSON bool)
 }
 
 // isRetryable reports whether a Gemini error is worth retrying.
-// 503 (server overload), 429 (rate limit), and timeouts are retryable.
+// 503 (server overload), 429 (rate limit), timeouts, and transient network
+// errors (connection reset, refused, DNS failures) are retryable.
 // 4xx client errors (400, 401, 403) are not — retrying won't help.
 func isRetryable(err error) bool {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
 	errStr := err.Error()
-	return strings.Contains(errStr, "status 503") || strings.Contains(errStr, "429")
+	if strings.Contains(errStr, "status 503") || strings.Contains(errStr, "429") {
+		return true
+	}
+	// Transient network-level errors — typically "connection reset by peer",
+	// "connection refused", or "no such host". These happen when long
+	// generations trip idle timeouts on intermediate proxies.
+	if strings.Contains(errStr, "connection reset") ||
+		strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "no such host") {
+		return true
+	}
+	return false
 }
 
-func (c *GeminiClient) generateOnce(ctx context.Context, prompt string, asJSON bool) (string, error) {
+func (c *GeminiClient) generateOnce(ctx context.Context, prompt string, asJSON bool, maxTokens int) (string, error) {
 	reqBody := geminiRequest{
 		Contents: []geminiContent{{Parts: []geminiPart{{Text: prompt}}}},
 	}
-	if asJSON {
-		reqBody.GenerationConfig = &generationConfig{ResponseMIMEType: "application/json"}
+	if asJSON || maxTokens > 0 {
+		cfg := &generationConfig{}
+		if asJSON {
+			cfg.ResponseMIMEType = "application/json"
+		}
+		if maxTokens > 0 {
+			cfg.MaxOutputTokens = &maxTokens
+		}
+		reqBody.GenerationConfig = cfg
 	}
 
 	payload, err := json.Marshal(reqBody)

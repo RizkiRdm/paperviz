@@ -141,7 +141,7 @@ func reVisualizeOne(ctx context.Context, client *external.GeminiClient, ec Extra
 // charts.chart_data (ARCHITECTURE.md Section 3).
 func tryExtractChartData(ctx context.Context, client *external.GeminiClient, text string) (dataJSON string, ok bool) {
 	prompt := fmt.Sprintf(chartDataExtractionPrompt, text)
-	raw, err := client.Generate(ctx, prompt, true)
+	raw, err := client.Generate(ctx, prompt, true, 0)
 	if err != nil {
 		return "", false
 	}
@@ -194,5 +194,5 @@ func annotateImage(ctx context.Context, client *external.GeminiClient, text stri
 		return "", fmt.Errorf("no page context available for annotation")
 	}
 	prompt := fmt.Sprintf(imageAnnotationPrompt, text)
-	return client.Generate(ctx, prompt, false)
+	return client.Generate(ctx, prompt, false, 0)
 }

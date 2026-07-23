@@ -73,8 +73,15 @@ func Simplify(ctx context.Context, client *external.GeminiClient, text, level st
 		return "", ErrInvalidReadingLevel
 	}
 
+	// ELI5 outputs are naturally longer (analogies, child-friendly rewrites)
+	// and can exceed 60s of generation time, causing TCP connection resets.
+	// Cap output tokens so generation completes within the per-attempt timeout.
+	maxTokens := 0
+	if level == "eli5" {
+		maxTokens = 2048
+	}
 	prompt := fmt.Sprintf(template, text)
-	result, err := client.Generate(ctx, prompt, false)
+	result, err := client.Generate(ctx, prompt, false, maxTokens)
 	if err != nil {
 		return "", fmt.Errorf("simplify text: %w", err)
 	}

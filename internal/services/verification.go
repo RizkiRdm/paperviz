@@ -56,7 +56,7 @@ type claimComparisonResult struct {
 // a passage. Shared by both sides of DiffClaims below.
 func extractClaims(ctx context.Context, client *external.GeminiClient, text string) ([]string, error) {
 	prompt := fmt.Sprintf(claimExtractionPrompt, text)
-	raw, err := client.Generate(ctx, prompt, true)
+	raw, err := client.Generate(ctx, prompt, true, 0)
 	if err != nil {
 		return nil, fmt.Errorf("extract claims: %w", err)
 	}
@@ -100,7 +100,7 @@ func DiffClaims(ctx context.Context, client *external.GeminiClient, originalText
 	}
 
 	prompt := fmt.Sprintf(claimComparisonPrompt, originalJSON, simplifiedJSON)
-	raw, err := client.Generate(ctx, prompt, true)
+	raw, err := client.Generate(ctx, prompt, true, 0)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("compare claims: %w", err)
 	}
