@@ -53,16 +53,20 @@ Do not return any explanatory text outside of this JSON. Use the specified forma
 Page text:
 %s`
 
-// fullTextChartPrompt scans the entire paper text for any data suitable for
-// visualization — tables, numerical comparisons, trends, stats. Unlike the
-// per-page chartDataExtractionPrompt (which fires per extracted image), this
-// prompt runs once on the full text and returns an array of chart objects.
-// This is the PRIMARY path for chart generation, works for ALL input types
-// (PDF and pasted text), not just PDFs with embedded images.
-const fullTextChartPrompt = `Scan the following academic paper text for data suitable for visualization
-as charts. Look for tables, numerical comparisons, trends, percentages,
-statistics, experimental results, or any structured data with labels and
-values.
+// fullTextChartPrompt scans the entire paper text for numerical data —
+// tables, percentages, statistics, comparisons, scores, counts — even when
+// embedded in prose (not just in tabular format). The prompt uses explicit
+// prose-to-chart examples so the model extracts data from sentences like
+// "accuracy improved from 72% to 89%" rather than skipping them.
+const fullTextChartPrompt = `You are a data extraction engine. Scan the following academic paper text
+and extract EVERY numerical data point, comparison, percentage, and
+statistical result. Format each dataset as a chart object.
+
+Examples of prose data to extract:
+- "accuracy improved from 72%% to 89%%" -> labels=["Before","After"], values=[72,89]
+- "Model A scored 85, Model B scored 92" -> labels=["A","B"], values=[85,92]
+- "25%% chose X, 75%% chose Y" -> labels=["X","Y"], values=[25,75]
+- Tables with rows and columns -> labels are row/column headers, values are numbers
 
 Return ONLY a JSON array. Each element must be:
 {
@@ -74,9 +78,7 @@ Return ONLY a JSON array. Each element must be:
 
 chart_type must be one of: "bar", "line", "pie", "scatter".
 
-If no chart-worthy data exists, return an empty array [].
-
-Do not return any explanatory text. Use the specified format exactly.
+If no numerical data exists at all, return [].
 
 Paper text:
 %s`
@@ -220,6 +222,10 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 	trimmed := strings.TrimSpace(raw)
 	trimmed = stripJSONFences(trimmed)
 	if trimmed == "" || trimmed == "[]" || trimmed == "null" {
+		slog.Info("text chart extraction: no chart-worthy data found by model",
+			"stage", "chart",
+			"source", "textscan",
+		)
 		return nil
 	}
 
@@ -230,6 +236,10 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 	}
 
 	if len(parsed) == 0 {
+		slog.Info("text chart extraction: empty array after parse",
+			"stage", "chart",
+			"source", "textscan",
+		)
 		return nil
 	}
 
@@ -252,6 +262,12 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 	if len(charts) == 0 {
 		return nil
 	}
+	slog.Info("text chart extraction complete",
+		"stage", "chart",
+		"charts_count", len(charts),
+		"gemini_returned", len(parsed),
+		"source", "textscan",
+	)
 	return charts
 }
 

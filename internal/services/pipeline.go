@@ -115,7 +115,7 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	// Supplemental path: for PDFs that DO have embedded chart images,
 	// run per-image data extraction on top of the text scan.
 	var charts []Chart
-	{
+	if in.OriginalText != "" {
 		chartCtx, cancel := context.WithTimeout(ctx, stageTimeout)
 		textCharts := ExtractChartsFromText(chartCtx, gemini, in.OriginalText)
 		cancel()
