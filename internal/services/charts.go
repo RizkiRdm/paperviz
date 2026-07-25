@@ -87,7 +87,9 @@ Page text:
 // tables, percentages, statistics, comparisons, scores, counts — even when
 // embedded in prose (not just in tabular format). The prompt uses explicit
 // prose-to-chart examples so the model extracts data from sentences like
-// "accuracy improved from 72% to 89%" rather than skipping them.
+// "accuracy improved from 72% to 89%" rather than skipping them. Includes
+// academic-statistics patterns (F-tests, means, p-values, regression
+// coefficients) that real papers use.
 const fullTextChartPrompt = `You are a data extraction engine. Scan the following academic paper text
 and extract EVERY numerical data point, comparison, percentage, and
 statistical result. Format each dataset as a chart object.
@@ -96,7 +98,12 @@ Examples of prose data to extract:
 - "accuracy improved from 72%% to 89%%" -> labels=["Before","After"], values=[72,89]
 - "Model A scored 85, Model B scored 92" -> labels=["A","B"], values=[85,92]
 - "25%% chose X, 75%% chose Y" -> labels=["X","Y"], values=[25,75]
+- "F(1,24) = 4.82, p < 0.05" -> labels=["F-value"], values=[4.82]
+- "M = 3.42, SD = 0.51 for control; M = 4.18, SD = 0.47 for treatment" -> labels=["Control","Treatment"], values=[3.42,4.18]
+- "beta = -0.23, SE = 0.08, p = 0.003" -> labels=["beta"], values=[-0.23]
+- "Group A: 85%%, Group B: 92%%, Group C: 78%%" -> labels=["A","B","C"], values=[85,92,78]
 - Tables with rows and columns -> labels are row/column headers, values are numbers
+- Any comparison of two or more numbers, even if scattered across sentences
 
 Return ONLY a JSON array. Each element must be:
 {
@@ -256,20 +263,22 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 
 	trimmed := strings.TrimSpace(raw)
 	trimmed = stripJSONFences(trimmed)
+	snippet := trimmed
+	if len(snippet) > 300 {
+		snippet = snippet[:300]
+	}
+
 	if trimmed == "" || trimmed == "[]" || trimmed == "null" {
 		slog.Info("text chart extraction: no chart-worthy data found by model",
 			"stage", "chart",
 			"source", "textscan",
+			"response_snippet", snippet,
 		)
 		return nil
 	}
 
 	var parsed []textChartElem
 	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
-		snippet := trimmed
-		if len(snippet) > 300 {
-			snippet = snippet[:300]
-		}
 		slog.Error("text chart JSON parse failed",
 			"stage", "chart",
 			"error", err,
@@ -282,6 +291,7 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 		slog.Info("text chart extraction: empty array after parse",
 			"stage", "chart",
 			"source", "textscan",
+			"response_snippet", snippet,
 		)
 		return nil
 	}

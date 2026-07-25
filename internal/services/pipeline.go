@@ -124,6 +124,10 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 		textCharts := ExtractChartsFromText(chartCtx, gemini, in.OriginalText)
 		cancel()
 		charts = textCharts
+		slog.Info("pipeline: text-scan chart result",
+			"stage", "chart",
+			"charts_count", len(charts),
+		)
 	}
 
 	// Supplemental: image-based extraction (PDFs with embedded chart images).
