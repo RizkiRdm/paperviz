@@ -5,10 +5,40 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 
 	"paperviz/internal/external"
 )
+
+// chartValues is a lenient JSON unmarshaler for number arrays. Gemini
+// flash-lite sometimes returns `"values":"72, 89"` (string) instead of
+// `"values":[72, 89]` (number array). This type handles both forms:
+// standard []float64, or comma/space-separated numbers with optional %.
+type chartValues []float64
+
+func (v *chartValues) UnmarshalJSON(b []byte) error {
+	var nums []float64
+	if err := json.Unmarshal(b, &nums); err == nil {
+		*v = nums
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	cleaned := strings.NewReplacer("%", "", ",", " ").Replace(s)
+	fields := strings.Fields(cleaned)
+	for _, f := range fields {
+		n, err := strconv.ParseFloat(f, 64)
+		if err != nil {
+			return fmt.Errorf("chartValues: cannot parse %q: %w", f, err)
+		}
+		nums = append(nums, n)
+	}
+	*v = nums
+	return nil
+}
 
 // Chart source-method values. Mirrors repository's CHECK-constrained enum
 // (see migrations/001_init.sql) but is redeclared here rather than imported,
@@ -87,10 +117,10 @@ Paper text:
 // by the fullTextChartPrompt. Unexported — only used inside this file for
 // validation before constructing Chart values.
 type textChartElem struct {
-	ChartType string    `json:"chart_type"`
-	Labels    []string  `json:"labels"`
-	Values    []float64 `json:"values"`
-	Title     string    `json:"title"`
+	ChartType string     `json:"chart_type"`
+	Labels    []string   `json:"labels"`
+	Values    chartValues `json:"values"`
+	Title     string     `json:"title"`
 }
 
 // imageAnnotationPrompt asks Gemini to write a plain-language caption for a
@@ -111,9 +141,9 @@ Page text:
 
 // chartDataJSON mirrors the JSON shape chartDataExtractionPrompt asks for.
 type chartDataJSON struct {
-	Labels []string  `json:"labels"`
-	Values []float64 `json:"values"`
-	Title  string    `json:"title"`
+	Labels []string    `json:"labels"`
+	Values chartValues `json:"values"`
+	Title  string      `json:"title"`
 }
 
 // pageText groups extracted body text by page number, used to give the
@@ -198,6 +228,11 @@ func tryExtractChartData(ctx context.Context, client *external.GeminiClient, tex
 
 	var parsed chartDataJSON
 	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
+		slog.Error("per-chart JSON parse failed",
+			"stage", "chart",
+			"error", err,
+			"page_text_bytes", len(text),
+		)
 		return "", false
 	}
 	if len(parsed.Labels) == 0 || len(parsed.Values) == 0 {
@@ -231,7 +266,15 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 
 	var parsed []textChartElem
 	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
-		slog.Error("text chart JSON parse failed", "stage", "chart", "error", err)
+		snippet := trimmed
+		if len(snippet) > 300 {
+			snippet = snippet[:300]
+		}
+		slog.Error("text chart JSON parse failed",
+			"stage", "chart",
+			"error", err,
+			"response_snippet", snippet,
+		)
 		return nil
 	}
 
