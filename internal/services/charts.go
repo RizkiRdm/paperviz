@@ -226,15 +226,17 @@ func tryExtractChartData(ctx context.Context, client *external.GeminiClient, tex
 	// ```json … ``` blocks that would cause json.Unmarshal to fail.
 	trimmed = stripJSONFences(trimmed)
 
-	// Discard trailing text after the outermost '}'.
-	if strings.HasPrefix(trimmed, "{") {
-		if idx := strings.LastIndex(trimmed, "}"); idx > 0 {
-			trimmed = trimmed[:idx+1]
-		}
-	}
-
 	var parsed chartDataJSON
 	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
+		if strings.HasPrefix(trimmed, "{") {
+			if idx := strings.LastIndex(trimmed, "}"); idx > 0 {
+				candidate := trimmed[:idx+1]
+				if err := json.Unmarshal([]byte(candidate), &parsed); err == nil {
+					trimmed = candidate
+					goto parsedOK
+				}
+			}
+		}
 		slog.Error("per-chart JSON parse failed",
 			"stage", "chart",
 			"error", err,
@@ -242,6 +244,8 @@ func tryExtractChartData(ctx context.Context, client *external.GeminiClient, tex
 		)
 		return "", false
 	}
+
+parsedOK:
 	if len(parsed.Labels) == 0 || len(parsed.Values) == 0 {
 		return "", false
 	}
@@ -255,7 +259,7 @@ func tryExtractChartData(ctx context.Context, client *external.GeminiClient, tex
 // Returns nil when no chart-worthy data exists or the AI call fails.
 func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, text string) []Chart {
 	prompt := fmt.Sprintf(fullTextChartPrompt, text)
-	raw, err := client.Generate(ctx, prompt, true, 2048)
+	raw, err := client.Generate(ctx, prompt, true, 0)
 	if err != nil {
 		slog.Error("text chart extraction failed", "stage", "chart", "error", err)
 		return nil
@@ -271,20 +275,22 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 		return nil
 	}
 
-	// Some models append explanatory text after the JSON array despite the
-	// "return ONLY JSON" instruction. Truncate at the outermost ']' to
-	// discard trailing prose before parsing.
-	if strings.HasPrefix(trimmed, "[") {
-		if idx := strings.LastIndex(trimmed, "]"); idx > 0 {
-			trimmed = trimmed[:idx+1]
-		}
-	}
-
 	var parsed []textChartElem
 	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
+		// Parse failed — try to salvage by truncating trailing text after
+		// the outermost ']'. Some models append explanatory prose despite
+		// the "return ONLY JSON" instruction.
+		if strings.HasPrefix(trimmed, "[") {
+			if idx := strings.LastIndex(trimmed, "]"); idx > 0 {
+				trimmed = trimmed[:idx+1]
+				if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
+					goto parsedOK
+				}
+			}
+		}
 		snippet := trimmed
-		if len(snippet) > 1000 {
-			snippet = snippet[:1000]
+		if len(snippet) > 2000 {
+			snippet = snippet[:2000]
 		}
 		slog.Error("text chart JSON parse failed",
 			"stage", "chart",
@@ -293,6 +299,8 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 		)
 		return nil
 	}
+
+parsedOK:
 
 	if len(parsed) == 0 {
 		slog.Info("text chart extraction: empty array after parse",
