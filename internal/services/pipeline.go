@@ -39,13 +39,6 @@ const (
 	pipelineStatusVerificationFailed = "verification_failed"
 )
 
-// stageTimeout bounds each pipeline stage's own work, layered on top of the
-// per-call timeouts already enforced inside the Gemini and PDF clients
-// (external/gemini.go, external/pdf.go). This is a second, coarser safety
-// net — if a stage's internal timeout logic has a bug, the pipeline still
-// won't hang the whole request forever.
-const stageTimeout = 45 * time.Second
-
 // RunPipeline is the single sequential extract -> simplify -> verify ->
 // chart flow required by ARCHITECTURE.md Section 5 ("Pipeline Service MUST
 // orchestrate the full flow ... as an explicit sequential function"). It
@@ -62,9 +55,7 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	// to reject the upload before any Gemini call is made at all, per
 	// ARCHITECTURE.md Failure Scenario 1. By the time we're here, we already
 	// have OriginalText.)
-	simplifyCtx, cancel := context.WithTimeout(ctx, stageTimeout)
-	simplifiedText, err := Simplify(simplifyCtx, gemini, in.OriginalText, in.ReadingLevel)
-	cancel()
+	simplifiedText, err := Simplify(ctx, gemini, in.OriginalText, in.ReadingLevel)
 	if err != nil {
 		// Failure Scenario 2: Gemini call times out after retry -> status
 		// "failed", error_message populated, nothing published.
@@ -82,9 +73,7 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 		//
 		// Stagger between Gemini-heavy stages so free-tier rate limits recover.
 		time.Sleep(3 * time.Second)
-		verifyCtx, cancel := context.WithTimeout(ctx, stageTimeout)
-	verifyResult, err := DiffClaims(verifyCtx, gemini, in.OriginalText, simplifiedText)
-	cancel()
+	verifyResult, err := DiffClaims(ctx, gemini, in.OriginalText, simplifiedText)
 	if err != nil {
 		slog.Error("pipeline stage failed", "stage", "verify", "error", err)
 		return PipelineOutput{
@@ -120,9 +109,7 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	time.Sleep(3 * time.Second)
 	var charts []Chart
 	if in.OriginalText != "" {
-		chartCtx, cancel := context.WithTimeout(ctx, stageTimeout)
-		textCharts := ExtractChartsFromText(chartCtx, gemini, in.OriginalText)
-		cancel()
+		textCharts := ExtractChartsFromText(ctx, gemini, in.OriginalText)
 		charts = textCharts
 		slog.Info("pipeline: text-scan chart result",
 			"stage", "chart",
@@ -138,9 +125,7 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 			if pages == nil {
 				pages = pageText{1: extracted.Text}
 			}
-			chartCtx, cancel := context.WithTimeout(ctx, stageTimeout)
-			imageCharts := ReVisualizeCharts(chartCtx, gemini, extracted.Charts, pages)
-			cancel()
+			imageCharts := ReVisualizeCharts(ctx, gemini, extracted.Charts, pages)
 			// Offset display order to append after text-scan charts.
 			offset := len(charts)
 			for i := range imageCharts {

@@ -84,7 +84,7 @@ const maxRetries = 10
 func (c *GeminiClient) Generate(ctx context.Context, prompt string, asJSON bool, maxTokens int) (string, error) {
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		attemptCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		attemptCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 		start := time.Now()
 		text, err := c.generateOnce(attemptCtx, prompt, asJSON, maxTokens)
 		cancel()

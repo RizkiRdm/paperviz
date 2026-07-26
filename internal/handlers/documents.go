@@ -176,7 +176,7 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // backgroundPipelineTimeout bounds the whole background run (all pipeline
 // stages combined), independent of the request that triggered it.
-const backgroundPipelineTimeout = 5 * time.Minute
+const backgroundPipelineTimeout = 20 * time.Minute
 
 // runPipelineAndSave runs the full pipeline and persists the result. Errors
 // are logged, not returned — there is no HTTP request left to answer by the
