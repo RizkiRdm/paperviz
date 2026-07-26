@@ -87,9 +87,7 @@ Page text:
 // tables, percentages, statistics, comparisons, scores, counts — even when
 // embedded in prose (not just in tabular format). The prompt uses explicit
 // prose-to-chart examples so the model extracts data from sentences like
-// "accuracy improved from 72% to 89%" rather than skipping them. Includes
-// academic-statistics patterns (F-tests, means, p-values, regression
-// coefficients) that real papers use.
+// "accuracy improved from 72% to 89%" rather than skipping them.
 const fullTextChartPrompt = `You are a data extraction engine. Scan the following academic paper text
 and extract EVERY numerical data point, comparison, percentage, and
 statistical result. Format each dataset as a chart object.
@@ -98,12 +96,7 @@ Examples of prose data to extract:
 - "accuracy improved from 72%% to 89%%" -> labels=["Before","After"], values=[72,89]
 - "Model A scored 85, Model B scored 92" -> labels=["A","B"], values=[85,92]
 - "25%% chose X, 75%% chose Y" -> labels=["X","Y"], values=[25,75]
-- "F(1,24) = 4.82, p < 0.05" -> labels=["F-value"], values=[4.82]
-- "M = 3.42, SD = 0.51 for control; M = 4.18, SD = 0.47 for treatment" -> labels=["Control","Treatment"], values=[3.42,4.18]
-- "beta = -0.23, SE = 0.08, p = 0.003" -> labels=["beta"], values=[-0.23]
-- "Group A: 85%%, Group B: 92%%, Group C: 78%%" -> labels=["A","B","C"], values=[85,92,78]
 - Tables with rows and columns -> labels are row/column headers, values are numbers
-- Any comparison of two or more numbers, even if scattered across sentences
 
 Return ONLY a JSON array. Each element must be:
 {
@@ -124,10 +117,10 @@ Paper text:
 // by the fullTextChartPrompt. Unexported — only used inside this file for
 // validation before constructing Chart values.
 type textChartElem struct {
-	ChartType string     `json:"chart_type"`
-	Labels    []string   `json:"labels"`
+	ChartType string      `json:"chart_type"`
+	Labels    []string    `json:"labels"`
 	Values    chartValues `json:"values"`
-	Title     string     `json:"title"`
+	Title     string      `json:"title"`
 }
 
 // imageAnnotationPrompt asks Gemini to write a plain-language caption for a
@@ -233,6 +226,13 @@ func tryExtractChartData(ctx context.Context, client *external.GeminiClient, tex
 	// ```json … ``` blocks that would cause json.Unmarshal to fail.
 	trimmed = stripJSONFences(trimmed)
 
+	// Discard trailing text after the outermost '}'.
+	if strings.HasPrefix(trimmed, "{") {
+		if idx := strings.LastIndex(trimmed, "}"); idx > 0 {
+			trimmed = trimmed[:idx+1]
+		}
+	}
+
 	var parsed chartDataJSON
 	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
 		slog.Error("per-chart JSON parse failed",
@@ -263,22 +263,29 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 
 	trimmed := strings.TrimSpace(raw)
 	trimmed = stripJSONFences(trimmed)
-	snippet := trimmed
-	if len(snippet) > 300 {
-		snippet = snippet[:300]
-	}
-
 	if trimmed == "" || trimmed == "[]" || trimmed == "null" {
 		slog.Info("text chart extraction: no chart-worthy data found by model",
 			"stage", "chart",
 			"source", "textscan",
-			"response_snippet", snippet,
 		)
 		return nil
 	}
 
+	// Some models append explanatory text after the JSON array despite the
+	// "return ONLY JSON" instruction. Truncate at the outermost ']' to
+	// discard trailing prose before parsing.
+	if strings.HasPrefix(trimmed, "[") {
+		if idx := strings.LastIndex(trimmed, "]"); idx > 0 {
+			trimmed = trimmed[:idx+1]
+		}
+	}
+
 	var parsed []textChartElem
 	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
+		snippet := trimmed
+		if len(snippet) > 1000 {
+			snippet = snippet[:1000]
+		}
 		slog.Error("text chart JSON parse failed",
 			"stage", "chart",
 			"error", err,
@@ -291,7 +298,6 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 		slog.Info("text chart extraction: empty array after parse",
 			"stage", "chart",
 			"source", "textscan",
-			"response_snippet", snippet,
 		)
 		return nil
 	}
