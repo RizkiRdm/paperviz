@@ -99,6 +99,35 @@ Anti-abandonment mechanism: each phase has a single-sentence "done means" statem
 
 ---
 
+## Phase 4b — Chart Pipeline Fix (context/timeout bug)
+
+**Done means**: Real paper upload with tables/numbers produces ≥1 chart in GET response. Degraded-flag logged distinct from "no data."
+
+Root cause: `gemini.go:87` uses `context.Background()` in retry loop → caller ctx ignored → pipeline stage timeouts dead letter → retries run on own clock → results race ctx expiry. Secondary: per-stage `stageTimeout` (45s) would kill retries post-fix.
+
+Execution (CHART_FIX.md):
+
+1. Fix `context.Background()` → `ctx` in `gemini.go:87`  → verify: `go build`, `go vet`
+2. Remove 4 `stageTimeout` wraps in `pipeline.go` → verify: `go build`, `go vet`, `grep stageTimeout` empty
+3. Raise `backgroundPipelineTimeout` 5min→20min in `documents.go` → verify: `go build`, `go vet`
+4. STOP → live paper upload test. Check logs for retries, charts in response. Do NOT proceed until verified.
+5. Add `chart_extraction_degraded` flag (7 files: charts.go, pipeline.go, handlers/documents.go, repository/types.go, repository/documents.go, migrations/001_init.sql, frontend/result-page.jsx)
+   - PipelineOutput.ChartExtractionDegraded bool
+   - ExtractChartsFromText returns `([]Chart, bool)`: `nil, true` on error, `nil, false` on legit empty
+   - DB column `chart_extraction_degraded INTEGER NOT NULL DEFAULT 0`
+   - response field `chart_extraction_degraded`
+   - Frontend: distinct msg when degraded + empty charts
+6. Add WAL pragmas in `db.go` after DB reset (same wipe as step 5 column)
+   - `PRAGMA journal_mode = WAL`
+   - `PRAGMA synchronous = NORMAL`
+   - `PRAGMA foreign_keys = ON` (already present)
+   - `PRAGMA busy_timeout = 5000`
+   - Verify mode returns `wal`
+
+**Est. sessions**: 2-4
+
+---
+
 ## Phase 6 — Expiry & Hardening
 
 **Done means**: Documents actually expire after 7 days; app doesn't crash on malformed input.
@@ -125,3 +154,5 @@ Anti-abandonment mechanism: each phase has a single-sentence "done means" statem
 
 - Multi-language source paper support — surfaced during scoping, explicitly out of MVP, no action.
 - Automated test-paper regression suite beyond the 5-paper manual set — worth doing eventually, not blocking MVP validation.
+
+opencode -s ses_070775873ffepQC20pidnJo7XG
