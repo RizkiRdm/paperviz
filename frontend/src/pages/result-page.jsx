@@ -136,6 +136,10 @@ export function ResultPage({ documentId, onBack }) {
               <ChartCard key={chart.id} chart={chart} />
             ))}
           </div>
+        ) : doc.chart_extraction_degraded ? (
+          <p className="mt-4 text-body text-ink-secondary">
+            Chart extraction couldn&apos;t complete for this document. The rest of the content is unaffected.
+          </p>
         ) : (
           <p className="mt-4 text-body text-ink-secondary">No charts detected in this document.</p>
         )}

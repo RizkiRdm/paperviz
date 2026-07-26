@@ -207,14 +207,14 @@ func (h *DocumentHandler) saveResult(documentID string, output services.Pipeline
 
 	if output.Status == repository.StatusFailed {
 		errMsg := output.ErrorMessage
-		if err := docRepo.UpdateStatus(documentID, repository.StatusFailed, nil, &errMsg); err != nil {
+		if err := docRepo.UpdateStatus(documentID, repository.StatusFailed, nil, &errMsg, false); err != nil {
 			return err
 		}
 		return tx.Commit()
 	}
 
 	simplified := output.SimplifiedText
-	if err := docRepo.UpdateStatus(documentID, output.Status, &simplified, nil); err != nil {
+	if err := docRepo.UpdateStatus(documentID, output.Status, &simplified, nil, output.ChartExtractionDegraded); err != nil {
 		return err
 	}
 
@@ -293,13 +293,14 @@ type chartResponse struct {
 // getDocumentResponse matches ARCHITECTURE.md Section E's Get Document
 // contract exactly.
 type getDocumentResponse struct {
-	ID             string          `json:"id"`
-	Status         string          `json:"status"`
-	ReadingLevel   string          `json:"reading_level"`
-	SimplifiedText *string         `json:"simplified_text"`
-	OriginalText   string          `json:"original_text"`
-	Charts         []chartResponse `json:"charts"`
-	ErrorMessage   *string         `json:"error_message"`
+	ID                     string          `json:"id"`
+	Status                 string          `json:"status"`
+	ReadingLevel           string          `json:"reading_level"`
+	SimplifiedText          *string         `json:"simplified_text"`
+	OriginalText            string          `json:"original_text"`
+	Charts                  []chartResponse `json:"charts"`
+	ErrorMessage            *string         `json:"error_message"`
+	ChartExtractionDegraded bool            `json:"chart_extraction_degraded"`
 }
 
 // Get handles GET /api/documents/:id. On every successful lookup it
@@ -352,12 +353,13 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, getDocumentResponse{
-		ID:             doc.ID,
-		Status:         doc.Status,
-		ReadingLevel:   doc.ReadingLevel,
-		SimplifiedText: doc.SimplifiedText,
-		OriginalText:   doc.OriginalText,
-		Charts:         chartResponses,
-		ErrorMessage:   doc.ErrorMessage,
+		ID:                     doc.ID,
+		Status:                 doc.Status,
+		ReadingLevel:           doc.ReadingLevel,
+		SimplifiedText:          doc.SimplifiedText,
+		OriginalText:            doc.OriginalText,
+		Charts:                  chartResponses,
+		ErrorMessage:            doc.ErrorMessage,
+		ChartExtractionDegraded: doc.ChartExtractionDegraded,
 	})
 }

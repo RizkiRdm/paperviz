@@ -257,12 +257,14 @@ parsedOK:
 // (tables, stats, numerical comparisons) using Gemini and returns a slice
 // of Chart structs. Always runs, independent of PDF image extraction.
 // Returns nil when no chart-worthy data exists or the AI call fails.
-func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, text string) []Chart {
+// The second return value is true when extraction itself failed (Gemini
+// error, parse error) vs. legitimately finding nothing.
+func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, text string) ([]Chart, bool) {
 	prompt := fmt.Sprintf(fullTextChartPrompt, text)
 	raw, err := client.Generate(ctx, prompt, true, 0)
 	if err != nil {
 		slog.Error("text chart extraction failed", "stage", "chart", "error", err)
-		return nil
+		return nil, true
 	}
 
 	trimmed := strings.TrimSpace(raw)
@@ -272,7 +274,7 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 			"stage", "chart",
 			"source", "textscan",
 		)
-		return nil
+		return nil, false
 	}
 
 	var parsed []textChartElem
@@ -297,7 +299,7 @@ func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, t
 			"error", err,
 			"response_snippet", snippet,
 		)
-		return nil
+		return nil, true
 	}
 
 parsedOK:
@@ -307,7 +309,7 @@ parsedOK:
 			"stage", "chart",
 			"source", "textscan",
 		)
-		return nil
+		return nil, false
 	}
 
 	charts := make([]Chart, 0, len(parsed))
@@ -327,7 +329,7 @@ parsedOK:
 	}
 
 	if len(charts) == 0 {
-		return nil
+		return nil, false
 	}
 	slog.Info("text chart extraction complete",
 		"stage", "chart",
@@ -335,7 +337,7 @@ parsedOK:
 		"gemini_returned", len(parsed),
 		"source", "textscan",
 	)
-	return charts
+	return charts, false
 }
 
 // stripJSONFences removes markdown code fences (```json … ``` or ``` … ```)

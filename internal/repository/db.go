@@ -25,9 +25,25 @@ func Open(dbPath, migrationsSQL string) (*sql.DB, error) {
 	// SQLITE_BUSY errors under the low-concurrency MVP load this is designed for.
 	db.SetMaxOpenConns(1)
 
+	// WAL mode + synchronous=NORMAL: write-ahead logging avoids the fsync
+	// overhead of rollback journals on every GET poll (which calls TouchLastAccessed
+	// — a write). synchronous=NORMAL is acceptable for ephemeral data (7-day expiry).
+	// busy_timeout=5000 prevents SQLITE_BUSY if MaxOpenConns is raised later.
+	if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("enable WAL: %w", err)
+	}
+	if _, err := db.Exec("PRAGMA synchronous = NORMAL"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("set synchronous mode: %w", err)
+	}
 	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
+	}
+	if _, err := db.Exec("PRAGMA busy_timeout = 5000"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("set busy timeout: %w", err)
 	}
 
 	var exists int

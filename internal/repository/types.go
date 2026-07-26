@@ -2,15 +2,16 @@ package repository
 
 // Document mirrors the documents table (ARCHITECTURE.md Section 3).
 type Document struct {
-	ID             string
-	CreatedAt      int64
-	LastAccessedAt int64
-	Status         string // processing | complete | failed | verification_failed
-	SourceType     string // pdf | pasted_text
-	ReadingLevel   string // simplified | eli5
-	OriginalText   string
-	SimplifiedText *string
-	ErrorMessage   *string
+	ID                     string
+	CreatedAt              int64
+	LastAccessedAt         int64
+	Status                 string // processing | complete | failed | verification_failed
+	SourceType             string // pdf | pasted_text
+	ReadingLevel           string // simplified | eli5
+	OriginalText           string
+	SimplifiedText          *string
+	ErrorMessage            *string
+	ChartExtractionDegraded bool
 }
 
 // Chart mirrors the charts table.

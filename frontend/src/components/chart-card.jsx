@@ -11,21 +11,14 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
 function DataChart({ chartData, title }) {
-  let parsed
-  try {
-    parsed = JSON.parse(chartData)
-  } catch {
-    return null // malformed chart_data shouldn't crash the result page
-  }
-
-  const rows = (parsed.labels || []).map((label, i) => ({
+  const rows = (chartData.labels || []).map((label, i) => ({
     label,
-    value: parsed.values?.[i] ?? 0,
+    value: chartData.values?.[i] ?? 0,
   }))
 
   return (
     <div>
-      <h3 className="text-h3 text-ink-primary">{parsed.title || title}</h3>
+      <h3 className="text-h3 text-ink-primary">{chartData.title || title}</h3>
       <div className="mt-3 h-64">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={rows}>

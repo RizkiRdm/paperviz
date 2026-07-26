@@ -24,11 +24,12 @@ type PipelineInput struct {
 // repository.Document.Status, redeclared here for the same layer-boundary
 // reason documented in charts.go.
 type PipelineOutput struct {
-	Status         string // "complete" | "failed" | "verification_failed"
-	SimplifiedText string
-	ErrorMessage   string
-	Verify         VerifyResult
-	Charts         []Chart
+	Status                 string // "complete" | "failed" | "verification_failed"
+	SimplifiedText         string
+	ErrorMessage           string
+	Verify                 VerifyResult
+	Charts                 []Chart
+	ChartExtractionDegraded bool
 }
 
 // Pipeline status values. See charts.go for why these are redeclared
@@ -108,12 +109,15 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	// run per-image data extraction on top of the text scan.
 	time.Sleep(3 * time.Second)
 	var charts []Chart
+	var chartDegraded bool
 	if in.OriginalText != "" {
-		textCharts := ExtractChartsFromText(ctx, gemini, in.OriginalText)
+		textCharts, degraded := ExtractChartsFromText(ctx, gemini, in.OriginalText)
 		charts = textCharts
+		chartDegraded = degraded
 		slog.Info("pipeline: text-scan chart result",
 			"stage", "chart",
 			"charts_count", len(charts),
+			"degraded", degraded,
 		)
 	}
 
@@ -138,9 +142,10 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	}
 
 	return PipelineOutput{
-		Status:         pipelineStatusComplete,
-		SimplifiedText: simplifiedText,
-		Verify:         verifyResult,
-		Charts:         charts,
+		Status:                  pipelineStatusComplete,
+		SimplifiedText:          simplifiedText,
+		Verify:                  verifyResult,
+		Charts:                  charts,
+		ChartExtractionDegraded: chartDegraded,
 	}
 }
