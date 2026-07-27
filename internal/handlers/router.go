@@ -33,7 +33,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 
 	docHandler := NewDocumentHandler(db, gemini)
 	r.Route("/api/documents", func(r chi.Router) {
-		r.Post("/", docHandler.Create)
+		r.With(rateLimitDocumentCreate).Post("/", docHandler.Create)
 		r.Get("/{id}", docHandler.Get)
 	})
 

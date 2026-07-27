@@ -83,39 +83,10 @@ Do not return any explanatory text outside of this JSON. Use the specified forma
 Page text:
 %s`
 
-// fullTextChartPrompt scans the entire paper text for numerical data —
-// tables, percentages, statistics, comparisons, scores, counts — even when
-// embedded in prose (not just in tabular format). The prompt uses explicit
-// prose-to-chart examples so the model extracts data from sentences like
-// "accuracy improved from 72% to 89%" rather than skipping them.
-const fullTextChartPrompt = `You are a data extraction engine. Scan the following academic paper text
-and extract EVERY numerical data point, comparison, percentage, and
-statistical result. Format each dataset as a chart object.
-
-Examples of prose data to extract:
-- "accuracy improved from 72%% to 89%%" -> labels=["Before","After"], values=[72,89]
-- "Model A scored 85, Model B scored 92" -> labels=["A","B"], values=[85,92]
-- "25%% chose X, 75%% chose Y" -> labels=["X","Y"], values=[25,75]
-- Tables with rows and columns -> labels are row/column headers, values are numbers
-
-Return ONLY a JSON array. Each element must be:
-{
-  "chart_type": "bar",
-  "title": "short descriptive title",
-  "labels": ["label1", "label2", ...],
-  "values": [number1, number2, ...]
-}
-
-chart_type must be one of: "bar", "line", "pie", "scatter".
-
-If no numerical data exists at all, return [].
-
-Paper text:
-%s`
-
-// textChartElem is the per-element struct for parsing the JSON array returned
-// by the fullTextChartPrompt. Unexported — only used inside this file for
-// validation before constructing Chart values.
+// textChartElem is the per-element struct for parsing a text-scan chart JSON
+// object. Kept for test compatibility (charts_test.go tests chartValues
+// unmarshal via this struct); the actual text-scan path was replaced by the
+// chapter-based approach in GenerateChapterChart.
 type textChartElem struct {
 	ChartType string      `json:"chart_type"`
 	Labels    []string    `json:"labels"`
@@ -253,93 +224,6 @@ parsedOK:
 	return trimmed, true
 }
 
-// ExtractChartsFromText scans the full paper text for chart-worthy data
-// (tables, stats, numerical comparisons) using Gemini and returns a slice
-// of Chart structs. Always runs, independent of PDF image extraction.
-// Returns nil when no chart-worthy data exists or the AI call fails.
-// The second return value is true when extraction itself failed (Gemini
-// error, parse error) vs. legitimately finding nothing.
-func ExtractChartsFromText(ctx context.Context, client *external.GeminiClient, text string) ([]Chart, bool) {
-	prompt := fmt.Sprintf(fullTextChartPrompt, text)
-	raw, err := client.Generate(ctx, prompt, true, 0)
-	if err != nil {
-		slog.Error("text chart extraction failed", "stage", "chart", "error", err)
-		return nil, true
-	}
-
-	trimmed := strings.TrimSpace(raw)
-	trimmed = stripJSONFences(trimmed)
-	if trimmed == "" || trimmed == "[]" || trimmed == "null" {
-		slog.Info("text chart extraction: no chart-worthy data found by model",
-			"stage", "chart",
-			"source", "textscan",
-		)
-		return nil, false
-	}
-
-	var parsed []textChartElem
-	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
-		// Parse failed — try to salvage by truncating trailing text after
-		// the outermost ']'. Some models append explanatory prose despite
-		// the "return ONLY JSON" instruction.
-		if strings.HasPrefix(trimmed, "[") {
-			if idx := strings.LastIndex(trimmed, "]"); idx > 0 {
-				trimmed = trimmed[:idx+1]
-				if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
-					goto parsedOK
-				}
-			}
-		}
-		snippet := trimmed
-		if len(snippet) > 2000 {
-			snippet = snippet[:2000]
-		}
-		slog.Error("text chart JSON parse failed",
-			"stage", "chart",
-			"error", err,
-			"response_snippet", snippet,
-		)
-		return nil, true
-	}
-
-parsedOK:
-
-	if len(parsed) == 0 {
-		slog.Info("text chart extraction: empty array after parse",
-			"stage", "chart",
-			"source", "textscan",
-		)
-		return nil, false
-	}
-
-	charts := make([]Chart, 0, len(parsed))
-	for i, elem := range parsed {
-		if len(elem.Labels) == 0 || len(elem.Values) == 0 {
-			continue
-		}
-		dataRaw, err := json.Marshal(elem)
-		if err != nil {
-			continue
-		}
-		charts = append(charts, Chart{
-			SourceMethod: chartSourceDataExtracted,
-			ChartData:    string(dataRaw),
-			DisplayOrder: i,
-		})
-	}
-
-	if len(charts) == 0 {
-		return nil, false
-	}
-	slog.Info("text chart extraction complete",
-		"stage", "chart",
-		"charts_count", len(charts),
-		"gemini_returned", len(parsed),
-		"source", "textscan",
-	)
-	return charts, false
-}
-
 // stripJSONFences removes markdown code fences (```json … ``` or ``` … ```)
 // surrounding a JSON string, which smaller LLMs sometimes add even when
 // instructed not to.
@@ -369,4 +253,93 @@ func annotateImage(ctx context.Context, client *external.GeminiClient, text stri
 	}
 	prompt := fmt.Sprintf(imageAnnotationPrompt, text)
 	return client.Generate(ctx, prompt, false, 0)
+}
+
+const chapterChartPrompt = `You are deciding whether this chapter of a paper contains data worth
+visualizing as a chart, and if so, producing that chart.
+
+Chapter title: %s
+Chapter summary: %s
+Chapter text:
+%s
+
+First, decide: does this chapter contain a SPECIFIC, meaningful set of
+numbers worth a reader seeing as a chart (comparisons, trends over time,
+proportions, before/after results, multiple measured values)? A chapter
+that only mentions numbers in passing, with no real comparison or pattern,
+does NOT qualify — do not force a chart out of weak material.
+
+If it does NOT qualify, respond with ONLY:
+{"has_chart": false}
+
+If it DOES qualify, choose the chart_type that best fits the shape of the
+data, using this rule:
+- "bar": comparing distinct discrete categories or groups against each other
+- "line": a trend over time, steps, or an ordered sequence
+- "pie": parts of a whole that sum to ~100%% or a fixed total
+- "scatter": relationship between two independent numeric variables
+
+Respond with ONLY JSON in this exact shape:
+{
+  "has_chart": true,
+  "chart_type": "bar" | "line" | "pie" | "scatter",
+  "title": "short descriptive title tied to this chapter",
+  "labels": ["label1", "label2", ...],
+  "values": [number1, number2, ...]
+}
+
+Do not return any explanatory text outside of this JSON.`
+
+type chapterChartJSON struct {
+	HasChart  bool        `json:"has_chart"`
+	ChartType string      `json:"chart_type"`
+	Title     string      `json:"title"`
+	Labels    []string    `json:"labels"`
+	Values    chartValues `json:"values"`
+}
+
+func GenerateChapterChart(ctx context.Context, client *external.GeminiClient, chapter Chapter, displayOrder int) (chart Chart, ok bool, degraded bool) {
+	prompt := fmt.Sprintf(chapterChartPrompt, chapter.Title, chapter.Summary, chapter.Excerpt)
+	raw, err := client.Generate(ctx, prompt, true, 0)
+	if err != nil {
+		slog.Error("chapter chart generation failed", "stage", "chart", "chapter", chapter.Title, "error", err)
+		return Chart{}, false, true
+	}
+
+	trimmed := strings.TrimSpace(raw)
+	trimmed = stripJSONFences(trimmed)
+
+	var parsed chapterChartJSON
+	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
+		slog.Error("chapter chart JSON parse failed", "stage", "chart", "chapter", chapter.Title, "error", err)
+		return Chart{}, false, true
+	}
+
+	if !parsed.HasChart || len(parsed.Labels) == 0 || len(parsed.Values) == 0 {
+		slog.Info("chapter chart: no chart warranted", "stage", "chart", "chapter", chapter.Title)
+		return Chart{}, false, false
+	}
+
+	validTypes := map[string]bool{"bar": true, "line": true, "pie": true, "scatter": true}
+	if !validTypes[parsed.ChartType] {
+		parsed.ChartType = "bar"
+	}
+
+	dataRaw, err := json.Marshal(parsed)
+	if err != nil {
+		return Chart{}, false, true
+	}
+
+	slog.Info("chapter chart generated",
+		"stage", "chart",
+		"chapter", chapter.Title,
+		"chart_type", parsed.ChartType,
+	)
+
+	return Chart{
+		SourceMethod: chartSourceDataExtracted,
+		ChartData:    string(dataRaw),
+		Annotation:   fmt.Sprintf("From chapter: %s", chapter.Title),
+		DisplayOrder: displayOrder,
+	}, true, false
 }

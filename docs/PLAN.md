@@ -112,17 +112,7 @@ Execution (CHART_FIX.md):
 3. Raise `backgroundPipelineTimeout` 5min→20min in `documents.go` → verify: `go build`, `go vet`
 4. STOP → live paper upload test. Check logs for retries, charts in response. Do NOT proceed until verified.
 5. Add `chart_extraction_degraded` flag (7 files: charts.go, pipeline.go, handlers/documents.go, repository/types.go, repository/documents.go, migrations/001_init.sql, frontend/result-page.jsx)
-   - PipelineOutput.ChartExtractionDegraded bool
-   - ExtractChartsFromText returns `([]Chart, bool)`: `nil, true` on error, `nil, false` on legit empty
-   - DB column `chart_extraction_degraded INTEGER NOT NULL DEFAULT 0`
-   - response field `chart_extraction_degraded`
-   - Frontend: distinct msg when degraded + empty charts
 6. Add WAL pragmas in `db.go` after DB reset (same wipe as step 5 column)
-   - `PRAGMA journal_mode = WAL`
-   - `PRAGMA synchronous = NORMAL`
-   - `PRAGMA foreign_keys = ON` (already present)
-   - `PRAGMA busy_timeout = 5000`
-   - Verify mode returns `wal`
 
 **Est. sessions**: 2-4
 
@@ -136,9 +126,38 @@ Execution (CHART_FIX.md):
 - [x] `last_accessed_at` update on every `GET /api/documents/:id` call. See `handlers/documents.go`'s `Get`.
 - [x] Error handling pass: malformed uploads, oversized files, non-PDF MIME types (magic-byte check, not just header), empty paste-text. See `handlers/documents.go` and `handlers/validation.go`.
 - [x] Structured logging pass (per ARCHITECTURE.md Logging Policy) — JSON via `log/slog`, document ID + byte length only, never full text content.
-- [ ] Manual full-flow test against all 5 Phase 0 test papers. **Not run** — requires a live `GEMINI_API_KEY`, a working `go build`, and a real machine (the build sandbox cannot resolve `modernc.org/sqlite`'s dependency tree over its restricted network — see Phase 1 note). This is the single most important remaining step before calling the MVP done: run `go mod tidy && go build ./... && go test ./...` on a normal machine, set `GEMINI_API_KEY`, and walk all 5 test papers through the real app.
+- [ ] Manual full-flow test against all 5 Phase 0 test papers. **Not run** — requires a live `GEMINI_API_KEY`, a working `go build`, and a real machine. This is the single most important remaining step before calling the MVP done.
 
 **Est. sessions**: 5-7
+
+---
+
+## Phase 7 — Security Hardening + Call Reduction + Chapter-Based Charts (Round 2)
+
+**Done means**: All 9 chunks from the FULL FIX PLAN (Groups A, B, C) implemented, compiled, tested. Live verification on 3 test papers remains as the final proof step.
+
+Execution (sequential chunks, each verified with `go build` + `go vet`):
+
+**Group A — Security & Reliability**
+- [x] A1: Remove debug log line (`gemini.go:174`) — `slog.Info("gemini debug", ...)` deleted
+- [x] A2: Add IP rate limiting (`internal/handlers/ratelimit.go`, new) — 1 req/30s, burst 2, POST only
+- [x] A3: Log PDF extraction goroutine leaks (`pdf.go`) — `slog.Warn` on 3 timeout branches
+
+**Group B — Gemini Call-Count Reduction**
+- [x] B1: Cap image charts per document (`pipeline.go`) — `maxImageChartsPerDocument = 5`
+- [x] B2: Merge claim extraction 2→1 call (`verification.go`) — `dualClaimExtractionPrompt`, DiffClaims 3→2 calls
+- [ ] B3: Combined single verification call (OPTIONAL, deferred — needs live API key + regression testing)
+
+**Group C — Chart Pipeline Redesign**
+- [x] C1: Chapter detection (`chapters.go`, new + `types.go`) — `DetectChapters()`, max 10 chapters
+- [x] C2: Chapter-aware chart generation (`charts.go`) — `GenerateChapterChart()`, varied types (bar/line/pie/scatter)
+- [x] C3: Wire new flow, remove old (`pipeline.go` + `charts.go`) — full-text-scan removed, image fallback unchanged
+
+**Remaining after code changes:**
+- [ ] Live upload test: 3 papers of different structure
+- [ ] Report: chapters detected, chart types (% not 100% bar), total Gemini calls
+
+**Est. sessions**: 3-5
 
 ---
 
@@ -154,5 +173,3 @@ Execution (CHART_FIX.md):
 
 - Multi-language source paper support — surfaced during scoping, explicitly out of MVP, no action.
 - Automated test-paper regression suite beyond the 5-paper manual set — worth doing eventually, not blocking MVP validation.
-
-opencode -s ses_070775873ffepQC20pidnJo7XG

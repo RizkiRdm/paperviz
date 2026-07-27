@@ -15,6 +15,8 @@ Rules:
 
 - **WAL mode required after DB reset.** Enabled via PRAGMA journal_mode=WAL + synchronous=NORMAL in `repository/db.go`. DB file must be deleted when schema changes (single flat migration). Already gitignored.
 
+- **B3 (single-call verification) skipped** — requires live API key + real-document regression testing against B2 before shipping. Plan still describes it as optional.
+
 ## DB Reset Protocol
 
 When schema changes (new column/table):
@@ -23,12 +25,15 @@ When schema changes (new column/table):
 3. `go run ./cmd/server` — fresh DB, fresh schema, fresh WAL
 4. Data ephemeral (7-day expiry). No migration runner yet.
 
-## Chart Pipeline Fix — Execution Order (docs/CHART_FIX.md)
+## Security & Hardening (Round 2 — applied July 2026)
 
-Chunks execute sequentially. Each produces proof before next starts.
-1. Chunk 1: fix `context.Background()` → `ctx` in `gemini.go:87`
-2. Chunk 2: remove per-stage `stageTimeout` wraps in `pipeline.go`
-3. Chunk 3: raise `backgroundPipelineTimeout` 5min → 20min
-4. STOP → live verification with real paper upload
-5. Chunk 4: add `chart_extraction_degraded` flag (7 files)
-6. Chunk 6: add WAL pragmas in `db.go` (after DB reset for new column)
+1. A1: Removed `slog.Info("gemini debug", ...)` from `gemini.go:174` — was leaking model name + URL on every call.
+2. A2: Added IP-based rate limiting on `POST /api/documents` (1 req/30s, burst 2) via `golang.org/x/time/rate`. New file `internal/handlers/ratelimit.go`. Only POST wrapped, GET unrestricted.
+3. A3: Added `slog.Warn` logs on PDF extraction timeout branches in `pdf.go` — makes leaked goroutines observable in logs.
+4. B1: Capped `maxImageChartsPerDocument = 5` in `pipeline.go` — bounds free-tier quota burn from image charts.
+5. B2: Merged claim extraction from 2→1 Gemini call using `dualClaimExtractionPrompt` in `verification.go`. DiffClaims now 2 calls (down from 3).
+6. C1-C3: Replaced full-text-scan chart pipeline with chapter-based approach:
+   - New `internal/services/chapters.go`: `DetectChapters()` splits simplified text into ≤10 chapters
+   - New `GenerateChapterChart()` in `charts.go`: one Gemini call per chapter, chart type varies (bar/line/pie/scatter)
+   - Old `ExtractChartsFromText`, `fullTextChartPrompt` removed. `textChartElem` kept (test compat).
+   - Image fallback path (`ReVisualizeCharts`) unchanged.

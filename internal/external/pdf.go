@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -66,6 +67,8 @@ func ExtractText(pdfBytes []byte) (string, error) {
 		}
 		return r.text, nil
 	case <-time.After(pdfParseTimeout):
+		slog.Warn("pdf text extraction timed out, background goroutine still running",
+			"stage", "pdf_extract", "timeout_s", int(pdfParseTimeout.Seconds()))
 		return "", fmt.Errorf("pdf text extraction timed out after %s", pdfParseTimeout)
 	}
 }
@@ -118,6 +121,8 @@ func ExtractTextByPage(pdfBytes []byte) (map[int]string, error) {
 	case r := <-done:
 		return r.pages, r.err
 	case <-time.After(pdfParseTimeout):
+		slog.Warn("pdf per-page text extraction timed out, background goroutine still running",
+			"stage", "pdf_extract_pages", "timeout_s", int(pdfParseTimeout.Seconds()))
 		return nil, fmt.Errorf("pdf per-page text extraction timed out after %s", pdfParseTimeout)
 	}
 }
@@ -161,6 +166,8 @@ func ExtractImages(pdfBytes []byte) ([]ExtractedImage, error) {
 	case r := <-done:
 		return r.images, r.err
 	case <-time.After(pdfParseTimeout):
+		slog.Warn("pdf image extraction timed out, background goroutine still running",
+			"stage", "pdf_extract_images", "timeout_s", int(pdfParseTimeout.Seconds()))
 		return nil, fmt.Errorf("pdf image extraction timed out after %s", pdfParseTimeout)
 	}
 }

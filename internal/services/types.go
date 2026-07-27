@@ -36,6 +36,15 @@ type Chart struct {
 	DisplayOrder int
 }
 
+// Chapter is one detected section of the paper, used to drive per-chapter
+// chart generation. Detected from SIMPLIFIED text — chapters match what
+// the reader sees, not the original paper's raw section boundaries.
+type Chapter struct {
+	Title   string
+	Summary string
+	Excerpt string
+}
+
 // VerifyResult is the output of the Claim-Diff Verification Service.
 type VerifyResult struct {
 	OriginalClaims   []string

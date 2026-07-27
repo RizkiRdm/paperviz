@@ -8,22 +8,25 @@ import (
 	"paperviz/internal/external"
 )
 
-// claimExtractionPrompt asks Gemini to list factual claims (numbers, named
-// findings, statistics) from a passage as a JSON string array. Used on both
-// the original and simplified text so they can be compared afterward.
-//
-// responseMimeType=application/json (passed via the `asJSON` flag in
-// GeminiClient.Generate) is what makes Gemini return parseable JSON instead
-// of a prose list — do not remove that flag from either call site below.
-const claimExtractionPrompt = `Extract every factual claim from the passage below as a JSON array of
-strings. A "factual claim" is any specific number, statistic, finding,
-comparison, name, date, or result stated in the text — the kind of detail
-that would be wrong if changed. Do NOT include opinions, transitions, or
-restatements of the same claim twice. Output ONLY a JSON array of strings,
-nothing else.
+const dualClaimExtractionPrompt = `Extract every factual claim from EACH of the two passages below, as two
+separate JSON arrays of strings. A "factual claim" is any specific number,
+statistic, finding, comparison, name, date, or result stated in the text —
+the kind of detail that would be wrong if changed. Do NOT include
+opinions, transitions, or restatements of the same claim twice.
 
-Passage:
+Respond with ONLY a JSON object in this exact shape, nothing else:
+{"original_claims": ["claim1", "claim2", ...], "simplified_claims": ["claim1", "claim2", ...]}
+
+Original passage:
+%s
+
+Simplified passage:
 %s`
+
+type dualClaimExtractionResult struct {
+	OriginalClaims   []string `json:"original_claims"`
+	SimplifiedClaims []string `json:"simplified_claims"`
+}
 
 // claimComparisonPrompt asks Gemini to compare two claim lists and report
 // whether they disagree on any fact. This is a second, independent LLM call
@@ -52,55 +55,43 @@ type claimComparisonResult struct {
 	Detail           string `json:"detail"`
 }
 
-// extractClaims calls Gemini to pull a JSON array of factual claims out of
-// a passage. Shared by both sides of DiffClaims below.
-func extractClaims(ctx context.Context, client *external.GeminiClient, text string) ([]string, error) {
-	prompt := fmt.Sprintf(claimExtractionPrompt, text)
-	raw, err := client.Generate(ctx, prompt, true, 0)
-	if err != nil {
-		return nil, fmt.Errorf("extract claims: %w", err)
-	}
-
-	var claims []string
-	if err := json.Unmarshal([]byte(raw), &claims); err != nil {
-		return nil, fmt.Errorf("parse claims JSON: %w", err)
-	}
-	return claims, nil
-}
-
 // DiffClaims runs the full claim-diff verification: extract claims from
-// both the original and simplified text (2 separate LLM calls, per PRD.md
-// Core Capability 5), then ask Gemini to judge whether they're factually
-// consistent. This is what stands between "the model wrote something
-// plausible" and "the model preserved the paper's actual findings" —
-// treat this as a correctness gate, not a formality.
+// both the original and simplified text together (1 dual-extraction LLM
+// call), then ask Gemini to judge whether they're factually consistent.
+// This is what stands between "the model wrote something plausible" and
+// "the model preserved the paper's actual findings" — treat this as a
+// correctness gate, not a formality.
 //
 // A mismatch here means the pipeline MUST NOT publish the simplified text
 // as verified (see ARCHITECTURE.md Acceptance Scenario 4) — the caller
 // (pipeline.go) is responsible for setting status=verification_failed
 // rather than complete when MismatchDetected is true.
+//
+// Call count: 2 total (1 dual-extraction + 1 comparison), down from 3
+// before the merge (2 single-extraction + 1 comparison).
 func DiffClaims(ctx context.Context, client *external.GeminiClient, originalText, simplifiedText string) (VerifyResult, error) {
-	originalClaims, err := extractClaims(ctx, client, originalText)
+	prompt := fmt.Sprintf(dualClaimExtractionPrompt, originalText, simplifiedText)
+	raw, err := client.Generate(ctx, prompt, true, 0)
 	if err != nil {
-		return VerifyResult{}, fmt.Errorf("extract original claims: %w", err)
+		return VerifyResult{}, fmt.Errorf("extract claims: %w", err)
 	}
 
-	simplifiedClaims, err := extractClaims(ctx, client, simplifiedText)
-	if err != nil {
-		return VerifyResult{}, fmt.Errorf("extract simplified claims: %w", err)
+	var dual dualClaimExtractionResult
+	if err := json.Unmarshal([]byte(raw), &dual); err != nil {
+		return VerifyResult{}, fmt.Errorf("parse dual claims JSON: %w", err)
 	}
 
-	originalJSON, err := json.Marshal(originalClaims)
+	originalJSON, err := json.Marshal(dual.OriginalClaims)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("marshal original claims: %w", err)
 	}
-	simplifiedJSON, err := json.Marshal(simplifiedClaims)
+	simplifiedJSON, err := json.Marshal(dual.SimplifiedClaims)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("marshal simplified claims: %w", err)
 	}
 
-	prompt := fmt.Sprintf(claimComparisonPrompt, originalJSON, simplifiedJSON)
-	raw, err := client.Generate(ctx, prompt, true, 0)
+	prompt = fmt.Sprintf(claimComparisonPrompt, originalJSON, simplifiedJSON)
+	raw, err = client.Generate(ctx, prompt, true, 0)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("compare claims: %w", err)
 	}
@@ -111,8 +102,8 @@ func DiffClaims(ctx context.Context, client *external.GeminiClient, originalText
 	}
 
 	return VerifyResult{
-		OriginalClaims:   originalClaims,
-		SimplifiedClaims: simplifiedClaims,
+		OriginalClaims:   dual.OriginalClaims,
+		SimplifiedClaims: dual.SimplifiedClaims,
 		MismatchDetected: comparison.MismatchDetected,
 		MismatchDetail:   comparison.Detail,
 	}, nil

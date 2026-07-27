@@ -8,6 +8,14 @@ import (
 	"paperviz/internal/external"
 )
 
+// maxImageChartsPerDocument caps how many embedded-image charts are sent
+// to Gemini per document. Each image can cost up to 2 Gemini calls
+// (data-extraction attempt + annotation fallback), so this directly bounds
+// free-tier quota usage per document. Images beyond this cap are marked
+// "omitted" rather than processed — this is a deliberate cost/completeness
+// tradeoff, not a bug.
+const maxImageChartsPerDocument = 5
+
 // PipelineInput is everything the pipeline needs to process one document.
 // SourceType distinguishes PDF uploads (which get chart processing) from
 // pasted text (which skips it — PRD.md Acceptance Scenario 2: "chart
@@ -99,25 +107,36 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 
 	// Stage 3: Chart re-visualization.
 	//
-	// Primary path: scan the full paper text for chart-worthy data — works
-	// for ALL input types (PDF and pasted text), independent of embedded
-	// images. Most academic PDFs render charts as vector graphics rather
-	// than embedded image streams, so the old image-only path produced
-	// zero results for real papers.
+	// Primary path: detect chapters/sections from simplified text, then
+	// generate at most one chart per chapter. This produces charts tied to
+	// the paper's actual structure rather than a flat scan for any number.
 	//
 	// Supplemental path: for PDFs that DO have embedded chart images,
-	// run per-image data extraction on top of the text scan.
+	// run per-image data extraction on top of the chapter charts.
 	time.Sleep(3 * time.Second)
 	var charts []Chart
 	var chartDegraded bool
-	if in.OriginalText != "" {
-		textCharts, degraded := ExtractChartsFromText(ctx, gemini, in.OriginalText)
-		charts = textCharts
-		chartDegraded = degraded
-		slog.Info("pipeline: text-scan chart result",
+
+	chapters, err := DetectChapters(ctx, gemini, simplifiedText)
+	if err != nil {
+		slog.Error("pipeline: chapter detection failed", "stage", "chapters", "error", err)
+		chartDegraded = true
+	} else if len(chapters) == 0 {
+		slog.Info("pipeline: no chapters detected, skipping chart generation", "stage", "chapters")
+	} else {
+		for i, chapter := range chapters {
+			chart, ok, degraded := GenerateChapterChart(ctx, gemini, chapter, i)
+			if degraded {
+				chartDegraded = true
+			}
+			if ok {
+				charts = append(charts, chart)
+			}
+		}
+		slog.Info("pipeline: chapter-based chart generation complete",
 			"stage", "chart",
-			"charts_count", len(charts),
-			"degraded", degraded,
+			"chapters_detected", len(chapters),
+			"charts_generated", len(charts),
 		)
 	}
 
@@ -129,7 +148,16 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 			if pages == nil {
 				pages = pageText{1: extracted.Text}
 			}
-			imageCharts := ReVisualizeCharts(ctx, gemini, extracted.Charts, pages)
+			imagesToProcess := extracted.Charts
+			if len(imagesToProcess) > maxImageChartsPerDocument {
+				slog.Info("pipeline: capping image chart extraction",
+					"stage", "chart",
+					"total_images_found", len(imagesToProcess),
+					"processing", maxImageChartsPerDocument,
+				)
+				imagesToProcess = imagesToProcess[:maxImageChartsPerDocument]
+			}
+			imageCharts := ReVisualizeCharts(ctx, gemini, imagesToProcess, pages)
 			// Offset display order to append after text-scan charts.
 			offset := len(charts)
 			for i := range imageCharts {

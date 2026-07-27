@@ -170,8 +170,7 @@ func (c *GeminiClient) generateOnce(ctx context.Context, prompt string, asJSON b
 		return "", fmt.Errorf("marshal gemini request: %w", err)
 	}
 
-	url := fmt.Sprintf(geminiEndpoint, c.model)
-	slog.Info("gemini debug", "model", c.model, "url", url)
+  url := fmt.Sprintf(geminiEndpoint, c.model)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return "", fmt.Errorf("build gemini request: %w", err)

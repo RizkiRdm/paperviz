@@ -1,6 +1,6 @@
 module paperviz
 
-go 1.24.1
+go 1.25.0
 
 require (
 	github.com/go-chi/chi/v5 v5.1.0
@@ -24,6 +24,7 @@ require (
 	golang.org/x/image v0.21.0 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.55.3 // indirect
