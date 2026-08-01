@@ -52,23 +52,7 @@ export function UploadDropzone({ file, text, onFileChange, onTextChange }) {
       </div>
 
       {mode === "file" ? (
-        <div
-          onDragOver={(e) => {
-            e.preventDefault()
-            setIsDragging(true)
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault()
-            setIsDragging(false)
-            handleFiles(e.dataTransfer.files)
-          }}
-          onClick={() => inputRef.current?.click()}
-          className={cn(
-            "flex min-h-[200px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 text-center shadow-[0_1px_2px_rgba(20,23,31,0.04),0_4px_12px_rgba(20,23,31,0.06)]",
-            isDragging ? "border-solid border-accent-verified" : "border-border-default",
-          )}
-        >
+        <>
           <input
             ref={inputRef}
             type="file"
@@ -76,28 +60,53 @@ export function UploadDropzone({ file, text, onFileChange, onTextChange }) {
             className="hidden"
             onChange={(e) => handleFiles(e.target.files)}
           />
-          {file ? (
-            <>
-              <FileText className="h-8 w-8 text-accent-verified" aria-hidden="true" />
-              <p className="text-body font-medium">{file.name}</p>
-              <p className="text-caption text-ink-secondary">Click to choose a different file</p>
-            </>
-          ) : (
-            <>
-              <Upload className="h-8 w-8 text-ink-secondary" aria-hidden="true" />
-              <p className="text-body font-medium">Drop a PDF here, or click to browse</p>
-              <p className="text-caption text-ink-secondary">Text-based PDFs only, up to 20MB</p>
-            </>
-          )}
-        </div>
+          <button
+            type="button"
+            onDragOver={(e) => {
+              e.preventDefault()
+              setIsDragging(true)
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setIsDragging(false)
+              handleFiles(e.dataTransfer.files)
+            }}
+            onClick={() => inputRef.current?.click()}
+            className={cn(
+              "flex w-full min-h-[200px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 text-center shadow-[0_1px_2px_rgba(20,23,31,0.04),0_4px_12px_rgba(20,23,31,0.06)]",
+              isDragging ? "border-solid border-accent-verified" : "border-border-default",
+            )}
+          >
+            {file ? (
+              <>
+                <FileText className="h-8 w-8 text-accent-verified" aria-hidden="true" />
+                <p className="text-body font-medium">{file.name}</p>
+                <p className="text-caption text-ink-secondary">Click to choose a different file</p>
+              </>
+            ) : (
+              <>
+                <Upload className="h-8 w-8 text-ink-secondary" aria-hidden="true" />
+                <p className="text-body font-medium">Drop a PDF here, or click to browse</p>
+                <p className="text-caption text-ink-secondary">Text-based PDFs only, up to 20MB</p>
+              </>
+            )}
+          </button>
+        </>
       ) : (
-        <textarea
-          value={text}
-          onChange={(e) => onTextChange(e.target.value)}
-          placeholder="Paste the paper's text here…"
-          rows={10}
-          className="w-full rounded-lg border border-border-default bg-surface-raised p-4 text-body shadow-[0_1px_2px_rgba(20,23,31,0.04),0_4px_12px_rgba(20,23,31,0.06)] focus:border-accent-verified"
-        />
+        <>
+          <label htmlFor="paper-text" className="mb-2 block text-body font-medium text-ink-primary">
+            Paper text
+          </label>
+          <textarea
+            id="paper-text"
+            value={text}
+            onChange={(e) => onTextChange(e.target.value)}
+            placeholder="Paste the paper's text here…"
+            rows={10}
+            className="w-full rounded-lg border border-border-default bg-surface-raised p-4 text-body shadow-[0_1px_2px_rgba(20,23,31,0.04),0_4px_12px_rgba(20,23,31,0.06)] focus:border-accent-verified"
+          />
+        </>
       )}
     </div>
   )
