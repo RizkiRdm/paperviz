@@ -187,9 +187,12 @@ export function ResultPage({ documentId, onBack }) {
         <button onClick={onBack} className="text-body text-ink-secondary hover:text-ink-primary">
           ← New document
         </button>
-        <div className="flex items-center gap-3">
-          <CopyLinkButton />
-          {doc.status === "complete" && <VerificationBadge />}
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-3">
+            <CopyLinkButton />
+            {doc.status === "complete" && <VerificationBadge />}
+          </div>
+          <span className="text-caption text-ink-secondary">Anyone with this link can view this document.</span>
         </div>
       </div>
 
