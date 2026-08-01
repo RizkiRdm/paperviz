@@ -23,6 +23,8 @@ const ERROR_MESSAGES = {
   unknown_error: "Something went wrong. Please try again.",
 }
 
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
+
 export function UploadPage({ onCreated }) {
   const [file, setFile] = useState(null)
   const [text, setText] = useState("")
@@ -65,6 +67,16 @@ export function UploadPage({ onCreated }) {
           file={file}
           text={text}
           onFileChange={(f) => {
+            if (f.size > MAX_FILE_SIZE_BYTES) {
+              setFile(null)
+              setError(ERROR_MESSAGES.file_too_large)
+              return
+            }
+            if (f.type !== "application/pdf") {
+              setFile(null)
+              setError(ERROR_MESSAGES.invalid_file_type)
+              return
+            }
             setFile(f)
             setError(null)
           }}
