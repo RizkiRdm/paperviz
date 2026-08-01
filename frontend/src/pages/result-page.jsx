@@ -10,6 +10,7 @@
 // object for the rest of this file, which is a real footgun in any
 // component that might later need DOM APIs.
 import { useEffect, useRef, useState } from "react"
+import { Button } from "@/components/ui/button"
 import { VerificationBadge, WarningBanner, ErrorBanner } from "@/components/ui/status-banners"
 import { ChartCard } from "@/components/chart-card"
 import { getDocument } from "@/lib/api"
@@ -21,14 +22,79 @@ import { getDocument } from "@/lib/api"
 // a frontend performance choice.
 const POLL_INTERVAL_MS = 2000
 
+// POLL_TIMEOUT_MS bounds the processing wait: if a document is stuck (e.g.
+// server restarted mid-pipeline), the user gets an exit instead of an
+// infinite spinner. Assumption value — negotiable, not a contract.
+const POLL_TIMEOUT_MS = 120000
+
+// COPY_FEEDBACK_MS — how long the button label stays "Copied!" after a
+// successful clipboard write before reverting to "Copy link".
+const COPY_FEEDBACK_MS = 2000
+
+// CopyLinkButton — PRD.md "User Flows > Primary Flow" share step: the user
+// can copy the shareable link. Uses navigator.clipboard when available
+// (secure context only); if the API is missing or the write is rejected
+// (older browser, non-HTTPS, permission denied), falls back to a visible
+// selectable <input> instead of failing silently. Confirmation is a local
+// state swap for ~2s — no toast library (none in package.json).
+function CopyLinkButton() {
+  const [copied, setCopied] = useState(false)
+  const [showUrlFallback, setShowUrlFallback] = useState(false)
+  const copyTimer = useRef(null)
+
+  useEffect(() => () => clearTimeout(copyTimer.current), [])
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setShowUrlFallback(false)
+      setCopied(true)
+      clearTimeout(copyTimer.current)
+      copyTimer.current = setTimeout(() => setCopied(false), COPY_FEEDBACK_MS)
+    } catch {
+      setShowUrlFallback(true)
+    }
+  }
+
+  return (
+    <div aria-live="polite" className="flex flex-col items-end gap-2">
+      <Button
+        variant="secondary"
+        onClick={handleCopy}
+        className={`transition active:scale-[0.98] ${
+          copied ? "border-accent-verified/30 bg-accent-verified-soft text-accent-verified" : ""
+        }`}
+      >
+        {copied ? "Copied!" : "Copy link"}
+      </Button>
+      {showUrlFallback && (
+        <div className="flex flex-col gap-1">
+          <span className="text-caption text-ink-secondary">Copy this link manually</span>
+          <input
+            readOnly
+            value={window.location.href}
+            onFocus={(e) => e.target.select()}
+            className="w-72 max-w-full rounded-md border border-border-default bg-surface-raised px-3 py-2 text-body text-ink-primary"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ResultPage({ documentId, onBack }) {
   const [doc, setDoc] = useState(null)
   const [error, setError] = useState(null)
   const [showOriginal, setShowOriginal] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
+  const [retryNonce, setRetryNonce] = useState(0)
   const pollTimer = useRef(null)
+  const pollStartRef = useRef(Date.now())
 
   useEffect(() => {
     let cancelled = false
+    setTimedOut(false)
+    pollStartRef.current = Date.now()
 
     async function poll() {
       try {
@@ -37,6 +103,10 @@ export function ResultPage({ documentId, onBack }) {
         setDoc(fetched)
 
         if (fetched.status === "processing") {
+          if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
+            setTimedOut(true)
+            return
+          }
           pollTimer.current = setTimeout(poll, POLL_INTERVAL_MS)
         }
       } catch (err) {
@@ -55,7 +125,24 @@ export function ResultPage({ documentId, onBack }) {
       cancelled = true
       clearTimeout(pollTimer.current)
     }
-  }, [documentId])
+  }, [documentId, retryNonce])
+
+  if (timedOut) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 text-center">
+        <p className="text-body text-ink-secondary">This is taking longer than usual.</p>
+        <button
+          onClick={() => setRetryNonce((n) => n + 1)}
+          className="mt-6 rounded-sm px-3 py-1.5 text-body font-medium bg-accent-verified-soft text-accent-verified"
+        >
+          Retry
+        </button>
+        <button onClick={onBack} className="mt-4 text-body text-accent-verified underline">
+          Start over
+        </button>
+      </main>
+    )
+  }
 
   if (error) {
     return (
@@ -100,7 +187,10 @@ export function ResultPage({ documentId, onBack }) {
         <button onClick={onBack} className="text-body text-ink-secondary hover:text-ink-primary">
           ← New document
         </button>
-        {doc.status === "complete" && <VerificationBadge />}
+        <div className="flex items-center gap-3">
+          <CopyLinkButton />
+          {doc.status === "complete" && <VerificationBadge />}
+        </div>
       </div>
 
       {doc.status === "verification_failed" && (
