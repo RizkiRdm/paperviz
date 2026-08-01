@@ -8,31 +8,14 @@
 //   - image_fallback: the original chart image, with a generated
 //     plain-language annotation alongside it.
 //   - omitted: an inline note only — "rest of document unaffected."
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+//
+// The data_extracted renderer lives in ./data-chart.jsx and is loaded via
+// React.lazy so the recharts bundle is fetched only when a data-extracted
+// chart actually renders (react-doctor/prefer-dynamic-import).
+import { lazy, Suspense } from "react"
 
-function DataChart({ chartData, title }) {
-  const rows = (chartData.labels || []).map((label, i) => ({
-    label,
-    value: chartData.values?.[i] ?? 0,
-  }))
-
-  return (
-    <div>
-      <h3 className="text-h3 text-ink-primary">{chartData.title || title}</h3>
-      <div className="mt-3 h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={rows}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-default)" />
-            <XAxis dataKey="label" tick={{ fontSize: 12, fill: "var(--color-ink-secondary)" }} />
-            <YAxis tick={{ fontSize: 12, fill: "var(--color-ink-secondary)" }} />
-            <Tooltip />
-            <Bar dataKey="value" fill="var(--color-accent-verified)" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  )
-}
+// LazyDataChart — the recharts-dependent renderer, code-split on demand.
+const LazyDataChart = lazy(() => import("./data-chart"))
 
 function ImageFallbackChart({ annotation, pageNumber }) {
   // Note: the backend does not currently expose a raw image download
@@ -57,7 +40,11 @@ export function ChartCard({ chart }) {
   return (
     <div className="rounded-lg bg-surface-raised p-4 shadow-[0_1px_2px_rgba(20,23,31,0.04),0_4px_12px_rgba(20,23,31,0.06)]">
       {chart.source_method === "data_extracted" && (
-        <DataChart chartData={chart.chart_data} title={`Chart, page ${chart.page_number}`} />
+        <Suspense
+          fallback={<p className="text-caption text-ink-secondary">Loading chart…</p>}
+        >
+          <LazyDataChart chartData={chart.chart_data} title={`Chart, page ${chart.page_number}`} />
+        </Suspense>
       )}
       {chart.source_method === "image_fallback" && (
         <ImageFallbackChart annotation={chart.annotation} pageNumber={chart.page_number} />
