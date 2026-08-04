@@ -2,38 +2,36 @@
 
 ## Objective
 
-Commit and push the verified React Doctor top-three fixes and chunk 4 client-side file validation.
+CHUNK 6 complete. Ready for CHUNK 7 (chart re-visualization frontend integration) or next user direction.
 
 ## Requirements
 
-- Defer Recharts until a data-extracted chart is rendered.
-- Use native interactive semantics for PDF selection.
-- Give pasted-text textarea a persistent visible label.
-- Reject files over `20 * 1024 * 1024` bytes with existing `file_too_large` message.
-- Reject `file.type !== "application/pdf"` with existing `invalid_file_type` message.
+- CHUNK 6 shipped: chart types, reading level badge, error messages, copy text, share dialog, processing stage tracking.
+- DB schema changed: `processing_stage` column added to documents table.
+- Existing dev DB needs reset: `rm paperviz.db paperviz.db-wal paperviz.db-shm` then restart server.
 
 ## Constraints
 
 - Follow `DESIGN.md` tokens and existing component patterns.
-- Do not fix the 10 remaining `result-page.jsx` React Doctor findings in this pass.
-- Do not stage unrelated working-tree changes.
-- Use DOM/runtime evidence instead of image-model analysis.
+- CSS-only animations (no JS animation libraries).
+- Minimal comments (one-line).
+- All parallel tasks within a chunk must complete before next chunk.
 
 ## Relevant Files
 
-- `frontend/src/components/chart-card.jsx`
-- `frontend/src/components/data-chart.jsx`
-- `frontend/src/components/upload-dropzone.jsx`
-- `frontend/src/pages/upload-page.jsx`
+- `frontend/src/components/data-chart.jsx` — bar/line/pie/scatter support
+- `frontend/src/pages/result-page.jsx` — badge, error, copy, share, stage
+- `internal/handlers/documents.go` — stage callback + GET response
+- `internal/repository/documents.go` — processing_stage column + UpdateStage
+- `internal/repository/types.go` — ProcessingStage field
+- `internal/services/pipeline.go` — OnStage callback
+- `migrations/001_init.sql` — processing_stage column
 
 ## Progress
 
-- Build passes; Recharts is emitted as a separate async chunk.
-- React Doctor confirms the requested three diagnostics are gone.
-- Playwright confirms lazy chart rendering, semantic controls, associated label, both validation errors, and valid-file recovery.
-- Full Go tests pass: 17 tests across 5 packages.
-- Graphify index refreshed.
+- CHUNK 6 committed and pushed to main.
+- Go build passes, 17/17 tests pass, npm build passes.
 
 ## Next Action
 
-Collect independent review results, resolve blockers if any, create atomic commits, push `main`, then plan chunk 5.
+Await user direction for CHUNK 7 or other work.

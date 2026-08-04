@@ -6,10 +6,8 @@
 
 ## High
 
-- Commit and push current React Doctor top-three fixes and chunk 4.
-- Plan and execute chunk 5 request timeouts after approval.
-- Fix remaining `result-page.jsx` React Doctor error: effect timer cleanup.
 - Decide and implement chart image-fallback serving contract before full chart release.
+- Fix remaining `result-page.jsx` React Doctor error: effect timer cleanup.
 
 ## Medium
 
@@ -22,6 +20,11 @@
 
 ## Completed
 
-- Agent-task chunks 0–3.
+- CHUNK 6: chart types, reading level badge, error messages, copy text, share dialog, processing stage tracking.
+- CHUNK 5: API layer, upload page, result page, share link copy.
+- CHUNK 4: client-side PDF size/type validation and browser verification.
+- CHUNK 3: public-link disclaimer.
+- CHUNK 2: polling timeout and copy-link behavior.
+- CHUNK 1: foundation (Go + Vite + Tailwind + Router).
+- CHUNK 0: project scaffolding.
 - React Doctor top-three fixes.
-- Chunk 4 client-side PDF size/type validation and browser verification.
