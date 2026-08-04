@@ -10,7 +10,8 @@ CREATE TABLE documents (
     original_text TEXT NOT NULL,
     simplified_text TEXT,
     error_message TEXT,
-    chart_extraction_degraded INTEGER NOT NULL DEFAULT 0 CHECK (chart_extraction_degraded IN (0, 1))
+    chart_extraction_degraded INTEGER NOT NULL DEFAULT 0 CHECK (chart_extraction_degraded IN (0, 1)),
+    processing_stage TEXT
 );
 
 CREATE INDEX idx_documents_last_accessed_at ON documents(last_accessed_at);

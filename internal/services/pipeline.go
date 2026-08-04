@@ -25,6 +25,7 @@ type PipelineInput struct {
 	SourceType   string // "pdf" | "pasted_text"
 	ReadingLevel string // "simplified" | "eli5"
 	PDFBytes     []byte // nil for pasted_text; used only for chart extraction
+	OnStage      func(stage string) // called at each pipeline stage transition
 }
 
 // PipelineOutput is the full result of one run, ready for the caller
@@ -59,11 +60,9 @@ const (
 // early return corresponds to one of ARCHITECTURE.md Section 6's Failure
 // Scenarios — the comment above each return says which one.
 func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in PipelineInput) PipelineOutput {
-	// Stage 1: Simplify. (Extraction already happened before RunPipeline is
-	// called — see handlers/documents.go — because extraction failure needs
-	// to reject the upload before any Gemini call is made at all, per
-	// ARCHITECTURE.md Failure Scenario 1. By the time we're here, we already
-	// have OriginalText.)
+ stage := func(s string) { if in.OnStage != nil { in.OnStage(s) } }
+
+ stage("simplifying")
 	simplifiedText, err := Simplify(ctx, gemini, in.OriginalText, in.ReadingLevel)
 	if err != nil {
 		// Failure Scenario 2: Gemini call times out after retry -> status
@@ -82,6 +81,7 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 		//
 		// Stagger between Gemini-heavy stages so free-tier rate limits recover.
 		time.Sleep(3 * time.Second)
+ stage("verifying")
 	verifyResult, err := DiffClaims(ctx, gemini, in.OriginalText, simplifiedText)
 	if err != nil {
 		slog.Error("pipeline stage failed", "stage", "verify", "error", err)
@@ -114,6 +114,7 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	// Supplemental path: for PDFs that DO have embedded chart images,
 	// run per-image data extraction on top of the chapter charts.
 	time.Sleep(3 * time.Second)
+ stage("generating_charts")
 	var charts []Chart
 	var chartDegraded bool
 

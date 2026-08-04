@@ -30,9 +30,9 @@ func NewDocumentRepo(db dbExecutor) *DocumentRepo {
 func (r *DocumentRepo) Insert(d Document) error {
 	_, err := r.db.Exec(
 		`INSERT INTO documents
-			(id, created_at, last_accessed_at, status, source_type, reading_level, original_text, simplified_text, error_message, chart_extraction_degraded)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.CreatedAt, d.LastAccessedAt, d.Status, d.SourceType, d.ReadingLevel, d.OriginalText, d.SimplifiedText, d.ErrorMessage, d.ChartExtractionDegraded,
+			(id, created_at, last_accessed_at, status, source_type, reading_level, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		d.ID, d.CreatedAt, d.LastAccessedAt, d.Status, d.SourceType, d.ReadingLevel, d.OriginalText, d.SimplifiedText, d.ErrorMessage, d.ChartExtractionDegraded, d.ProcessingStage,
 	)
 	if err != nil {
 		return fmt.Errorf("insert document: %w", err)
@@ -43,11 +43,11 @@ func (r *DocumentRepo) Insert(d Document) error {
 // Get retrieves a document by ID. Returns ErrNotFound if no row matches.
 func (r *DocumentRepo) Get(id string) (*Document, error) {
 	row := r.db.QueryRow(
-		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, original_text, simplified_text, error_message, chart_extraction_degraded
+		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage
 		FROM documents WHERE id = ?`, id,
 	)
 	var d Document
-	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded)
+	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -58,10 +58,9 @@ func (r *DocumentRepo) Get(id string) (*Document, error) {
 }
 
 // UpdateStatus sets status/simplified_text/error_message/chart_extraction_degraded for a document.
-// Used by the pipeline to record terminal states (complete/failed/verification_failed).
 func (r *DocumentRepo) UpdateStatus(id, status string, simplifiedText, errorMessage *string, chartExtractionDegraded bool) error {
 	_, err := r.db.Exec(
-		`UPDATE documents SET status = ?, simplified_text = ?, error_message = ?, chart_extraction_degraded = ? WHERE id = ?`,
+		`UPDATE documents SET status = ?, simplified_text = ?, error_message = ?, chart_extraction_degraded = ?, processing_stage = NULL WHERE id = ?`,
 		status, simplifiedText, errorMessage, chartExtractionDegraded, id,
 	)
 	if err != nil {
@@ -77,6 +76,14 @@ func (r *DocumentRepo) TouchLastAccessed(id string, now int64) error {
 	_, err := r.db.Exec(`UPDATE documents SET last_accessed_at = ? WHERE id = ?`, now, id)
 	if err != nil {
 		return fmt.Errorf("touch last_accessed_at: %w", err)
+	}
+	return nil
+}
+
+func (r *DocumentRepo) UpdateStage(id string, stage *string) error {
+	_, err := r.db.Exec(`UPDATE documents SET processing_stage = ? WHERE id = ?`, stage, id)
+	if err != nil {
+		return fmt.Errorf("update processing stage: %w", err)
 	}
 	return nil
 }

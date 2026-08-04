@@ -1,62 +1,68 @@
-// ponytail: result page redesign with Dub top bar, card containers, and toggle pills
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { VerificationBadge, WarningBanner, ErrorBanner } from "@/components/ui/status-banners"
 import { ChartCard } from "@/components/chart-card"
 import { getDocument } from "@/lib/api"
-import { ArrowLeft, Copy, Check, Sparkles, RefreshCw, BarChart2 } from "lucide-react"
+import { ArrowLeft, Copy, Check, Sparkles, RefreshCw, BarChart2, Link2, X } from "lucide-react"
 
 const POLL_INTERVAL_MS = 2000
 const POLL_TIMEOUT_MS = 120000
 const COPY_FEEDBACK_MS = 2000
 
-function CopyLinkButton() {
-  const [copied, setCopied] = useState(false)
-  const [showUrlFallback, setShowUrlFallback] = useState(false)
-  const copyTimer = useRef(null)
+const READING_LEVEL_LABELS = {
+  simplified: "Simplified",
+  eli5: "ELI5",
+}
 
-  useEffect(() => () => clearTimeout(copyTimer.current), [])
+const ERROR_MESSAGES = {
+  simplification_failed: "The simplification step failed. Please try again.",
+  verification_failed_to_run: "Verification could not complete. Please try again.",
+  extraction_failed: "Text extraction failed. Please check the PDF format.",
+}
+
+// Share dialog modal — DESIGN.md Elevated Feature Card (16px radius, subtle-2 shadow)
+function ShareDialog({ url, onClose }) {
+  const [copied, setCopied] = useState(false)
+  const timerRef = useRef(null)
+
+  useEffect(() => () => clearTimeout(timerRef.current), [])
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(window.location.href)
-      setShowUrlFallback(false)
+      await navigator.clipboard.writeText(url)
       setCopied(true)
-      clearTimeout(copyTimer.current)
-      copyTimer.current = setTimeout(() => setCopied(false), COPY_FEEDBACK_MS)
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), COPY_FEEDBACK_MS)
     } catch {
-      setShowUrlFallback(true)
+      // fallback: select input
     }
   }
 
   return (
-    <div aria-live="polite" className="flex flex-col items-end gap-2">
-      <Button
-        variant="secondary"
-        onClick={handleCopy}
-        className="h-9 px-3 text-xs gap-1.5 font-medium"
-      >
-        {copied ? (
-          <>
-            <Check className="h-3.5 w-3.5 text-[#16a34a]" /> Copied Link
-          </>
-        ) : (
-          <>
-            <Copy className="h-3.5 w-3.5 text-[#737373]" /> Share Link
-          </>
-        )}
-      </Button>
-      {showUrlFallback && (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-[#737373]">Copy manually:</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
+      <div className="w-full max-w-md rounded-[16px] border border-[#e5e5e5] bg-white p-6 shadow-[rgba(0,0,0,0.1)_0px_0px_0px_4px]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-[#2563eb]" />
+            <h3 className="text-sm font-semibold text-[#0a0a0a]">Share this summary</h3>
+          </div>
+          <button onClick={onClose} className="rounded-full p-1 text-[#737373] hover:text-[#0a0a0a] transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="flex gap-2">
           <input
             readOnly
-            value={window.location.href}
+            value={url}
             onFocus={(e) => e.target.select()}
-            className="w-64 rounded-[6px] border border-[#000000] bg-white px-2.5 py-1 text-xs text-[#171717]"
+            className="flex-1 rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-xs text-[#171717] font-mono"
           />
+          <Button onClick={handleCopy} variant="secondary" className="shrink-0">
+            {copied ? <Check className="h-3.5 w-3.5 text-[#16a34a]" /> : <Copy className="h-3.5 w-3.5 text-[#737373]" />}
+          </Button>
         </div>
-      )}
+        <p className="mt-3 text-[11px] text-[#737373]">Link expires after 7 days of inactivity.</p>
+      </div>
     </div>
   )
 }
@@ -67,8 +73,13 @@ export function ResultPage({ documentId, onBack }) {
   const [showOriginal, setShowOriginal] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
+  const [showShare, setShowShare] = useState(false)
+  const [textCopied, setTextCopied] = useState(false)
   const pollTimer = useRef(null)
   const pollStartRef = useRef(Date.now())
+  const copyTimerRef = useRef(null)
+
+  useEffect(() => () => clearTimeout(copyTimerRef.current), [])
 
   useEffect(() => {
     let cancelled = false
@@ -80,7 +91,6 @@ export function ResultPage({ documentId, onBack }) {
         const fetched = await getDocument(documentId)
         if (cancelled) return
         setDoc(fetched)
-
         if (fetched.status === "processing") {
           if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
             setTimedOut(true)
@@ -100,13 +110,19 @@ export function ResultPage({ documentId, onBack }) {
         }
       }
     }
-
     poll()
-    return () => {
-      cancelled = true
-      clearTimeout(pollTimer.current)
-    }
+    return () => { cancelled = true; clearTimeout(pollTimer.current) }
   }, [documentId, retryNonce])
+
+  async function handleCopyText() {
+    const text = showOriginal ? doc.original_text : doc.simplified_text
+    try {
+      await navigator.clipboard.writeText(text)
+      setTextCopied(true)
+      clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setTextCopied(false), COPY_FEEDBACK_MS)
+    } catch {}
+  }
 
   if (timedOut) {
     return (
@@ -139,12 +155,21 @@ export function ResultPage({ documentId, onBack }) {
     )
   }
 
+const STAGE_LABELS = {
+  simplifying: "Simplifying language...",
+  verifying: "Verifying claims against source...",
+  generating_charts: "Generating visualizations...",
+}
+
   if (!doc || doc.status === "processing") {
+    const stageLabel = doc?.processing_stage ? STAGE_LABELS[doc.processing_stage] || doc.processing_stage : null
     return (
       <div className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6 text-center">
         <div className="max-w-md rounded-[16px] border border-[#e5e5e5] bg-white p-8 shadow-xs flex flex-col items-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#2563eb] border-t-transparent mb-4" />
-          <h2 className="font-satoshi text-lg font-medium text-[#0a0a0a]">Simplifying & Verifying...</h2>
+          <h2 className="font-satoshi text-lg font-medium text-[#0a0a0a]">
+            {stageLabel || "Simplifying & Verifying..."}
+          </h2>
           <p className="mt-2 text-xs text-[#737373] leading-relaxed">
             Reading paper, generating plain language summary, and verifying key statements against source.
           </p>
@@ -154,10 +179,13 @@ export function ResultPage({ documentId, onBack }) {
   }
 
   if (doc.status === "failed") {
+    const msg = doc.error_message && ERROR_MESSAGES[doc.error_message]
+      ? ERROR_MESSAGES[doc.error_message]
+      : "We couldn't process this document. Please check the PDF format and try again."
     return (
       <div className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6">
         <div className="max-w-md w-full">
-          <ErrorBanner message="We couldn't process this document. Please check the PDF format and try again." />
+          <ErrorBanner message={msg} />
           <Button onClick={onBack} variant="secondary" className="mt-4 w-full">
             Start Over
           </Button>
@@ -167,10 +195,10 @@ export function ResultPage({ documentId, onBack }) {
   }
 
   const displayedText = showOriginal ? doc.original_text : doc.simplified_text
+  const levelLabel = READING_LEVEL_LABELS[doc.reading_level] || doc.reading_level
 
   return (
     <div className="min-h-screen bg-white text-[#171717] bg-dotted-grid">
-      {/* Top Bar Navigation */}
       <header className="border-b border-[#e5e5e5] bg-white/80 backdrop-blur-xs sticky top-0 z-10">
         <div className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-3.5">
           <div className="flex items-center gap-4">
@@ -183,62 +211,68 @@ export function ResultPage({ documentId, onBack }) {
             <span className="h-4 w-px bg-[#e5e5e5]" />
             <span className="font-mono text-xs font-semibold text-[#0a0a0a]">PaperViz</span>
           </div>
-
           <div className="flex items-center gap-3">
             {doc.status === "complete" && <VerificationBadge />}
-            <CopyLinkButton />
+            <Button variant="secondary" onClick={() => setShowShare(true)} className="h-9 px-3 text-xs gap-1.5 font-medium">
+              <Link2 className="h-3.5 w-3.5 text-[#737373]" /> Share
+            </Button>
           </div>
         </div>
       </header>
 
-      {/* Content Container */}
       <main className="mx-auto max-w-[900px] px-6 py-12">
         {doc.status === "verification_failed" && (
-          <div className="mb-6">
-            <WarningBanner />
-          </div>
+          <div className="mb-6"><WarningBanner /></div>
         )}
 
-        {/* Action Bar & Mode Switcher */}
+        {/* Action bar — reading level badge + view toggle + copy text */}
         <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-[#e5e5e5]">
-          <div>
+          <div className="flex items-center gap-3">
             <h1 className="font-satoshi text-2xl sm:text-3xl font-medium text-[#0a0a0a]">
               Paper Summary
             </h1>
-            <p className="text-xs text-[#737373] mt-1">
-              7-day share link ready · {showOriginal ? "Showing Original Text" : "Showing Plain Language Version"}
-            </p>
+            <span className="inline-flex items-center rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
+              {levelLabel}
+            </span>
           </div>
 
-          {/* View Toggle Pill */}
-          <div className="inline-flex gap-1 rounded-full border border-[#e5e5e5] bg-white p-1 shadow-2xs">
-            <button
-              onClick={() => setShowOriginal(false)}
-              className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
-                !showOriginal ? "bg-[#0a0a0a] text-white" : "text-[#737373] hover:text-[#171717]"
-              }`}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={handleCopyText}
+              className="h-8 px-2.5 text-xs gap-1.5 font-medium"
             >
-              Simplified
-            </button>
-            <button
-              onClick={() => setShowOriginal(true)}
-              className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
-                showOriginal ? "bg-[#0a0a0a] text-white" : "text-[#737373] hover:text-[#171717]"
-              }`}
-            >
-              Original
-            </button>
+              {textCopied ? <Check className="h-3.5 w-3.5 text-[#16a34a]" /> : <Copy className="h-3.5 w-3.5 text-[#737373]" />}
+              {textCopied ? "Copied" : "Copy Text"}
+            </Button>
+
+            <div className="inline-flex gap-1 rounded-full border border-[#e5e5e5] bg-white p-1 shadow-2xs">
+              <button
+                onClick={() => setShowOriginal(false)}
+                className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
+                  !showOriginal ? "bg-[#0a0a0a] text-white" : "text-[#737373] hover:text-[#171717]"
+                }`}
+              >
+                Simplified
+              </button>
+              <button
+                onClick={() => setShowOriginal(true)}
+                className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
+                  showOriginal ? "bg-[#0a0a0a] text-white" : "text-[#737373] hover:text-[#171717]"
+                }`}
+              >
+                Original
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Simplified / Original Text Container */}
         <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
           <div className="prose prose-neutral max-w-none text-[#171717] text-base leading-relaxed whitespace-pre-wrap font-inter">
             {displayedText}
           </div>
         </article>
 
-        {/* Charts Section */}
         <section className="mt-12">
           <div className="flex items-center gap-2 mb-6">
             <BarChart2 className="h-5 w-5 text-[#2563eb]" />
@@ -246,7 +280,6 @@ export function ResultPage({ documentId, onBack }) {
               Charts & Visualizations
             </h2>
           </div>
-
           {doc.charts && doc.charts.length > 0 ? (
             <div className="flex flex-col gap-6">
               {doc.charts.map((chart) => (
@@ -266,7 +299,8 @@ export function ResultPage({ documentId, onBack }) {
           )}
         </section>
       </main>
+
+      {showShare && <ShareDialog url={window.location.href} onClose={() => setShowShare(false)} />}
     </div>
   )
 }
-

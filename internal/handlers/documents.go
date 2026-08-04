@@ -185,6 +185,14 @@ func (h *DocumentHandler) runPipelineAndSave(documentID string, input services.P
 	ctx, cancel := context.WithTimeout(context.Background(), backgroundPipelineTimeout)
 	defer cancel()
 
+	input.OnStage = func(stage string) {
+		docRepo := repository.NewDocumentRepo(h.db)
+		s := stage
+		if err := docRepo.UpdateStage(documentID, &s); err != nil {
+			slog.Error("update processing stage failed", "document_id", documentID, "stage", stage, "error", err)
+		}
+	}
+
 	output := services.RunPipeline(ctx, h.gemini, input)
 
 	if err := h.saveResult(documentID, output); err != nil {
@@ -301,6 +309,7 @@ type getDocumentResponse struct {
 	Charts                  []chartResponse `json:"charts"`
 	ErrorMessage            *string         `json:"error_message"`
 	ChartExtractionDegraded bool            `json:"chart_extraction_degraded"`
+	ProcessingStage         *string         `json:"processing_stage,omitempty"`
 }
 
 // Get handles GET /api/documents/:id. On every successful lookup it
@@ -361,5 +370,6 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		Charts:                  chartResponses,
 		ErrorMessage:            doc.ErrorMessage,
 		ChartExtractionDegraded: doc.ChartExtractionDegraded,
+		ProcessingStage:         doc.ProcessingStage,
 	})
 }

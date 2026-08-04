@@ -12,6 +12,7 @@ type Document struct {
 	SimplifiedText          *string
 	ErrorMessage            *string
 	ChartExtractionDegraded bool
+	ProcessingStage         *string
 }
 
 // Chart mirrors the charts table.
