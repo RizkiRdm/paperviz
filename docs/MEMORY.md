@@ -1,58 +1,50 @@
 Goal
-Security hardening, Gemini call-count reduction, and chapter-based chart pipeline redesign for PaperViz.
+- Execute PaperViz's PAPERVIZ_AGENT_TASKS.md chunks 0→9 in PLAN→APPROVE→EXECUTE order, one at a time; chunks 0-2 done, currently awaiting approval for CHUNK 3 (public-link disclaimer).
 Constraints & Preferences
-- maxRetries=10 and backoff (max 32s) in gemini.go — never touch (free-tier survival)
-- Image fallback path (ReVisualizeCharts) unchanged by Group C
-- textChartElem kept for test compat (charts_test.go)
-- B3 (single-call verification) deferred — needs live API key + real-paper regression testing
-- All chunks sequential, each verified with go build + go vet + go test before next starts
-- After code changes, always update AGENTS.md, MEMORY.md, PLAN.md + run graphify update
+- Workflow (verbatim): "PLAN PHASE… Output a plan… Do NOT write or edit any code in this phase" → "STOP. Wait for explicit approval ('execute' / 'lanjut' / 'go') before touching any file."
+- Strict chunk order 0 → 9; no batching into one plan.
+- CHUNK 1: edit result-page.jsx only; "Do NOT change POLL_INTERVAL_MS (2000ms) — that's a documented backend contract"; "Do NOT touch lib/api.js (that's Chunk 5)."
+- Chunk 2 spec: clipboard button next to "← New document"/VerificationBadge row, navigator.clipboard.writeText(window.location.href) with try/catch, fallback = visible selectable text input, "Copied!" ~2s via local useState + setTimeout, NO new toast dependency (grep package.json first — confirmed none exists).
+- Chunk 3 spec: "do this chunk AFTER Chunk 2 is approved and merged"; disclaimer under copy button; exact proposed copy "Anyone with this link can view this document."
+- Proof: raw npm run build output + manual/Playwright observation.
+- AGENTS.md: UI work must follow DESIGN.md; layers handlers → services → repository/external.
+- User model note (active): "the model i use is deepseek or sometimes model without image analysis, and just code" — do NOT delegate image/pixel checks to other models; use DOM assertions instead of pixel-by-pixel verification. Also "use deepseek v4 flash free (new) only for all case"; after failure stop after 1-2 attempts, report, don't retry in background.
+- Anti-hallucination: never claim done without pasted real output.
 Progress
 Done
-- A1: Removed debug log line (slog.Info("gemini debug", ...)) from gemini.go:174 — was leaking model name + URL on every Gemini call
-- A2: Added IP-based rate limiting on POST /api/documents (1 req/30s, burst 2) via golang.org/x/time/rate. New file internal/handlers/ratelimit.go. Only POST wrapped, GET unrestricted. Client gets HTTP 429 {"error":"rate_limited"} on 3rd request within 30s.
-- A3: Added slog.Warn logs on PDF extraction timeout branches in pdf.go (ExtractText, ExtractTextByPage, ExtractImages) — makes leaked goroutines observable in logs.
-- B1: Added maxImageChartsPerDocument = 5 constant in pipeline.go. Truncates extracted.Charts before passing to ReVisualizeCharts. Logs when truncation occurs.
-- B2: Replaced 2 separate extractClaims calls with 1 dual-extraction call using dualClaimExtractionPrompt in verification.go. DiffClaims now 2 Gemini calls total (down from 3). Deleted extractClaims function and old claimExtractionPrompt.
-- C1: Added Chapter struct to types.go. Created internal/services/chapters.go with DetectChapters() — calls Gemini once to split simplified text into ≤10 chapters. Not wired into pipeline yet.
-- C2: Added chapterChartPrompt + chapterChartJSON struct + GenerateChapterChart() to charts.go. Per-chapter chart generation with varied types (bar/line/pie/scatter). Not wired into pipeline yet.
-- C3: Replaced Stage 3 text-scan path in pipeline.go (ExtractChartsFromText) with chapter-based flow (DetectChapters → per-chapter GenerateChapterChart). Removed fullTextChartPrompt, ExtractChartsFromText from charts.go. Kept textChartElem (test compat). Image fallback path unchanged.
-- go build ./... / go vet ./... / go test ./... (17/17 pass) — all clean.
-- graphify update . ran (1915 nodes, 1796 edges, 211 communities)
-- Updated AGENTS.md, docs/MEMORY.md, docs/PLAN.md
-- git commit + push: feat(charts,security): chapter-based pipeline, rate limit, claim merge
+- CHUNK 0 (investigation only): chapter↔chart correlation = trust-the-LLM-with-no-check (charts.go:301-345 accepts JSON as-is; no excerpt grounding length limits; annotation fmt.Sprintf("From chapter: %s", chapter.Title) at charts.go:342).
+- CHUNK 1 (polling timeout): POLL_TIMEOUT_MS = 120000, timedOut, retryNonce, pollStartRef, effect deps [documentId, retryNonce], timeout UI branch ("This is taking longer than usual." + Retry + Start over). Proven: forced 3000 → Playwright showed fallback UI at 3s persisting through 11s, Retry restarts polling, Start over → / upload page. Reverted to 120000, final build passed.
+- CHUNK 2 (copy-link button): CopyLinkButton local component + COPY_FEEDBACK_MS = 2000 in result-page.jsx; placed top-right flex group beside VerificationBadge; Button import added from @/components/ui/button (secondary variant); success → "Copied!" 2s (accent-verified-soft tint + active:scale-[0.98] + transition); catch → visible read-only input "Copy this link manually" with onFocus select-all. Proven: Playwright stub captured writes: ["http://localhost:5173/doc123"], "Copied!" 2s revert verified, rejection path rendered input with correct URL. Build ✓ built in 6.33s.
+- Committed + pushed: e7515c0 feat(frontend): polling timeout + copy-link button → origin/main (git@github.com:RizkiRdm/paperviz.git), f2d03bd..e7515c0.
+- CHUNK 3 plan delivered, awaiting approval.
+- Read in chunk 2: frontend/src/components/ui/button.jsx (secondary variant classes), frontend/package.json (no toast lib), frontend/src/index.css:106 (global :focus-visible ring exists), upload-page.jsx (layout patterns).
 In Progress
-- Live verification: upload 3 test papers to verify chapters detected + chart types varied + Gemini call counts (needs running server + GEMINI_API_KEY)
+- (none) — CHUNK 2 complete/merged; CHUNK 3 plan pending approval.
 Blocked
-- None
+- CHUNK 3 execution blocked on user approval ("execute"/"lanjut"/"go").
 Key Decisions
-- Rate limit POST only (not GET) — GET endpoint doesn't call Gemini, so no quota risk
-- 30s/2 burst deliberate — conservative for free-tier key protection
-- Chapter detection uses simplifiedText (not in.OriginalText) — chapters match what reader sees
-- Max 10 chapters + max 5 image charts = combined ceiling 15 Gemini chart calls per doc
-- textChartElem kept despite ExtractChartsFromText removal because charts_test.go uses it to test chartValues unmarshal
-- B3 deferred (optional) — needs live API key + output comparison against B2 on real papers before shipping
+- POLL_TIMEOUT_MS = 120000 assumption value, negotiable — approved.
+- Clipboard fallback: visible selectable input instead of silent failure (spec-required precedent).
+- Copy button shows for both complete and verification_failed; disclaimer sits OUTSIDE CopyLinkButton's aria-live="polite" wrapper (avoids re-announcing on state change).
+- Screenshot /tmp/opencode/chunk2-copy-button.png saved but model can't view images — visual QA delegated to multimodal sub-agent aborted per user order; DOM assertions used instead.
+- Left unrelated worktree changes uncommitted (AGENTS.md, docs/ moves, DESIGN.md, agent configs, paperviz binary, graphify-out/).
 Next Steps
-1. DB reset + server restart (kill server; rm paperviz.db*; go run ./cmd/server)
-2. Upload 3 test papers of different structure (short blog-style, standard 6-section, long multi-subsection)
-3. For each paper, report: chapters detected (count + titles), charts generated (count + type distribution), total Gemini calls, relevance spot-check
-4. Confirm chart types are NOT 100% bar across all papers
+1. Get approval on CHUNK 3 plan → edit result-page.jsx: top row right cluster → flex flex-col items-end gap-1, disclaimer <span className="text-caption text-ink-secondary">Anyone with this link can view this document.</span> under copy button/badge.
+2. npm run build raw output; Playwright DOM assertion of disclaimer text + outerHTML snippet; confirm copy button + badge no regression.
+3. Commit + push chunk 3 (same pattern as chunk 1-2).
+4. Plan CHUNK 4 next.
 Critical Context
-- Free-tier gemini-2.5-flash-lite has 20-request sliding window quota (~1 req/3.5s)
-- B3 (combined single verification call) described in plan but intentionally deferred — merging extraction + comparison into one call risks accuracy regression
-- Combined ceiling: 10 chapter charts + 5 image fallback charts = 15 per document
-- Old fullTextChartPrompt and ExtractChartsFromText fully removed — cannot fall back to old full-text-scan path
+- Playwright MCP: playwright / browser_run_code_unsafe, route mocking **/api/documents/*, addInitScript clipboard stubbing pattern already proven.
+- Vite dev on :5173 (5174 earlier). Kill via pkill -f vite after tests.
+- Chunk 5 later: lib/api.js — AbortController, ApiError("network_timeout", 0), ERROR_MESSAGES additions.
+- Chunk 9 later: security headers middleware; CSP must allow Google Fonts.
+- Comment-hook fired on new comments — justified by mirroring existing file comment conventions.
+- LSP typescript NOT installed/declined (lsp-install-decisions.json); build used as syntax check.
+- context7 available (Tailwind v4 docs); codegraph available.
 Relevant Files
-- internal/external/gemini.go: debug log line removed (L174)
-- internal/external/pdf.go: slog.Warn added on 3 timeout branches (ExtractText, ExtractTextByPage, ExtractImages)
-- internal/handlers/ratelimit.go: new — per-IP token bucket (1 req/30s, burst 2)
-- internal/handlers/router.go: POST route wrapped with rateLimitDocumentCreate middleware
-- internal/services/pipeline.go: maxImageChartsPerDocument=5, chapter-based chart flow replaces ExtractChartsFromText
-- internal/services/charts.go: new GenerateChapterChart, chapterChartPrompt, chapterChartJSON; removed fullTextChartPrompt, ExtractChartsFromText; kept textChartElem
-- internal/services/chapters.go: new — DetectChapters(), chapterDetectionPrompt, maxChapters=10
-- internal/services/types.go: new Chapter struct (Title, Summary, Excerpt)
-- internal/services/verification.go: dualClaimExtractionPrompt, dualClaimExtractionResult; deleted extractClaims, claimExtractionPrompt; DiffClaims now 2 calls (down from 3)
-- go.mod / go.sum: added golang.org/x/time/rate v0.15.0
-- AGENTS.md: updated with Round 2 changes, known issues
-- docs/MEMORY.md: updated with Round 2 progress
-- docs/PLAN.md: new Phase 7 tracking all chunks
+- frontend/src/pages/result-page.jsx: chunk 1-2 changes (committed e7515c0); chunk 3 target (top row ~lines 160-167, CopyLinkButton ~lines 36-94).
+- frontend/src/components/ui/button.jsx: shared Button (secondary variant used for copy button).
+- frontend/src/components/ui/status-banners.jsx: VerificationBadge, WarningBanner, ErrorBanner.
+- frontend/src/lib/api.js: off-limits until chunk 5.
+- docs/PAPERVIZ_AGENT_TASKS.md, AGENTS.md, docs/PRD.md, docs/ARCHITECTURE.md, DESIGN.md: governing docs (all read).
+- Repo: git@github.com:RizkiRdm/paperviz.git, branch main, HEAD e7515c0.

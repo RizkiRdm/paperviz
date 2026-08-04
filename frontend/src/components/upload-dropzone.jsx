@@ -1,14 +1,6 @@
-// UploadDropzone — DESIGN.md "Cards & Dropzone > Upload Dropzone":
-// radius-lg, shadow-card, dashed border-default when idle, solid
-// accent-verified border on drag-hover.
-//
-// Handles both input modes from PRD.md's primary flow step 1 ("uploads a
-// PDF or pastes text") via a simple mode toggle — file and pasted text are
-// mutually exclusive per ARCHITECTURE.md's API contract ("exactly one of
-// file/text is required"), so switching modes clears whichever input was
-// previously set for the other mode.
+// ponytail: upload dropzone redesign matching DESIGN.md hairline cards & pill feature tags
 import { useRef, useState } from "react"
-import { Upload, FileText } from "lucide-react"
+import { Upload, FileText, Sparkles, ShieldCheck, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function UploadDropzone({ file, text, onFileChange, onTextChange }) {
@@ -23,32 +15,35 @@ export function UploadDropzone({ file, text, onFileChange, onTextChange }) {
 
   return (
     <div>
-      {/* Mode toggle: plain buttons, not the ToggleGroup component — this
-          switches between two entirely different input widgets below, not
-          between two states of the same control, so a lighter-weight
-          control reads more honestly here than reusing ReadingLevelSelector's
-          ToggleGroup. */}
-      <div className="mb-3 flex gap-2 text-body">
-        <button
-          type="button"
-          onClick={() => setMode("file")}
-          className={cn(
-            "rounded-sm px-3 py-1.5 font-medium",
-            mode === "file" ? "bg-accent-verified-soft text-accent-verified" : "text-ink-secondary",
-          )}
-        >
-          Upload PDF
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("text")}
-          className={cn(
-            "rounded-sm px-3 py-1.5 font-medium",
-            mode === "text" ? "bg-accent-verified-soft text-accent-verified" : "text-ink-secondary",
-          )}
-        >
-          Paste text
-        </button>
+      {/* Mode toggle pill selector per DESIGN.md */}
+      <div className="mb-4 flex items-center justify-between">
+        <div className="inline-flex gap-1 rounded-full border border-[#e5e5e5] bg-[#ffffff] p-1 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setMode("file")}
+            className={cn(
+              "rounded-full px-3.5 py-1 text-xs font-medium transition-colors",
+              mode === "file" ? "bg-[#0a0a0a] text-white" : "text-[#737373] hover:text-[#171717]",
+            )}
+          >
+            Upload PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("text")}
+            className={cn(
+              "rounded-full px-3.5 py-1 text-xs font-medium transition-colors",
+              mode === "text" ? "bg-[#0a0a0a] text-white" : "text-[#737373] hover:text-[#171717]",
+            )}
+          >
+            Paste Text
+          </button>
+        </div>
+
+        <span className="text-xs text-[#737373] flex items-center gap-1">
+          <ShieldCheck className="h-3.5 w-3.5 text-[#16a34a]" />
+          Instant verification
+        </span>
       </div>
 
       {mode === "file" ? (
@@ -74,40 +69,47 @@ export function UploadDropzone({ file, text, onFileChange, onTextChange }) {
             }}
             onClick={() => inputRef.current?.click()}
             className={cn(
-              "flex w-full min-h-[200px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 text-center shadow-[0_1px_2px_rgba(20,23,31,0.04),0_4px_12px_rgba(20,23,31,0.06)]",
-              isDragging ? "border-solid border-accent-verified" : "border-border-default",
+              "flex w-full min-h-[220px] cursor-pointer flex-col items-center justify-center gap-3 rounded-[12px] border border-dashed p-8 text-center bg-white transition-all hover:border-[#a3a3a3]",
+              isDragging ? "border-solid border-[#2563eb] bg-[#f5f5f5]" : "border-[#e5e5e5]",
             )}
           >
             {file ? (
-              <>
-                <FileText className="h-8 w-8 text-accent-verified" aria-hidden="true" />
-                <p className="text-body font-medium">{file.name}</p>
-                <p className="text-caption text-ink-secondary">Click to choose a different file</p>
-              </>
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#dbeaff] text-[#2563eb]">
+                  <FileText className="h-6 w-6" aria-hidden="true" />
+                </div>
+                <p className="text-sm font-medium text-[#171717]">{file.name}</p>
+                <p className="text-xs text-[#737373]">Click or drag to replace PDF</p>
+              </div>
             ) : (
-              <>
-                <Upload className="h-8 w-8 text-ink-secondary" aria-hidden="true" />
-                <p className="text-body font-medium">Drop a PDF here, or click to browse</p>
-                <p className="text-caption text-ink-secondary">Text-based PDFs only, up to 20MB</p>
-              </>
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#f5f5f5] text-[#737373]">
+                  <Upload className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <p className="text-sm font-medium text-[#171717]">
+                  Drop research paper PDF here, or <span className="text-[#2563eb] underline">browse</span>
+                </p>
+                <p className="text-xs text-[#737373]">Text-based PDFs up to 20MB</p>
+              </div>
             )}
           </button>
         </>
       ) : (
         <>
-          <label htmlFor="paper-text" className="mb-2 block text-body font-medium text-ink-primary">
-            Paper text
+          <label htmlFor="paper-text" className="mb-2 block text-xs font-medium text-[#737373] uppercase tracking-wider">
+            Paper Content
           </label>
           <textarea
             id="paper-text"
             value={text}
             onChange={(e) => onTextChange(e.target.value)}
-            placeholder="Paste the paper's text here…"
-            rows={10}
-            className="w-full rounded-lg border border-border-default bg-surface-raised p-4 text-body shadow-[0_1px_2px_rgba(20,23,31,0.04),0_4px_12px_rgba(20,23,31,0.06)] focus:border-accent-verified"
+            placeholder="Paste raw academic paper text here…"
+            rows={8}
+            className="w-full rounded-[6px] border border-[#000000] bg-white p-4 text-sm text-[#171717] placeholder-[#737373] focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
           />
         </>
       )}
     </div>
   )
 }
+

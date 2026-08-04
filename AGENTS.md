@@ -1,3 +1,19 @@
+# AGENTS.md — PaperViz 
+## Quick Rules 
+- MUST follow ARCHITECTURE.md layer boundaries (`handlers → services → repository/external`) without exception.
+- MUST NOT introduce an ORM, job queue, message broker, or microservice split — see ARCHITECTURE.md Non-goals.- MUST NOT persist uploaded PDF bytes to disk.
+- MUST NOT route LLM calls through any gateway other than direct Gemini API for MVP.
+- MUST run tests before marking any task complete.
+
+## Design System Rules
+For any task that modifies or generates UI, styling, layout, or components:
+1. Read `@DESIGN.md` completely before implementation.
+2. Treat it as the absolute source of truth.
+3. Do not invent any colors, spacing, or fonts outside of these rules.
+
+## Project Context 
+PaperViz converts academic papers (PDF/pasted text) into simplified-language versions plus re-visualized charts, served at ephemeral (7-day) no-auth share links. Target user: undergraduate students. Full context in PRD.md. Solo-dev project with ~1hr/day human oversight — agent autonomy within a phase is expected, but cross-phase scope changes require explicit human sign-off. --- ## Tech Stack - Backend: Go 1.22+, `chi` router, `modernc.org/sqlite` (no CGO), raw `database/sql`.- Frontend: React 18 + Vite + Tailwind CSS + shadcn/ui, Recharts for chart rendering.- LLM: Google Gemini API, direct HTTP integration.- PDF processing: Go-native text/image extraction libraries (pinned exact versions in `go.mod`).- No Docker/orchestration requirement for MVP — single binary + SQLite file.
+
 ## graphify
 
 Code graph at `graphify-out/`. Query before grep/read.
@@ -37,3 +53,22 @@ When schema changes (new column/table):
    - New `GenerateChapterChart()` in `charts.go`: one Gemini call per chapter, chart type varies (bar/line/pie/scatter)
    - Old `ExtractChartsFromText`, `fullTextChartPrompt` removed. `textChartElem` kept (test compat).
    - Image fallback path (`ReVisualizeCharts`) unchanged.
+
+---
+
+## Coding Conventions 
+- MUST follow standard Go formatting (`gofmt`) 
+— non-negotiable, run before every commit.
+- MUST use explicit error returns (`if err != nil`) 
+— no panics for expected error paths (validation failures, API timeouts). Panics reserved for truly unrecoverable states (e.g., failed DB connection at startup).
+- MUST NOT use global mutable state for request-scoped data (document ID, request context) 
+— pass explicitly.
+- Service functions MUST be pure with respect to side effects where possible: `func Simplify(text string, level string) (string, error)` 
+— no hidden reads from global config inside business logic functions; pass config explicitly.
+- Naming: Go idiomatic (`CamelCase` exported, `camelCase` unexported). No Hungarian notation, no abbreviation-heavy naming.- Logging: structured JSON via standard library or a single chosen logging lib — MUST NOT log full document text content (see ARCHITECTURE.md Logging Policy).
+
+## Testing Rules 
+- Every service function MUST have a table-driven unit test: minimum 1 success case, 1 error case.
+- Pipeline integration test REQUIRED covering all 4 Acceptance Scenarios and 4 Failure Scenarios listed in ARCHITECTURE.md Section 6.
+- MUST run `go test ./...` before considering any task in PLAN.md complete.
+- Claim-diff verification MUST be tested against the Phase 0 corrupted-passage case (PLAN.md) to confirm it actually catches injected errors — a verification system that never fails its own test is not proven. 

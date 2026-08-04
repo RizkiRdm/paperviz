@@ -1,19 +1,14 @@
-// Button — matches DESIGN.md "Components > Buttons" exactly:
-//   Primary:   --accent-verified fill, white text, radius-md, shadow-card on hover only.
-//   Secondary: transparent fill, --ink-primary text, 1px --border-default border, radius-md.
-//   Disabled:  0.4 opacity, no hover transform.
-//
-// asChild lets a caller render this styling on a different element (e.g. an
-// <a> for a "copy link" action) without wrapping in an extra <button> — the
-// standard shadcn/ui pattern via Radix's Slot primitive.
+// ponytail: button variants per DESIGN.md (Filled Dark CTA #0a0a0a, Outlined #ffffff with #e5e5e5 border, Ghost)
 import { Slot } from "@radix-ui/react-slot"
 import { cn } from "@/lib/utils"
 
 const variantClasses = {
   primary:
-    "bg-accent-verified text-white hover:shadow-[0_1px_2px_rgba(20,23,31,0.04),0_4px_12px_rgba(20,23,31,0.06)]",
+    "bg-[#0a0a0a] text-white hover:bg-[#171717] shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]",
   secondary:
-    "bg-transparent text-ink-primary border border-border-default hover:bg-surface-raised",
+    "bg-white text-[#171717] border border-[#e5e5e5] hover:bg-[#f5f5f5]",
+  ghost:
+    "bg-transparent text-[#171717] hover:bg-[#f5f5f5]",
 }
 
 export function Button({
@@ -28,8 +23,7 @@ export function Button({
     <Comp
       disabled={disabled}
       className={cn(
-        // DESIGN.md "Do's and Don'ts": min 44x44px touch targets.
-        "inline-flex min-h-[44px] items-center justify-center rounded-md px-4 text-body font-medium transition-shadow",
+        "inline-flex min-h-[40px] items-center justify-center rounded-[8px] px-4 text-sm font-medium transition-all active:scale-[0.99]",
         "disabled:pointer-events-none disabled:opacity-40",
         variantClasses[variant],
         className,
@@ -38,3 +32,4 @@ export function Button({
     />
   )
 }
+

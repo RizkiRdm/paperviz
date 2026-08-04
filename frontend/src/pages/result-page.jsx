@@ -1,42 +1,15 @@
-// ResultPage — PRD.md "User Flows > Primary Flow" steps 3-5: processing
-// indicator while polling, then simplified text with an original-text
-// toggle, charts inline with annotations, and a verification badge/warning
-// depending on outcome. This is the single most state-heavy component in
-// the app; read the polling effect first, then the render branches below
-// it follow the same status values the backend can return.
-//
-// Note: the fetched document is stored as `doc`, not `document` — using
-// `document` as a variable name would shadow the global window.document
-// object for the rest of this file, which is a real footgun in any
-// component that might later need DOM APIs.
+// ponytail: result page redesign with Dub top bar, card containers, and toggle pills
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { VerificationBadge, WarningBanner, ErrorBanner } from "@/components/ui/status-banners"
 import { ChartCard } from "@/components/chart-card"
 import { getDocument } from "@/lib/api"
+import { ArrowLeft, Copy, Check, Sparkles, RefreshCw, BarChart2 } from "lucide-react"
 
-// POLL_INTERVAL_MS matches ARCHITECTURE.md Section E's client contract
-// exactly: "Client polling interval for processing status: REQUIRED
-// minimum 2s between polls (frontend-enforced)." Do not lower this without
-// updating that doc first — it's a stated server-side assumption, not just
-// a frontend performance choice.
 const POLL_INTERVAL_MS = 2000
-
-// POLL_TIMEOUT_MS bounds the processing wait: if a document is stuck (e.g.
-// server restarted mid-pipeline), the user gets an exit instead of an
-// infinite spinner. Assumption value — negotiable, not a contract.
 const POLL_TIMEOUT_MS = 120000
-
-// COPY_FEEDBACK_MS — how long the button label stays "Copied!" after a
-// successful clipboard write before reverting to "Copy link".
 const COPY_FEEDBACK_MS = 2000
 
-// CopyLinkButton — PRD.md "User Flows > Primary Flow" share step: the user
-// can copy the shareable link. Uses navigator.clipboard when available
-// (secure context only); if the API is missing or the write is rejected
-// (older browser, non-HTTPS, permission denied), falls back to a visible
-// selectable <input> instead of failing silently. Confirmation is a local
-// state swap for ~2s — no toast library (none in package.json).
 function CopyLinkButton() {
   const [copied, setCopied] = useState(false)
   const [showUrlFallback, setShowUrlFallback] = useState(false)
@@ -61,20 +34,26 @@ function CopyLinkButton() {
       <Button
         variant="secondary"
         onClick={handleCopy}
-        className={`transition active:scale-[0.98] ${
-          copied ? "border-accent-verified/30 bg-accent-verified-soft text-accent-verified" : ""
-        }`}
+        className="h-9 px-3 text-xs gap-1.5 font-medium"
       >
-        {copied ? "Copied!" : "Copy link"}
+        {copied ? (
+          <>
+            <Check className="h-3.5 w-3.5 text-[#16a34a]" /> Copied Link
+          </>
+        ) : (
+          <>
+            <Copy className="h-3.5 w-3.5 text-[#737373]" /> Share Link
+          </>
+        )}
       </Button>
       {showUrlFallback && (
         <div className="flex flex-col gap-1">
-          <span className="text-caption text-ink-secondary">Copy this link manually</span>
+          <span className="text-xs text-[#737373]">Copy manually:</span>
           <input
             readOnly
             value={window.location.href}
             onFocus={(e) => e.target.select()}
-            className="w-72 max-w-full rounded-md border border-border-default bg-surface-raised px-3 py-2 text-body text-ink-primary"
+            className="w-64 rounded-[6px] border border-[#000000] bg-white px-2.5 py-1 text-xs text-[#171717]"
           />
         </div>
       )}
@@ -114,7 +93,9 @@ export function ResultPage({ documentId, onBack }) {
           setError(
             err.code === "not_found"
               ? "This link has expired or doesn't exist."
-              : "Something went wrong loading this document.",
+              : err.code === "network_timeout"
+                ? "The request timed out. Please check your connection."
+                : "Something went wrong loading this document."
           )
         }
       }
@@ -129,114 +110,163 @@ export function ResultPage({ documentId, onBack }) {
 
   if (timedOut) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 text-center">
-        <p className="text-body text-ink-secondary">This is taking longer than usual.</p>
-        <button
-          onClick={() => setRetryNonce((n) => n + 1)}
-          className="mt-6 rounded-sm px-3 py-1.5 text-body font-medium bg-accent-verified-soft text-accent-verified"
-        >
-          Retry
-        </button>
-        <button onClick={onBack} className="mt-4 text-body text-accent-verified underline">
-          Start over
-        </button>
-      </main>
+      <div className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md rounded-[16px] border border-[#e5e5e5] bg-white p-8 shadow-xs">
+          <p className="text-sm text-[#737373]">Processing is taking longer than expected.</p>
+          <div className="mt-6 flex flex-col gap-2">
+            <Button onClick={() => setRetryNonce((n) => n + 1)} variant="primary">
+              <RefreshCw className="h-4 w-4 mr-2" /> Check Status Again
+            </Button>
+            <Button onClick={onBack} variant="secondary">
+              Upload Another Paper
+            </Button>
+          </div>
+        </div>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <main className="mx-auto max-w-2xl px-6 py-16">
-        <ErrorBanner message={error} />
-        <button onClick={onBack} className="mt-4 text-body text-accent-verified underline">
-          Start over
-        </button>
-      </main>
+      <div className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6">
+        <div className="max-w-md w-full">
+          <ErrorBanner message={error} />
+          <Button onClick={onBack} variant="secondary" className="mt-4 w-full">
+            Start Over
+          </Button>
+        </div>
+      </div>
     )
   }
 
   if (!doc || doc.status === "processing") {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 text-center">
-        <p className="text-body text-ink-secondary">
-          Reading your paper and rewriting it — this usually takes under a minute.
-        </p>
-      </main>
+      <div className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md rounded-[16px] border border-[#e5e5e5] bg-white p-8 shadow-xs flex flex-col items-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#2563eb] border-t-transparent mb-4" />
+          <h2 className="font-satoshi text-lg font-medium text-[#0a0a0a]">Simplifying & Verifying...</h2>
+          <p className="mt-2 text-xs text-[#737373] leading-relaxed">
+            Reading paper, generating plain language summary, and verifying key statements against source.
+          </p>
+        </div>
+      </div>
     )
   }
 
   if (doc.status === "failed") {
     return (
-      <main className="mx-auto max-w-2xl px-6 py-16">
-        <ErrorBanner message="We couldn't process this document. Please try again." />
-        <button onClick={onBack} className="mt-4 text-body text-accent-verified underline">
-          Start over
-        </button>
-      </main>
+      <div className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6">
+        <div className="max-w-md w-full">
+          <ErrorBanner message="We couldn't process this document. Please check the PDF format and try again." />
+          <Button onClick={onBack} variant="secondary" className="mt-4 w-full">
+            Start Over
+          </Button>
+        </div>
+      </div>
     )
   }
 
-  // status is "complete" or "verification_failed" from here on — both
-  // have simplified_text to show (ARCHITECTURE.md Acceptance Scenario 4:
-  // a mismatch flags the result, it doesn't delete it).
   const displayedText = showOriginal ? doc.original_text : doc.simplified_text
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
-      <div className="flex items-center justify-between gap-4">
-        <button onClick={onBack} className="text-body text-ink-secondary hover:text-ink-primary">
-          ← New document
-        </button>
-        <div className="flex flex-col items-end gap-1">
+    <div className="min-h-screen bg-white text-[#171717] bg-dotted-grid">
+      {/* Top Bar Navigation */}
+      <header className="border-b border-[#e5e5e5] bg-white/80 backdrop-blur-xs sticky top-0 z-10">
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-3.5">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-xs font-medium text-[#737373] hover:text-[#0a0a0a] transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" /> New Document
+            </button>
+            <span className="h-4 w-px bg-[#e5e5e5]" />
+            <span className="font-mono text-xs font-semibold text-[#0a0a0a]">PaperViz</span>
+          </div>
+
           <div className="flex items-center gap-3">
-            <CopyLinkButton />
             {doc.status === "complete" && <VerificationBadge />}
+            <CopyLinkButton />
           </div>
-          <span className="text-caption text-ink-secondary">Anyone with this link can view this document.</span>
         </div>
-      </div>
+      </header>
 
-      {doc.status === "verification_failed" && (
-        <div className="mt-6">
-          <WarningBanner />
-        </div>
-      )}
-
-      <div className="mt-6 flex items-center gap-2">
-        <button
-          onClick={() => setShowOriginal(false)}
-          className={`rounded-sm px-3 py-1.5 text-body font-medium ${!showOriginal ? "bg-accent-verified-soft text-accent-verified" : "text-ink-secondary"}`}
-        >
-          Simplified
-        </button>
-        <button
-          onClick={() => setShowOriginal(true)}
-          className={`rounded-sm px-3 py-1.5 text-body font-medium ${showOriginal ? "bg-accent-verified-soft text-accent-verified" : "text-ink-secondary"}`}
-        >
-          Original
-        </button>
-      </div>
-
-      <article className="mt-6 max-w-prose text-reading font-reading text-ink-primary whitespace-pre-wrap">
-        {displayedText}
-      </article>
-
-      <section className="mt-12">
-        <h2 className="text-h2 text-ink-primary">Charts</h2>
-        {doc.charts && doc.charts.length > 0 ? (
-          <div className="mt-4 flex flex-col gap-4">
-            {doc.charts.map((chart) => (
-              <ChartCard key={chart.id} chart={chart} />
-            ))}
+      {/* Content Container */}
+      <main className="mx-auto max-w-[900px] px-6 py-12">
+        {doc.status === "verification_failed" && (
+          <div className="mb-6">
+            <WarningBanner />
           </div>
-        ) : doc.chart_extraction_degraded ? (
-          <p className="mt-4 text-body text-ink-secondary">
-            Chart extraction couldn&apos;t complete for this document. The rest of the content is unaffected.
-          </p>
-        ) : (
-          <p className="mt-4 text-body text-ink-secondary">No charts detected in this document.</p>
         )}
-      </section>
-    </main>
+
+        {/* Action Bar & Mode Switcher */}
+        <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-[#e5e5e5]">
+          <div>
+            <h1 className="font-satoshi text-2xl sm:text-3xl font-medium text-[#0a0a0a]">
+              Paper Summary
+            </h1>
+            <p className="text-xs text-[#737373] mt-1">
+              7-day share link ready · {showOriginal ? "Showing Original Text" : "Showing Plain Language Version"}
+            </p>
+          </div>
+
+          {/* View Toggle Pill */}
+          <div className="inline-flex gap-1 rounded-full border border-[#e5e5e5] bg-white p-1 shadow-2xs">
+            <button
+              onClick={() => setShowOriginal(false)}
+              className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
+                !showOriginal ? "bg-[#0a0a0a] text-white" : "text-[#737373] hover:text-[#171717]"
+              }`}
+            >
+              Simplified
+            </button>
+            <button
+              onClick={() => setShowOriginal(true)}
+              className={`rounded-full px-3.5 py-1 text-xs font-medium transition-colors ${
+                showOriginal ? "bg-[#0a0a0a] text-white" : "text-[#737373] hover:text-[#171717]"
+              }`}
+            >
+              Original
+            </button>
+          </div>
+        </div>
+
+        {/* Simplified / Original Text Container */}
+        <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
+          <div className="prose prose-neutral max-w-none text-[#171717] text-base leading-relaxed whitespace-pre-wrap font-inter">
+            {displayedText}
+          </div>
+        </article>
+
+        {/* Charts Section */}
+        <section className="mt-12">
+          <div className="flex items-center gap-2 mb-6">
+            <BarChart2 className="h-5 w-5 text-[#2563eb]" />
+            <h2 className="font-satoshi text-xl font-medium text-[#0a0a0a]">
+              Charts & Visualizations
+            </h2>
+          </div>
+
+          {doc.charts && doc.charts.length > 0 ? (
+            <div className="flex flex-col gap-6">
+              {doc.charts.map((chart) => (
+                <ChartCard key={chart.id} chart={chart} />
+              ))}
+            </div>
+          ) : doc.chart_extraction_degraded ? (
+            <div className="rounded-[12px] border border-[#e5e5e5] bg-[#f5f5f5] p-5 text-center">
+              <p className="text-xs text-[#737373]">
+                Chart extraction could not complete for this document. Summary content is unaffected.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-[12px] border border-[#e5e5e5] bg-[#f5f5f5] p-5 text-center">
+              <p className="text-xs text-[#737373]">No charts were detected in this paper.</p>
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
   )
 }
+

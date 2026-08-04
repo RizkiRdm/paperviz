@@ -1,5 +1,4 @@
 # Blueprint Document
-
 Blueprint Version: 1.0
 Project Name: PaperViz
 Architecture Style: Monolith, single binary
