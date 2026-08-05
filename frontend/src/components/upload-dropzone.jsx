@@ -57,6 +57,7 @@ export function UploadDropzone({ file, text, onFileChange, onTextChange }) {
           />
           <button
             type="button"
+            aria-label="Upload a PDF file"
             onDragOver={(e) => {
               e.preventDefault()
               setIsDragging(true)

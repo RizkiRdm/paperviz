@@ -8,6 +8,7 @@
 import { useState, useEffect } from "react"
 import { UploadPage } from "@/pages/upload-page"
 import { ResultPage } from "@/pages/result-page"
+import { ErrorBoundary } from "@/components/error-boundary"
 
 // Reads a document ID directly out of the URL path (e.g. "/V1StGXR8_Z5jdHi6B")
 // so a shared link opens straight to the result page on first load, per
@@ -42,9 +43,13 @@ export default function App() {
     setDocumentId(null)
   }
 
-  if (documentId) {
-    return <ResultPage documentId={documentId} onBack={handleBack} />
-  }
-
-  return <UploadPage onCreated={handleCreated} />
+  return (
+    <ErrorBoundary>
+      {documentId ? (
+        <ResultPage documentId={documentId} onBack={handleBack} />
+      ) : (
+        <UploadPage onCreated={handleCreated} />
+      )}
+    </ErrorBoundary>
+  )
 }

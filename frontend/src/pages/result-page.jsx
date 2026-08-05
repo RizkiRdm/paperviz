@@ -164,7 +164,11 @@ const STAGE_LABELS = {
   if (!doc || doc.status === "processing") {
     const stageLabel = doc?.processing_stage ? STAGE_LABELS[doc.processing_stage] || doc.processing_stage : null
     return (
-      <div className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6 text-center">
+      <div
+        role="status"
+        aria-live="polite"
+        className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6 text-center"
+      >
         <div className="max-w-md rounded-[16px] border border-[#e5e5e5] bg-white p-8 shadow-xs flex flex-col items-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#2563eb] border-t-transparent mb-4" />
           <h2 className="font-satoshi text-lg font-medium text-[#0a0a0a]">

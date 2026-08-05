@@ -27,6 +27,11 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	// middleware, not a new dependency (chi ships it).
 	r.Use(middleware.Recoverer)
 
+	// SecurityHeaders sets X-Content-Type-Options, X-Frame-Options, and
+	// CSP on every response. Must run before logging so headers are set
+	// when log captures response.
+	r.Use(SecurityHeaders)
+
 	// slogRequestLogger logs every request with method, path, status,
 	// duration, and request ID — structured JSON output via slog.
 	r.Use(slogRequestLogger)
