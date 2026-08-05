@@ -2,13 +2,14 @@
 
 ## Objective
 
-CHUNK 6 complete. Ready for CHUNK 7 (chart re-visualization frontend integration) or next user direction.
+All PAPERVIZ_AGENT_TASKS.md chunks (0–9) complete. Await user direction.
 
 ## Requirements
 
-- CHUNK 6 shipped: chart types, reading level badge, error messages, copy text, share dialog, processing stage tracking.
-- DB schema changed: `processing_stage` column added to documents table.
-- Existing dev DB needs reset: `rm paperviz.db paperviz.db-wal paperviz.db-shm` then restart server.
+- CHUNKS 6–9 shipped: error boundary, dropzone aria-label, aria-live polling, security headers.
+- Backend CSP allows Google Fonts + Fontshare (fonts.googleapis.com, fonts.gstatic.com, api.fontshare.com).
+- Error boundary is class component (hooks can't catch render errors).
+- Processing branch has `role="status"` + `aria-live="polite"` for screen reader announcements.
 
 ## Constraints
 
@@ -19,19 +20,18 @@ CHUNK 6 complete. Ready for CHUNK 7 (chart re-visualization frontend integration
 
 ## Relevant Files
 
-- `frontend/src/components/data-chart.jsx` — bar/line/pie/scatter support
-- `frontend/src/pages/result-page.jsx` — badge, error, copy, share, stage
-- `internal/handlers/documents.go` — stage callback + GET response
-- `internal/repository/documents.go` — processing_stage column + UpdateStage
-- `internal/repository/types.go` — ProcessingStage field
-- `internal/services/pipeline.go` — OnStage callback
-- `migrations/001_init.sql` — processing_stage column
+- `frontend/src/components/error-boundary.jsx` — ErrorBoundary class component
+- `frontend/src/App.jsx` — wraps both ResultPage and UploadPage
+- `frontend/src/components/upload-dropzone.jsx` — aria-label on dropzone button
+- `frontend/src/pages/result-page.jsx` — aria-live on processing branch
+- `internal/handlers/security_headers.go` — SecurityHeaders middleware
+- `internal/handlers/router.go` — middleware wiring
 
 ## Progress
 
-- CHUNK 6 committed and pushed to main.
-- Go build passes, 17/17 tests pass, npm build passes.
+- All chunks (0–9) committed and pushed to main.
+- Go build passes, npm build passes.
 
 ## Next Action
 
-Await user direction for CHUNK 7 or other work.
+Await user direction for new features or next phase.

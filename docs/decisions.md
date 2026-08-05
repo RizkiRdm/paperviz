@@ -2,6 +2,27 @@
 
 Historical entries are append-only. Deprecate decisions instead of deleting them.
 
+## 2026-08-06 — Error boundary as class component
+
+- **Context:** Zero error boundaries in app. Any uncaught render error blanks entire page with no message.
+- **Decision:** Create `ErrorBoundary` class component with `getDerivedStateFromError` + `componentDidCatch`. Wrap both `ResultPage` and `UploadPage` branches in `App.jsx`. Fallback UI uses existing `ErrorBanner` + Reload button.
+- **Alternatives considered:** Hooks-only version (can't catch render errors); error boundary per page; Sentry integration.
+- **Consequences:** Class component required (React limitation). Catches all render errors in both pages. No external dependencies added.
+
+## 2026-08-06 — Security headers via chi middleware
+
+- **Context:** Static file serving sets no security headers (no CSP, X-Frame-Options, X-Content-Type-Options).
+- **Decision:** New `SecurityHeaders` middleware in `internal/handlers/security_headers.go`. Sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and CSP allowing Google Fonts + Fontshare. Wired after `Recoverer`, before `slogRequestLogger`.
+- **Alternatives considered:** Headers in `cmd/server/main.go`; per-handler headers; nginx/reverse proxy.
+- **Consequences:** All responses get security headers. CSP allows `fonts.googleapis.com`, `fonts.gstatic.com`, `api.fontshare.com`. `connect-src 'self'` blocks cross-origin API calls.
+
+## 2026-08-06 — aria-live on processing branch only
+
+- **Context:** Screen reader users get no announcement when document status changes from "processing" to "complete"/"failed".
+- **Decision:** Add `role="status"` + `aria-live="polite"` to processing branch `<div>` wrapper. ErrorBanner/WarningBanner already have `role="alert"` (self-announcing).
+- **Alternatives considered:** aria-live on complete branch; aria-live on entire ResultPage; live region outside processing branch.
+- **Consequences:** Stage changes announced ("Simplifying language..." → "Verifying claims..."). No double-wrapping of error/warning banners.
+
 ## 2026-08-04 — Chart type switching via chartData.type
 
 - **Context:** `data-chart.jsx` only rendered BarCharts. Pipeline generates charts with `type` field (bar/line/pie/scatter) but frontend ignored it.

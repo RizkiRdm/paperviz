@@ -20,6 +20,10 @@
 
 ## Completed
 
+- CHUNK 9: security headers (X-Content-Type-Options, X-Frame-Options, CSP).
+- CHUNK 8: aria-live polling status for screen reader announcements.
+- CHUNK 7: keyboard-accessible dropzone (aria-label on native button).
+- CHUNK 6: React ErrorBoundary class component wrapping App.
 - CHUNK 6: chart types, reading level badge, error messages, copy text, share dialog, processing stage tracking.
 - CHUNK 5: API layer, upload page, result page, share link copy.
 - CHUNK 4: client-side PDF size/type validation and browser verification.
