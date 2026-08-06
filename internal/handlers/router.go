@@ -37,9 +37,20 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	r.Use(slogRequestLogger)
 
 	docHandler := NewDocumentHandler(db, gemini)
+	authMiddleware := NewAuthMiddleware(db)
+
 	r.Route("/api/documents", func(r chi.Router) {
-		r.With(rateLimitDocumentCreate).Post("/", docHandler.Create)
+		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth).Post("/", docHandler.Create)
 		r.Get("/{id}", docHandler.Get)
+		r.With(authMiddleware.RequireAuth).Get("/", docHandler.List)
+	})
+
+	authHandler := NewAuthHandler(db)
+	r.Route("/api/auth", func(r chi.Router) {
+		r.Post("/signup", authHandler.Signup)
+		r.Post("/login", authHandler.Login)
+		r.Post("/logout", authHandler.Logout)
+		r.Get("/me", authHandler.Me)
 	})
 
 	// Serve the built SPA for everything else. Any unmatched path falls

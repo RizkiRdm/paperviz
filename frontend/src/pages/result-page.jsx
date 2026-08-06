@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react"
+import { useParams, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { VerificationBadge, WarningBanner, ErrorBanner } from "@/components/ui/status-banners"
 import { ChartCard } from "@/components/chart-card"
 import { getDocument } from "@/lib/api"
 import { ArrowLeft, Copy, Check, Sparkles, RefreshCw, BarChart2, Link2, X } from "lucide-react"
+import { NotFoundPage } from "@/pages/not-found-page"
 
 const POLL_INTERVAL_MS = 2000
 const POLL_TIMEOUT_MS = 120000
@@ -67,9 +69,13 @@ function ShareDialog({ url, onClose }) {
   )
 }
 
-export function ResultPage({ documentId, onBack }) {
+export function ResultPage() {
+  const { documentId } = useParams()
+  const navigate = useNavigate()
+  const onBack = () => navigate("/")
   const [doc, setDoc] = useState(null)
   const [error, setError] = useState(null)
+  const [notFound, setNotFound] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
@@ -100,13 +106,15 @@ export function ResultPage({ documentId, onBack }) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(
-            err.code === "not_found"
-              ? "This link has expired or doesn't exist."
-              : err.code === "network_timeout"
+          if (err.code === "not_found") {
+            setNotFound(true)
+          } else {
+            setError(
+              err.code === "network_timeout"
                 ? "The request timed out. Please check your connection."
                 : "Something went wrong loading this document."
-          )
+            )
+          }
         }
       }
     }
@@ -122,6 +130,10 @@ export function ResultPage({ documentId, onBack }) {
       clearTimeout(copyTimerRef.current)
       copyTimerRef.current = setTimeout(() => setTextCopied(false), COPY_FEEDBACK_MS)
     } catch {}
+  }
+
+  if (notFound) {
+    return <NotFoundPage />
   }
 
   if (timedOut) {

@@ -13,6 +13,7 @@ type Document struct {
 	ErrorMessage            *string
 	ChartExtractionDegraded bool
 	ProcessingStage         *string
+	UserID                  *string // nullable — anonymous docs have NULL user_id
 }
 
 // Chart mirrors the charts table.

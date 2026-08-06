@@ -1,5 +1,6 @@
 // ponytail: upload page redesign with Satoshi display headline, pill feature tags & hairline card surface
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { UploadDropzone } from "@/components/upload-dropzone"
 import { ReadingLevelSelector } from "@/components/ui/reading-level-selector"
 import { Button } from "@/components/ui/button"
@@ -21,7 +22,8 @@ const ERROR_MESSAGES = {
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
 
-export function UploadPage({ onCreated }) {
+export function UploadPage() {
+  const navigate = useNavigate()
   const [file, setFile] = useState(null)
   const [text, setText] = useState("")
   const [readingLevel, setReadingLevel] = useState("simplified")
@@ -39,7 +41,7 @@ export function UploadPage({ onCreated }) {
     setIsSubmitting(true)
     try {
       const result = await createDocument({ file, text, readingLevel })
-      onCreated(result.document_id)
+      navigate(`/${result.document_id}`)
     } catch (err) {
       setError(ERROR_MESSAGES[err.code] || ERROR_MESSAGES.unknown_error)
       setIsSubmitting(false)

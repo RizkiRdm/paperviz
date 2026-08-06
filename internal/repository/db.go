@@ -4,18 +4,16 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"sort"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
 
 // Open opens (creating if needed) the SQLite database at path and applies
-// the schema migration if the documents table does not yet exist.
-//
-// ponytail: a single flat migration file is fine at MVP scale (one schema,
-// no history to replay). If the schema needs to evolve post-launch, switch
-// to a numbered migration runner that tracks applied versions in a
-// schema_migrations table before adding a second migration file.
-func Open(dbPath, migrationsSQL string) (*sql.DB, error) {
+// any pending migrations. Migration tracking uses a schema_migrations table
+// to ensure each migration runs exactly once, in order.
+func Open(dbPath string, migrations map[int]string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
@@ -46,30 +44,75 @@ func Open(dbPath, migrationsSQL string) (*sql.DB, error) {
 		return nil, fmt.Errorf("set busy timeout: %w", err)
 	}
 
-	var exists int
-	err = db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='documents'`).Scan(&exists)
-	if err != nil {
+	// Ensure schema_migrations table exists
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+		version INTEGER PRIMARY KEY,
+		applied_at INTEGER NOT NULL
+	)`); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("check schema: %w", err)
+		return nil, fmt.Errorf("create schema_migrations: %w", err)
 	}
 
-	if exists == 0 {
-		if _, err := db.Exec(migrationsSQL); err != nil {
+	// Get applied migrations
+	applied := make(map[int]bool)
+	rows, err := db.Query(`SELECT version FROM schema_migrations`)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("query schema_migrations: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var version int
+		if err := rows.Scan(&version); err != nil {
 			db.Close()
-			return nil, fmt.Errorf("apply migration: %w", err)
+			return nil, fmt.Errorf("scan schema_migrations: %w", err)
+		}
+		applied[version] = true
+	}
+	if err := rows.Err(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("iterate schema_migrations: %w", err)
+	}
+
+	// Sort migration versions
+	versions := make([]int, 0, len(migrations))
+	for v := range migrations {
+		versions = append(versions, v)
+	}
+	sort.Ints(versions)
+
+	// Apply pending migrations
+	for _, version := range versions {
+		if applied[version] {
+			continue
+		}
+
+		migrationSQL := migrations[version]
+		if _, err := db.Exec(migrationSQL); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("apply migration %d: %w", version, err)
+		}
+
+		if _, err := db.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, version, unixNow()); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("record migration %d: %w", version, err)
 		}
 	}
 
 	return db, nil
 }
 
-// ReadMigration loads the migration SQL file from disk. Kept separate from
-// Open so callers control the path (and tests can pass an in-memory schema
-// string directly without touching the filesystem).
+// ReadMigration loads a migration SQL file from disk.
 func ReadMigration(path string) (string, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("read migration %s: %w", path, err)
 	}
 	return string(b), nil
+}
+
+// unixNow returns the current Unix timestamp in seconds.
+func unixNow() int64 {
+	return time.Now().Unix()
 }

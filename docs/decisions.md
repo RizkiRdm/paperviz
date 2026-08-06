@@ -2,6 +2,41 @@
 
 Historical entries are append-only. Deprecate decisions instead of deleting them.
 
+## 2026-08-06 — Auth system: Option A (schema_migrations table)
+
+- **Context:** Need to run multiple SQL migrations in order. Current `db.go` had hardcoded migration logic.
+- **Decision:** Create `schema_migrations` table tracking applied versions. `db.go` rewritten with `map[int]string` migration system. Both 001_init.sql and 002_users.sql loaded and applied in order.
+- **Alternatives considered:** Embed all migrations in one file; use a third-party migration library.
+- **Consequences:** Robust migration tracking for V1.5+. DB schema changed — dev DB needs reset. No external dependencies added.
+
+## 2026-08-06 — Server-side sessions (no JWT/localStorage)
+
+- **Context:** Need session management for auth. JWT in localStorage is insecure (XSS vulnerability).
+- **Decision:** Server-side sessions in SQLite (sessions table: token, user_id, expires_at). httpOnly, Secure, SameSite=Lax cookies. No JWT, no localStorage.
+- **Alternatives considered:** JWT in httpOnly cookies; JWT in localStorage; third-party session store.
+- **Consequences:** More secure than localStorage JWT. Session data server-side (can invalidate). Requires SQLite for session storage.
+
+## 2026-08-06 — AuthMiddleware as struct (not standalone functions)
+
+- **Context:** Need RequireAuth and OptionalAuth middleware. Current middleware.go has standalone functions.
+- **Decision:** Create `AuthMiddleware` struct with DB injection. `RequireAuth` and `OptionalAuth` methods. `contextKey` type for context values. `UserIDFromContext` helper.
+- **Alternatives considered:** Standalone functions with `dbFromRequest` context approach; middleware per-handler.
+- **Consequences:** Cleaner than context-passing approach. Consistent with chi middleware patterns. Easy to test with mock DB.
+
+## 2026-08-06 — Document ownership: nullable user_id
+
+- **Context:** Need to link documents to users while keeping anonymous upload functional.
+- **Decision:** Add nullable `user_id TEXT REFERENCES users(id)` to documents. `OptionalAuth` on POST /api/documents: if user_id in context, store it; if absent, leave NULL (anonymous).
+- **Alternatives considered:** Required user_id (breaks anonymous flow); separate owned_documents table.
+- **Consequences:** Anonymous documents stay valid rows. Authenticated uploads get ownership. List endpoint filters by user_id.
+
+## 2026-08-06 — Frontend routing: react-router-dom
+
+- **Context:** App.jsx had manual popstate routing. Adding login/signup/dashboard requires proper router.
+- **Decision:** Install react-router-dom, replace manual routing with BrowserRouter + Routes. Routes: `/` (upload), `/login`, `/signup`, `/dashboard`, `/:documentId` (result), `*` (404).
+- **Alternatives considered:** Keep manual routing; use other router libraries.
+- **Consequences:** Proper URL handling. Nested routes possible. History API managed by library.
+
 ## 2026-08-06 — Error boundary as class component
 
 - **Context:** Zero error boundaries in app. Any uncaught render error blanks entire page with no message.

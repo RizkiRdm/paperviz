@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 )
@@ -25,4 +26,16 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 
 func writeError(w http.ResponseWriter, status int, code string) {
 	writeJSON(w, status, errorResponse{Error: code})
+}
+
+// readJSON decodes the request body into dst. Returns an error if the body
+// is not valid JSON or exceeds 1MB.
+func readJSON(r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(nil, r.Body, 1<<20) // 1MB limit
+	defer func() {
+		// Drain and close the body to allow connection reuse
+		_, _ = io.Copy(io.Discard, r.Body)
+		r.Body.Close()
+	}()
+	return json.NewDecoder(r.Body).Decode(dst)
 }

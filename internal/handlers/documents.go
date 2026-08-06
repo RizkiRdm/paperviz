@@ -16,6 +16,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -52,11 +53,22 @@ func NewDocumentHandler(db *sql.DB, gemini *external.GeminiClient) *DocumentHand
 	return &DocumentHandler{db: db, gemini: gemini}
 }
 
-// createDocumentResponse is the 201 response body for POST /api/documents,
-// matching ARCHITECTURE.md Section E's API Contract exactly.
 type createDocumentResponse struct {
 	DocumentID string `json:"document_id"`
 	Status     string `json:"status"`
+}
+
+type listDocumentResponse struct {
+	Documents []documentSummary `json:"documents"`
+	Total    int               `json:"total"`
+	Limit    int               `json:"limit"`
+	Offset   int               `json:"offset"`
+}
+
+type documentSummary struct {
+	ID        string `json:"id"`
+	Status    string `json:"status"`
+	CreatedAt int64  `json:"created_at"`
 }
 
 // Create handles POST /api/documents. It is intentionally synchronous up
@@ -143,6 +155,11 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().Unix()
+	var userID *string
+	if uid := UserIDFromContext(r.Context()); uid != "" {
+		userID = &uid
+	}
+
 	doc := repository.Document{
 		ID:             id,
 		CreatedAt:      now,
@@ -151,6 +168,7 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SourceType:     sourceType,
 		ReadingLevel:   readingLevel,
 		OriginalText:   originalText,
+		UserID:         userID,
 	}
 
 	docRepo := repository.NewDocumentRepo(h.db)
@@ -371,5 +389,50 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ErrorMessage:            doc.ErrorMessage,
 		ChartExtractionDegraded: doc.ChartExtractionDegraded,
 		ProcessingStage:         doc.ProcessingStage,
+	})
+}
+
+func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	limit := 20
+	offset := 0
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	docRepo := repository.NewDocumentRepo(h.db)
+	docs, err := docRepo.ListByUser(userID, limit, offset)
+	if err != nil {
+		slog.Error("list documents failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	summaries := make([]documentSummary, 0, len(docs))
+	for _, d := range docs {
+		summaries = append(summaries, documentSummary{
+			ID:        d.ID,
+			Status:    d.Status,
+			CreatedAt: d.CreatedAt,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, listDocumentResponse{
+		Documents: summaries,
+		Total:    len(summaries),
+		Limit:    limit,
+		Offset:   offset,
 	})
 }

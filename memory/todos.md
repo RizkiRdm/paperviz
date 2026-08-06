@@ -20,6 +20,17 @@
 
 ## Completed
 
+- Phase 1 SaaS Foundation: ALL 10 CHUNKS COMPLETE (2026-08-06).
+- CHUNK 10: Responsive smoke test — no fixed-width issues found.
+- CHUNK 9: 404 page (NotFoundPage route + document_not_found handling).
+- CHUNK 8: Copy-link button verification (existing ShareDialog already works).
+- CHUNK 7: Dashboard page with auth check + /api/auth/me endpoint.
+- CHUNK 6: Login and Signup pages with validation.
+- CHUNK 5: Frontend routing (react-router-dom).
+- CHUNK 4: Wire ownership into document handlers (user_id, paginated list).
+- CHUNK 3: Auth middleware (RequireAuth, OptionalAuth).
+- CHUNK 2: Signup/Login handlers (backend).
+- CHUNK 1: DB Migration (users table, document ownership, schema_migrations).
 - CHUNK 9: security headers (X-Content-Type-Options, X-Frame-Options, CSP).
 - CHUNK 8: aria-live polling status for screen reader announcements.
 - CHUNK 7: keyboard-accessible dropzone (aria-label on native button).

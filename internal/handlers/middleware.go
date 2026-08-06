@@ -1,12 +1,27 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+
+	"paperviz/internal/repository"
 )
+
+type contextKey string
+
+const userIDKey contextKey = "user_id"
+
+func UserIDFromContext(ctx context.Context) string {
+	if uid, ok := ctx.Value(userIDKey).(string); ok {
+		return uid
+	}
+	return ""
+}
 
 type responseWriterWrapper struct {
 	http.ResponseWriter
@@ -43,5 +58,56 @@ func slogRequestLogger(next http.Handler) http.Handler {
 			level = slog.LevelWarn
 		}
 		slog.Log(r.Context(), level, "request", args...)
+	})
+}
+
+// AuthMiddleware groups session-based auth middleware that needs DB access.
+type AuthMiddleware struct {
+	db *sql.DB
+}
+
+func NewAuthMiddleware(db *sql.DB) *AuthMiddleware {
+	return &AuthMiddleware{db: db}
+}
+
+// RequireAuth rejects requests without a valid session cookie.
+func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session_token")
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "unauthenticated")
+			return
+		}
+
+		sessionRepo := repository.NewSessionRepo(m.db)
+		session, err := sessionRepo.Get(cookie.Value)
+		if err != nil {
+			writeError(w, http.StatusUnauthorized, "unauthenticated")
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), userIDKey, session.UserID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// OptionalAuth attaches user_id to context if session cookie is valid.
+func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session_token")
+		if err != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		sessionRepo := repository.NewSessionRepo(m.db)
+		session, err := sessionRepo.Get(cookie.Value)
+		if err != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), userIDKey, session.UserID)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

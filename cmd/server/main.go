@@ -65,17 +65,23 @@ func main() {
 		port = "8080"
 	}
 
-	migrationSQL, err := repository.ReadMigration("migrations/001_init.sql")
+	migrations := make(map[int]string)
+
+	migration1SQL, err := repository.ReadMigration("migrations/001_init.sql")
 	if err != nil {
-		// A failed DB connection/schema load at startup is one of the few
-		// cases AGENTS.md allows a panic-equivalent (os.Exit) for — see
-		// Coding Conventions: "Panics reserved for truly unrecoverable
-		// states (e.g., failed DB connection at startup)."
-		slog.Error("failed to read migration file", "error", err)
+		slog.Error("failed to read migration 001", "error", err)
 		os.Exit(1)
 	}
+	migrations[1] = migration1SQL
 
-	db, err := repository.Open(dbPath, migrationSQL)
+	migration2SQL, err := repository.ReadMigration("migrations/002_users.sql")
+	if err != nil {
+		slog.Error("failed to read migration 002", "error", err)
+		os.Exit(1)
+	}
+	migrations[2] = migration2SQL
+
+	db, err := repository.Open(dbPath, migrations)
 	if err != nil {
 		slog.Error("failed to open database", "error", err)
 		os.Exit(1)

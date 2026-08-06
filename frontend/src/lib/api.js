@@ -18,6 +18,10 @@ export class ApiError extends Error {
   }
 }
 
+// Timeout constants (configurable per spec)
+const CREATE_TIMEOUT_MS = 30000 // 30 seconds
+const POLL_TIMEOUT_MS = 10000 // 10 seconds
+
 async function parseErrorResponse(response) {
   try {
     const body = await response.json()
@@ -41,16 +45,23 @@ export async function createDocument({ file, text, readingLevel }) {
     formData.append("text", text)
   }
 
-  const response = await fetch("/api/documents", {
-    method: "POST",
-    body: formData,
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
+  try {
+    const response = await fetch("/api/documents", {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    })
 
-  if (!response.ok) {
-    throw await parseErrorResponse(response)
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
   }
-
-  return response.json() // { document_id, status }
 }
 
 // getDocument polls a document's current state. Per ARCHITECTURE.md
@@ -59,11 +70,18 @@ export async function createDocument({ file, text, readingLevel }) {
 // polling loop, not here, since this function is just the single-request
 // primitive.
 export async function getDocument(id) {
-  const response = await fetch(`/api/documents/${id}`)
-
-  if (!response.ok) {
-    throw await parseErrorResponse(response)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
+  try {
+    const response = await fetch(`/api/documents/${id}`, {
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
   }
-
-  return response.json()
 }

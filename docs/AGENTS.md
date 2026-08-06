@@ -1,6 +1,0 @@
-
----
-
-## Known Issues (populated during implementation)
-
-- **Chart image_fallback path has no image-serving mechanism.** The `charts` table stores `image_blob BLOB` for the image-fallback path (ARCHITECTURE.md Failure Scenario 3), but the documented `GET /api/documents/:id` response contract (Section E) does not include an image field or a way to fetch one. The frontend's `image_fallback` chart state (`frontend/src/components/chart-card.jsx`) currently shows only the generated plain-language annotation and page number — not the original chart image itself. This satisfies PLAN.md Phase 4's "done means" (image-fallback path is demonstrated: original chart + annotation are captured and persisted) but is a visible gap versus PRD.md Core Capability 4's fallback description ("extract the original chart image... overlay a plain-language annotation *alongside it*"). Fixing this requires an architectural decision — either add a new endpoint (e.g. `GET /api/documents/:id/charts/:chartId/image`) or base64-inline the blob into the existing response — and per AGENTS.md's escalation rule, that decision was flagged rather than made unilaterally. Revisit before considering chart re-visualization fully shipped.

@@ -30,9 +30,9 @@ func NewDocumentRepo(db dbExecutor) *DocumentRepo {
 func (r *DocumentRepo) Insert(d Document) error {
 	_, err := r.db.Exec(
 		`INSERT INTO documents
-			(id, created_at, last_accessed_at, status, source_type, reading_level, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.CreatedAt, d.LastAccessedAt, d.Status, d.SourceType, d.ReadingLevel, d.OriginalText, d.SimplifiedText, d.ErrorMessage, d.ChartExtractionDegraded, d.ProcessingStage,
+			(id, created_at, last_accessed_at, status, source_type, reading_level, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		d.ID, d.CreatedAt, d.LastAccessedAt, d.Status, d.SourceType, d.ReadingLevel, d.OriginalText, d.SimplifiedText, d.ErrorMessage, d.ChartExtractionDegraded, d.ProcessingStage, d.UserID,
 	)
 	if err != nil {
 		return fmt.Errorf("insert document: %w", err)
@@ -43,11 +43,11 @@ func (r *DocumentRepo) Insert(d Document) error {
 // Get retrieves a document by ID. Returns ErrNotFound if no row matches.
 func (r *DocumentRepo) Get(id string) (*Document, error) {
 	row := r.db.QueryRow(
-		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage
+		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id
 		FROM documents WHERE id = ?`, id,
 	)
 	var d Document
-	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage)
+	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -97,4 +97,30 @@ func (r *DocumentRepo) DeleteExpiredBefore(cutoff int64) (int64, error) {
 		return 0, fmt.Errorf("delete expired documents: %w", err)
 	}
 	return res.RowsAffected()
+}
+
+// ListByUser returns documents belonging to a user, ordered by most recent, paginated.
+func (r *DocumentRepo) ListByUser(userID string, limit, offset int) ([]Document, error) {
+	rows, err := r.db.Query(
+		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id
+		FROM documents WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		userID, limit, offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list documents by user: %w", err)
+	}
+	defer rows.Close()
+
+	var docs []Document
+	for rows.Next() {
+		var d Document
+		if err := rows.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID); err != nil {
+			return nil, fmt.Errorf("scan document: %w", err)
+		}
+		docs = append(docs, d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate documents: %w", err)
+	}
+	return docs, nil
 }
