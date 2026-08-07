@@ -51,6 +51,20 @@ Historical entries are append-only. Deprecate decisions instead of deleting them
 - **Alternatives considered:** Headers in `cmd/server/main.go`; per-handler headers; nginx/reverse proxy.
 - **Consequences:** All responses get security headers. CSP allows `fonts.googleapis.com`, `fonts.gstatic.com`, `api.fontshare.com`. `connect-src 'self'` blocks cross-origin API calls.
 
+## 2026-08-07 — PipelineOutput moved from pipeline.go to types.go
+
+- **Context:** Adding `Chapters` field to `PipelineOutput` required modifying the struct. Discovered `PipelineOutput` was declared in both `pipeline.go` and `types.go` (redeclaration error).
+- **Decision:** Keep `PipelineOutput` in `types.go` only. Remove duplicate from `pipeline.go`.
+- **Alternatives considered:** Keep in `pipeline.go` and remove from `types.go`.
+- **Consequences:** Single source of truth for pipeline output type. All service-layer types now co-located in `types.go`.
+
+## 2026-08-07 — MismatchDetail as *string in claimDiffResponse
+
+- **Context:** `ClaimDiff.MismatchDetail` is `*string` in repository. Initially declared as `string` in `claimDiffResponse` wire struct.
+- **Decision:** Keep `*string` in response struct to match repository type exactly. Avoids nil-pointer dereference on documents without mismatch detail.
+- **Alternatives considered:** Convert to `string` with empty-default; use `omitempty` with `string`.
+- **Consequences:** API consumers see `null` for documents without mismatch detail (honest representation). No silent empty-string conversion.
+
 ## 2026-08-06 — aria-live on processing branch only
 
 - **Context:** Screen reader users get no announcement when document status changes from "processing" to "complete"/"failed".

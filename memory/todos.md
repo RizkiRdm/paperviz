@@ -20,6 +20,14 @@
 
 ## Completed
 
+- P0 Core Features: ALL 7 CHUNKS COMPLETE (2026-08-07).
+- B5: Frontend chapter summary card above article.
+- B4: Handler saves chapters + exposes in GET response.
+- B3: Pipeline carries chapters through PipelineOutput.
+- B2: ChapterRepo + Chapter type in repository layer.
+- B1: Migration 003_chapters.sql.
+- A2: Expandable claim comparison panel under Verified badge.
+- A1: claim_diff wired through GET response.
 - Phase 1 SaaS Foundation: ALL 10 CHUNKS COMPLETE (2026-08-06).
 - CHUNK 10: Responsive smoke test — no fixed-width issues found.
 - CHUNK 9: 404 page (NotFoundPage route + document_not_found handling).

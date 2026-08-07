@@ -2,49 +2,44 @@
 
 ## Objective
 
-Phase 1 SaaS Foundation COMPLETE. Await user direction for V1.5 scope.
+P0 Core Features COMPLETE. Await user direction for next phase.
 
 ## Requirements
 
-- All 10 chunks complete:
-  - Chunk 1: DB migration (users, sessions, user_id on documents)
-  - Chunk 2: Auth handlers (signup, login, logout, me)
-  - Chunk 3: Auth middleware (RequireAuth, OptionalAuth)
-  - Chunk 4: Document ownership (user_id in create, paginated list)
-  - Chunk 5: Frontend routing (react-router-dom)
-  - Chunk 6: Login and Signup pages
-  - Chunk 7: Dashboard page + /api/auth/me
-  - Chunk 8: Copy-link button verification (existing ShareDialog)
-  - Chunk 9: 404 page (NotFoundPage)
-  - Chunk 10: Responsive smoke test (no breakage <375px)
+- Batch A — Claim-diff verification:
+  - A1: Backend exposes `claim_diff` in GET response (already persisted rows wired through)
+  - A2: Frontend expandable claim comparison panel under Verified badge
+- Batch B — Chapter structure:
+  - B1: Migration `003_chapters.sql` (chapters table + index)
+  - B2: `ChapterRepo` + `Chapter` type in repository layer
+  - B3: Pipeline carries chapters through `PipelineOutput`
+  - B4: `saveResult` persists chapters, Get handler exposes them
+  - B5: Frontend "Sections in this paper" summary card above article
 
 ## Constraints
 
-- Anonymous document creation stays functional (no login required to try product)
-- Only persistence/library/ownership requires an account
-- Server-side sessions in SQLite (no JWT/localStorage)
-- Follow DESIGN.md tokens and existing component patterns
+- No new Gemini calls for claim-diff (reads already-persisted rows)
+- Chapter detection already existed (`DetectChapters`) — only persistence was missing
+- One concern per chunk, sequential execution, BUKTI SELESAI after each
+- DESIGN.md tokens: `rounded-[12px]`, `border-[#e5e5e5]`, `bg-[#f5f5f5]`
 
 ## Relevant Files
 
-- `migrations/002_users.sql` — users + sessions tables
-- `internal/repository/users.go` — UserRepo
-- `internal/repository/sessions.go` — SessionRepo
-- `internal/handlers/auth.go` — Signup, Login, Logout, Me
-- `internal/handlers/middleware.go` — AuthMiddleware
-- `internal/handlers/router.go` — all routes wired
-- `frontend/src/App.jsx` — react-router-dom routes
-- `frontend/src/pages/login-page.jsx` — login form
-- `frontend/src/pages/signup-page.jsx` — signup form
-- `frontend/src/pages/dashboard-page.jsx` — auth-gated doc list
-- `frontend/src/pages/not-found-page.jsx` — 404 UI
+- `internal/handlers/documents.go` — getDocumentResponse, saveResult, Get handler
+- `internal/repository/chapters.go` — ChapterRepo (new)
+- `internal/repository/types.go` — Chapter struct (new)
+- `internal/services/types.go` — PipelineOutput.Chapters field
+- `internal/services/pipeline.go` — passes chapters through
+- `migrations/003_chapters.sql` — new migration
+- `frontend/src/components/ui/status-banners.jsx` — VerificationBadge (onClick), ClaimComparisonPanel (new)
+- `frontend/src/pages/result-page.jsx` — chapter summary card, claim toggle state
 
 ## Progress
 
-- Phase 1 complete. All chunks committed.
+- All 7 chunks committed and pushed (0a9df0f through be738e9).
 - Go build passes, npm build passes.
-- Responsive smoke test passed (no fixed-width issues).
+- DB reset required (new chapters table).
 
 ## Next Action
 
-Await user direction for V1.5 features or next phase.
+Await user direction for next phase.
