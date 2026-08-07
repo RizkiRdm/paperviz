@@ -1,12 +1,43 @@
 // ponytail: status indicators styled per DESIGN.md (Soft Mint badge, Tangerine warning, Red error)
 import { ShieldCheck, AlertTriangle, AlertCircle } from "lucide-react"
 
-export function VerificationBadge() {
+export function VerificationBadge({ onClick }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-medium text-[#16a34a] border border-[#bbf7d0]">
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-medium text-[#16a34a] border border-[#bbf7d0] hover:bg-[#d1fae5] transition-colors cursor-pointer"
+    >
       <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
       Verified
-    </span>
+    </button>
+  )
+}
+
+export function ClaimComparisonPanel({ claimDiff, onClose }) {
+  const original = JSON.parse(claimDiff.original_claims || "[]")
+  const simplified = JSON.parse(claimDiff.simplified_claims || "[]")
+  return (
+    <div className="mt-3 rounded-[12px] border border-[#e5e5e5] bg-[#f5f5f5] p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold text-[#0a0a0a]">Claims checked</p>
+        <button onClick={onClose} className="text-[11px] text-[#737373] hover:text-[#0a0a0a]">Hide</button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+        <div>
+          <p className="font-medium text-[#737373] mb-1.5">Original</p>
+          <ul className="space-y-1 text-[#171717]">
+            {original.map((c, i) => <li key={i}>• {c}</li>)}
+          </ul>
+        </div>
+        <div>
+          <p className="font-medium text-[#737373] mb-1.5">Simplified</p>
+          <ul className="space-y-1 text-[#171717]">
+            {simplified.map((c, i) => <li key={i}>• {c}</li>)}
+          </ul>
+        </div>
+      </div>
+    </div>
   )
 }
 

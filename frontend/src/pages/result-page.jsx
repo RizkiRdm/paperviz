@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { VerificationBadge, WarningBanner, ErrorBanner } from "@/components/ui/status-banners"
+import { VerificationBadge, WarningBanner, ErrorBanner, ClaimComparisonPanel } from "@/components/ui/status-banners"
 import { ChartCard } from "@/components/chart-card"
 import { getDocument } from "@/lib/api"
 import { ArrowLeft, Copy, Check, Sparkles, RefreshCw, BarChart2, Link2, X } from "lucide-react"
@@ -80,6 +80,7 @@ export function ResultPage() {
   const [timedOut, setTimedOut] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
   const [showShare, setShowShare] = useState(false)
+  const [showClaims, setShowClaims] = useState(false)
   const [textCopied, setTextCopied] = useState(false)
   const pollTimer = useRef(null)
   const pollStartRef = useRef(Date.now())
@@ -228,7 +229,9 @@ const STAGE_LABELS = {
             <span className="font-mono text-xs font-semibold text-[#0a0a0a]">PaperViz</span>
           </div>
           <div className="flex items-center gap-3">
-            {doc.status === "complete" && <VerificationBadge />}
+            {doc.status === "complete" && (
+              <VerificationBadge onClick={() => setShowClaims(v => !v)} />
+            )}
             <Button variant="secondary" onClick={() => setShowShare(true)} className="h-9 px-3 text-xs gap-1.5 font-medium">
               <Link2 className="h-3.5 w-3.5 text-[#737373]" /> Share
             </Button>
@@ -239,6 +242,12 @@ const STAGE_LABELS = {
       <main className="mx-auto max-w-[900px] px-6 py-12">
         {doc.status === "verification_failed" && (
           <div className="mb-6"><WarningBanner /></div>
+        )}
+
+        {showClaims && doc.claim_diff && (
+          <div className="mb-6">
+            <ClaimComparisonPanel claimDiff={doc.claim_diff} onClose={() => setShowClaims(false)} />
+          </div>
         )}
 
         {/* Action bar — reading level badge + view toggle + copy text */}
