@@ -52,3 +52,17 @@ type VerifyResult struct {
 	MismatchDetected bool
 	MismatchDetail   string
 }
+
+// PipelineOutput is the full result of one run, ready for the caller
+// (handlers, via repository) to persist. Status follows the same enum as
+// repository.Document.Status, redeclared here for the same layer-boundary
+// reason documented in charts.go.
+type PipelineOutput struct {
+	Status                 string // "complete" | "failed" | "verification_failed"
+	SimplifiedText         string
+	ErrorMessage           string
+	Verify                 VerifyResult
+	Charts                 []Chart
+	ChartExtractionDegraded bool
+	Chapters               []Chapter
+}

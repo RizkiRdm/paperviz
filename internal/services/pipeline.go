@@ -28,19 +28,6 @@ type PipelineInput struct {
 	OnStage      func(stage string) // called at each pipeline stage transition
 }
 
-// PipelineOutput is the full result of one run, ready for the caller
-// (handlers, via repository) to persist. Status follows the same enum as
-// repository.Document.Status, redeclared here for the same layer-boundary
-// reason documented in charts.go.
-type PipelineOutput struct {
-	Status                 string // "complete" | "failed" | "verification_failed"
-	SimplifiedText         string
-	ErrorMessage           string
-	Verify                 VerifyResult
-	Charts                 []Chart
-	ChartExtractionDegraded bool
-}
-
 // Pipeline status values. See charts.go for why these are redeclared
 // locally instead of imported from repository.
 const (
@@ -176,5 +163,6 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 		Verify:                  verifyResult,
 		Charts:                  charts,
 		ChartExtractionDegraded: chartDegraded,
+		Chapters:                chapters,
 	}
 }
