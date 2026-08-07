@@ -316,18 +316,29 @@ type chartResponse struct {
 	PageNumber   *int            `json:"page_number,omitempty"`
 }
 
+// claimDiffResponse is the wire shape for claim-diff verification data.
+// OriginalClaims/SimplifiedClaims are pre-serialized JSON arrays from the
+// repository — we wrap them in json.RawMessage to avoid double-marshal.
+type claimDiffResponse struct {
+	OriginalClaims   json.RawMessage `json:"original_claims,omitempty"`
+	SimplifiedClaims json.RawMessage `json:"simplified_claims,omitempty"`
+	MismatchDetected bool            `json:"mismatch_detected"`
+	MismatchDetail   *string         `json:"mismatch_detail,omitempty"`
+}
+
 // getDocumentResponse matches ARCHITECTURE.md Section E's Get Document
 // contract exactly.
 type getDocumentResponse struct {
-	ID                     string          `json:"id"`
-	Status                 string          `json:"status"`
-	ReadingLevel           string          `json:"reading_level"`
-	SimplifiedText          *string         `json:"simplified_text"`
-	OriginalText            string          `json:"original_text"`
-	Charts                  []chartResponse `json:"charts"`
-	ErrorMessage            *string         `json:"error_message"`
-	ChartExtractionDegraded bool            `json:"chart_extraction_degraded"`
-	ProcessingStage         *string         `json:"processing_stage,omitempty"`
+	ID                     string            `json:"id"`
+	Status                 string            `json:"status"`
+	ReadingLevel           string            `json:"reading_level"`
+	SimplifiedText          *string           `json:"simplified_text"`
+	OriginalText            string            `json:"original_text"`
+	Charts                  []chartResponse   `json:"charts"`
+	ErrorMessage            *string           `json:"error_message"`
+	ChartExtractionDegraded bool              `json:"chart_extraction_degraded"`
+	ProcessingStage         *string           `json:"processing_stage,omitempty"`
+	ClaimDiff               *claimDiffResponse `json:"claim_diff,omitempty"`
 }
 
 // Get handles GET /api/documents/:id. On every successful lookup it
@@ -379,6 +390,17 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		chartResponses = append(chartResponses, cr)
 	}
 
+	claimDiffRepo := repository.NewClaimDiffRepo(h.db)
+	var claimDiffResp *claimDiffResponse
+	if cd, err := claimDiffRepo.GetByDocument(id); err == nil {
+		claimDiffResp = &claimDiffResponse{
+			OriginalClaims:   json.RawMessage(cd.OriginalClaims),
+			SimplifiedClaims: json.RawMessage(cd.SimplifiedClaims),
+			MismatchDetected: cd.MismatchDetected,
+			MismatchDetail:   cd.MismatchDetail,
+		}
+	}
+
 	writeJSON(w, http.StatusOK, getDocumentResponse{
 		ID:                     doc.ID,
 		Status:                 doc.Status,
@@ -389,6 +411,7 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ErrorMessage:            doc.ErrorMessage,
 		ChartExtractionDegraded: doc.ChartExtractionDegraded,
 		ProcessingStage:         doc.ProcessingStage,
+		ClaimDiff:               claimDiffResp,
 	})
 }
 
