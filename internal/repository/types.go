@@ -38,6 +38,16 @@ type ClaimDiff struct {
 	MismatchDetail   *string
 }
 
+// Chapter mirrors the chapters table.
+type Chapter struct {
+	ID           string
+	DocumentID   string
+	Title        string
+	Summary      string
+	Excerpt      string
+	DisplayOrder int
+}
+
 // Status enum values, per ARCHITECTURE.md Section 3 CHECK constraint.
 const (
 	StatusProcessing         = "processing"
