@@ -302,6 +302,24 @@ func (h *DocumentHandler) saveResult(documentID string, output services.Pipeline
 		}
 	}
 
+	chapterRepo := repository.NewChapterRepo(tx)
+	for i, ch := range output.Chapters {
+		chapterID, err := repository.NewID()
+		if err != nil {
+			return fmt.Errorf("generate chapter id: %w", err)
+		}
+		if err := chapterRepo.Insert(repository.Chapter{
+			ID:           chapterID,
+			DocumentID:   documentID,
+			Title:        ch.Title,
+			Summary:      ch.Summary,
+			Excerpt:      ch.Excerpt,
+			DisplayOrder: i,
+		}); err != nil {
+			return err
+		}
+	}
+
 	return tx.Commit()
 }
 
@@ -326,6 +344,13 @@ type claimDiffResponse struct {
 	MismatchDetail   *string         `json:"mismatch_detail,omitempty"`
 }
 
+type chapterResponse struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Summary      string `json:"summary"`
+	DisplayOrder int    `json:"display_order"`
+}
+
 // getDocumentResponse matches ARCHITECTURE.md Section E's Get Document
 // contract exactly.
 type getDocumentResponse struct {
@@ -339,6 +364,7 @@ type getDocumentResponse struct {
 	ChartExtractionDegraded bool              `json:"chart_extraction_degraded"`
 	ProcessingStage         *string           `json:"processing_stage,omitempty"`
 	ClaimDiff               *claimDiffResponse `json:"claim_diff,omitempty"`
+	Chapters                []chapterResponse  `json:"chapters,omitempty"`
 }
 
 // Get handles GET /api/documents/:id. On every successful lookup it
@@ -401,6 +427,23 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	chapterRepo := repository.NewChapterRepo(h.db)
+	chapters, err := chapterRepo.ListByDocument(id)
+	if err != nil {
+		slog.Error("list chapters failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	chapterResponses := make([]chapterResponse, 0, len(chapters))
+	for _, ch := range chapters {
+		chapterResponses = append(chapterResponses, chapterResponse{
+			ID:           ch.ID,
+			Title:        ch.Title,
+			Summary:      ch.Summary,
+			DisplayOrder: ch.DisplayOrder,
+		})
+	}
+
 	writeJSON(w, http.StatusOK, getDocumentResponse{
 		ID:                     doc.ID,
 		Status:                 doc.Status,
@@ -412,6 +455,7 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ChartExtractionDegraded: doc.ChartExtractionDegraded,
 		ProcessingStage:         doc.ProcessingStage,
 		ClaimDiff:               claimDiffResp,
+		Chapters:                chapterResponses,
 	})
 }
 
