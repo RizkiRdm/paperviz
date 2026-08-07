@@ -292,6 +292,20 @@ const STAGE_LABELS = {
           </div>
         </div>
 
+        {doc.chapters && doc.chapters.length > 0 && (
+          <div className="mb-6 rounded-[12px] border border-[#e5e5e5] bg-[#f5f5f5] p-4">
+            <p className="text-xs font-semibold text-[#0a0a0a] mb-3">Sections in this paper</p>
+            <ul className="space-y-2">
+              {doc.chapters.map((ch, i) => (
+                <li key={ch.id || i} className="flex gap-2 text-xs">
+                  <span className="font-medium text-[#171717]">{ch.title}</span>
+                  <span className="text-[#737373]">— {ch.summary}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
           <div className="prose prose-neutral max-w-none text-[#171717] text-base leading-relaxed whitespace-pre-wrap font-inter">
             {displayedText}
