@@ -34,6 +34,7 @@ type Chart struct {
 	Annotation   string
 	PageNumber   int
 	DisplayOrder int
+	ChapterIndex int // index in chapters array; -1 if not linked to a chapter
 }
 
 // Chapter is one detected section of the paper, used to drive per-chapter

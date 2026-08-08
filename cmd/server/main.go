@@ -81,6 +81,13 @@ func main() {
 	}
 	migrations[2] = migration2SQL
 
+	migration3SQL, err := repository.ReadMigration("migrations/003_chapters.sql")
+	if err != nil {
+		slog.Error("failed to read migration 003", "error", err)
+		os.Exit(1)
+	}
+	migrations[3] = migration3SQL
+
 	db, err := repository.Open(dbPath, migrations)
 	if err != nil {
 		slog.Error("failed to open database", "error", err)

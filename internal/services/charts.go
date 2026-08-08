@@ -341,5 +341,6 @@ func GenerateChapterChart(ctx context.Context, client *external.GeminiClient, ch
 		ChartData:    string(dataRaw),
 		Annotation:   fmt.Sprintf("From chapter: %s", chapter.Title),
 		DisplayOrder: displayOrder,
+		ChapterIndex: displayOrder,
 	}, true, false
 }

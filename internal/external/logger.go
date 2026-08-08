@@ -40,7 +40,16 @@ func (h *jsonlHandler) Handle(_ context.Context, r slog.Record) error {
 	}
 
 	r.Attrs(func(a slog.Attr) bool {
-		m[a.Key] = a.Value.Any()
+		// Resolve LogValuer attrs, then render errors as their Error() string.
+		// JSON-marshaling an error value directly produces {} because error
+		// types expose no exported fields — symptoms like "failed to open
+		// database" lost their cause entirely (see cmd/server/main.go).
+		v := a.Value.Resolve()
+		if err, ok := v.Any().(error); ok {
+			m[a.Key] = err.Error()
+			return true
+		}
+		m[a.Key] = v.Any()
 		return true
 	})
 

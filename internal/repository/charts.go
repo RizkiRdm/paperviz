@@ -30,9 +30,9 @@ func NewChartRepo(db dbExecutor) *ChartRepo {
 // Insert writes one chart row, linked to its parent document.
 func (r *ChartRepo) Insert(c Chart) error {
 	_, err := r.db.Exec(
-		`INSERT INTO charts (id, document_id, source_method, chart_data, image_blob, annotation, page_number, display_order)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.ID, c.DocumentID, c.SourceMethod, c.ChartData, c.ImageBlob, c.Annotation, c.PageNumber, c.DisplayOrder,
+		`INSERT INTO charts (id, document_id, source_method, chart_data, image_blob, annotation, page_number, display_order, chapter_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, c.DocumentID, c.SourceMethod, c.ChartData, c.ImageBlob, c.Annotation, c.PageNumber, c.DisplayOrder, c.ChapterID,
 	)
 	if err != nil {
 		return fmt.Errorf("insert chart: %w", err)
@@ -43,7 +43,7 @@ func (r *ChartRepo) Insert(c Chart) error {
 // ListByDocument returns all charts for a document, ordered for display.
 func (r *ChartRepo) ListByDocument(documentID string) ([]Chart, error) {
 	rows, err := r.db.Query(
-		`SELECT id, document_id, source_method, chart_data, image_blob, annotation, page_number, display_order
+		`SELECT id, document_id, source_method, chart_data, image_blob, annotation, page_number, display_order, chapter_id
 		FROM charts WHERE document_id = ? ORDER BY display_order ASC`, documentID,
 	)
 	if err != nil {
@@ -54,7 +54,7 @@ func (r *ChartRepo) ListByDocument(documentID string) ([]Chart, error) {
 	var charts []Chart
 	for rows.Next() {
 		var c Chart
-		if err := rows.Scan(&c.ID, &c.DocumentID, &c.SourceMethod, &c.ChartData, &c.ImageBlob, &c.Annotation, &c.PageNumber, &c.DisplayOrder); err != nil {
+		if err := rows.Scan(&c.ID, &c.DocumentID, &c.SourceMethod, &c.ChartData, &c.ImageBlob, &c.Annotation, &c.PageNumber, &c.DisplayOrder, &c.ChapterID); err != nil {
 			return nil, fmt.Errorf("scan chart: %w", err)
 		}
 		charts = append(charts, c)

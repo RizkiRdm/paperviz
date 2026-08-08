@@ -6,12 +6,13 @@
 
 ## High
 
+- DB reset + rebuild + test chapter-tabbed view with real PDF (migration 004: chapter_id on charts).
 - Decide and implement chart image-fallback serving contract before full chart release.
-- Fix remaining `result-page.jsx` React Doctor error: effect timer cleanup.
 
 ## Medium
 
-- Fix remaining result-page accessibility label, lazy ref initialization, and seven explicit button types.
+- Add contextual help tooltips for VerificationBadge and ClaimComparisonPanel (P2 from critique).
+- Add processing progress indicator or elapsed time (P3 from critique).
 - Run full five-paper manual flow before MVP release.
 
 ## Low
@@ -20,34 +21,13 @@
 
 ## Completed
 
+- UX copy clarified — error messages, processing text, chart empty states (2026-08-08).
+- Chapter-tabbed view implemented — backend migration 004, chapter_id on charts, frontend horizontal tabs with ARIA + keyboard nav (2026-08-08).
+- Result page hardened — clipboard fallback feedback, share dialog Escape dismiss + autoFocus (2026-08-08).
+- Critique on result page — 29/36 score, 2 P1s fixed, 2 P2s + 1 P3 identified (2026-08-08).
+- PRODUCT.md created — platform, users, positioning, principles (2026-08-08).
+- Fixed DB startup error — stale DB + migration gap + logger defect (2026-08-08).
+- Fixed JSONL logger error rendering — errors now show as strings not `{}` (2026-08-08).
+- Added logger regression test — red→green (2026-08-08).
 - P0 Core Features: ALL 7 CHUNKS COMPLETE (2026-08-07).
-- B5: Frontend chapter summary card above article.
-- B4: Handler saves chapters + exposes in GET response.
-- B3: Pipeline carries chapters through PipelineOutput.
-- B2: ChapterRepo + Chapter type in repository layer.
-- B1: Migration 003_chapters.sql.
-- A2: Expandable claim comparison panel under Verified badge.
-- A1: claim_diff wired through GET response.
 - Phase 1 SaaS Foundation: ALL 10 CHUNKS COMPLETE (2026-08-06).
-- CHUNK 10: Responsive smoke test — no fixed-width issues found.
-- CHUNK 9: 404 page (NotFoundPage route + document_not_found handling).
-- CHUNK 8: Copy-link button verification (existing ShareDialog already works).
-- CHUNK 7: Dashboard page with auth check + /api/auth/me endpoint.
-- CHUNK 6: Login and Signup pages with validation.
-- CHUNK 5: Frontend routing (react-router-dom).
-- CHUNK 4: Wire ownership into document handlers (user_id, paginated list).
-- CHUNK 3: Auth middleware (RequireAuth, OptionalAuth).
-- CHUNK 2: Signup/Login handlers (backend).
-- CHUNK 1: DB Migration (users table, document ownership, schema_migrations).
-- CHUNK 9: security headers (X-Content-Type-Options, X-Frame-Options, CSP).
-- CHUNK 8: aria-live polling status for screen reader announcements.
-- CHUNK 7: keyboard-accessible dropzone (aria-label on native button).
-- CHUNK 6: React ErrorBoundary class component wrapping App.
-- CHUNK 6: chart types, reading level badge, error messages, copy text, share dialog, processing stage tracking.
-- CHUNK 5: API layer, upload page, result page, share link copy.
-- CHUNK 4: client-side PDF size/type validation and browser verification.
-- CHUNK 3: public-link disclaimer.
-- CHUNK 2: polling timeout and copy-link behavior.
-- CHUNK 1: foundation (Go + Vite + Tailwind + Router).
-- CHUNK 0: project scaffolding.
-- React Doctor top-three fixes.

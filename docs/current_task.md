@@ -2,44 +2,56 @@
 
 ## Objective
 
-P0 Core Features COMPLETE. Await user direction for next phase.
+Chapter-tabbed view implemented. Awaiting DB reset + rebuild + testing.
 
 ## Requirements
 
-- Batch A — Claim-diff verification:
-  - A1: Backend exposes `claim_diff` in GET response (already persisted rows wired through)
-  - A2: Frontend expandable claim comparison panel under Verified badge
-- Batch B — Chapter structure:
-  - B1: Migration `003_chapters.sql` (chapters table + index)
-  - B2: `ChapterRepo` + `Chapter` type in repository layer
-  - B3: Pipeline carries chapters through `PipelineOutput`
-  - B4: `saveResult` persists chapters, Get handler exposes them
-  - B5: Frontend "Sections in this paper" summary card above article
+- **Backend:**
+  - Migration 004: `chapter_id` column on charts table
+  - Services `Chart.ChapterIndex` field
+  - Repository `Chart.ChapterID` field
+  - `Insert` + `ListByDocument` handle `chapter_id`
+  - Handler exposes `content` on chapters, `chapter_id` on charts
+  - `saveResult` links charts to chapters via `chapterIndexToID` map
+
+- **Frontend:**
+  - Horizontal scrollable tabs (only when 2+ chapters)
+  - ARIA roles: `tablist`, `tab`, `tabpanel`
+  - Keyboard navigation (arrow keys)
+  - Chapter-scoped content + charts
+  - Fallback to linear view when 0-1 chapters
+
+- **UX copy:**
+  - Error messages use "We couldn't..." pattern
+  - Processing text uses student-friendly language
+  - Chart empty states simplified
 
 ## Constraints
 
-- No new Gemini calls for claim-diff (reads already-persisted rows)
-- Chapter detection already existed (`DetectChapters`) — only persistence was missing
-- One concern per chunk, sequential execution, BUKTI SELESAI after each
-- DESIGN.md tokens: `rounded-[12px]`, `border-[#e5e5e5]`, `bg-[#f5f5f5]`
+- DB reset required for migration 004 (schema change)
+- Rebuild required after DB reset
+- Live Gemini regression tests still outstanding
 
 ## Relevant Files
 
-- `internal/handlers/documents.go` — getDocumentResponse, saveResult, Get handler
-- `internal/repository/chapters.go` — ChapterRepo (new)
-- `internal/repository/types.go` — Chapter struct (new)
-- `internal/services/types.go` — PipelineOutput.Chapters field
-- `internal/services/pipeline.go` — passes chapters through
-- `migrations/003_chapters.sql` — new migration
-- `frontend/src/components/ui/status-banners.jsx` — VerificationBadge (onClick), ClaimComparisonPanel (new)
-- `frontend/src/pages/result-page.jsx` — chapter summary card, claim toggle state
+- `migrations/004_chapter_charts.sql` — new migration
+- `internal/services/types.go` — Chart.ChapterIndex field
+- `internal/services/charts.go` — GenerateChapterChart sets ChapterIndex
+- `internal/repository/types.go` — Chart.ChapterID field
+- `internal/repository/charts.go` — Insert + ListByDocument handle chapter_id
+- `internal/handlers/documents.go` — chapterResponse.Content, chartResponse.ChapterID, saveResult links charts to chapters
+- `frontend/src/pages/result-page.jsx` — tabbed chapter view with ARIA + keyboard nav
 
 ## Progress
 
-- All 7 chunks committed and pushed (0a9df0f through be738e9).
-- Go build passes, npm build passes.
-- DB reset required (new chapters table).
+- All backend + frontend changes implemented.
+- Tests pass (21/21).
+- Design detector clean (0 findings).
+- Committed but not yet pushed.
 
 ## Next Action
 
-Await user direction for next phase.
+1. DB reset: `rm paperviz.db*`
+2. Rebuild: `go build -o paperviz ./cmd/server`
+3. Test: Upload PDF with chapters → verify tabbed view
+4. Push: `git push`

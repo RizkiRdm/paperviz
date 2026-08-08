@@ -26,6 +26,7 @@ type Chart struct {
 	Annotation   *string
 	PageNumber   *int
 	DisplayOrder int
+	ChapterID    *string // nullable — links chart to a chapter
 }
 
 // ClaimDiff mirrors the claim_diffs table.

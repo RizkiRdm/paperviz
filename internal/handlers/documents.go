@@ -272,6 +272,27 @@ func (h *DocumentHandler) saveResult(documentID string, output services.Pipeline
 		return err
 	}
 
+	// Insert chapters first to get their IDs, then link charts to chapters.
+	chapterRepo := repository.NewChapterRepo(tx)
+	chapterIndexToID := make(map[int]string, len(output.Chapters))
+	for i, ch := range output.Chapters {
+		chapterID, err := repository.NewID()
+		if err != nil {
+			return fmt.Errorf("generate chapter id: %w", err)
+		}
+		if err := chapterRepo.Insert(repository.Chapter{
+			ID:           chapterID,
+			DocumentID:   documentID,
+			Title:        ch.Title,
+			Summary:      ch.Summary,
+			Excerpt:      ch.Excerpt,
+			DisplayOrder: i,
+		}); err != nil {
+			return err
+		}
+		chapterIndexToID[i] = chapterID
+	}
+
 	// Charts only exist when status is complete (verification_failed stops
 	// the pipeline before chart processing — see services/pipeline.go).
 	chartRepo := repository.NewChartRepo(tx)
@@ -288,6 +309,12 @@ func (h *DocumentHandler) saveResult(documentID string, output services.Pipeline
 			annotationPtr = &c.Annotation
 		}
 		pageNum := c.PageNumber
+		var chapterIDPtr *string
+		if c.ChapterIndex >= 0 {
+			if id, ok := chapterIndexToID[c.ChapterIndex]; ok {
+				chapterIDPtr = &id
+			}
+		}
 		if err := chartRepo.Insert(repository.Chart{
 			ID:           chartID,
 			DocumentID:   documentID,
@@ -297,24 +324,7 @@ func (h *DocumentHandler) saveResult(documentID string, output services.Pipeline
 			Annotation:   annotationPtr,
 			PageNumber:   &pageNum,
 			DisplayOrder: c.DisplayOrder,
-		}); err != nil {
-			return err
-		}
-	}
-
-	chapterRepo := repository.NewChapterRepo(tx)
-	for i, ch := range output.Chapters {
-		chapterID, err := repository.NewID()
-		if err != nil {
-			return fmt.Errorf("generate chapter id: %w", err)
-		}
-		if err := chapterRepo.Insert(repository.Chapter{
-			ID:           chapterID,
-			DocumentID:   documentID,
-			Title:        ch.Title,
-			Summary:      ch.Summary,
-			Excerpt:      ch.Excerpt,
-			DisplayOrder: i,
+			ChapterID:    chapterIDPtr,
 		}); err != nil {
 			return err
 		}
@@ -332,6 +342,7 @@ type chartResponse struct {
 	ChartData    json.RawMessage `json:"chart_data,omitempty"`
 	Annotation   *string         `json:"annotation,omitempty"`
 	PageNumber   *int            `json:"page_number,omitempty"`
+	ChapterID    *string         `json:"chapter_id,omitempty"`
 }
 
 // claimDiffResponse is the wire shape for claim-diff verification data.
@@ -348,6 +359,7 @@ type chapterResponse struct {
 	ID           string `json:"id"`
 	Title        string `json:"title"`
 	Summary      string `json:"summary"`
+	Content      string `json:"content"`
 	DisplayOrder int    `json:"display_order"`
 }
 
@@ -409,6 +421,7 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 			SourceMethod: c.SourceMethod,
 			Annotation:   c.Annotation,
 			PageNumber:   c.PageNumber,
+			ChapterID:    c.ChapterID,
 		}
 		if c.ChartData != nil && *c.ChartData != "" {
 			cr.ChartData = json.RawMessage(*c.ChartData)
@@ -440,6 +453,7 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 			ID:           ch.ID,
 			Title:        ch.Title,
 			Summary:      ch.Summary,
+			Content:      ch.Excerpt,
 			DisplayOrder: ch.DisplayOrder,
 		})
 	}

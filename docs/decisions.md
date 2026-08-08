@@ -113,3 +113,31 @@ Historical entries are append-only. Deprecate decisions instead of deleting them
 - **Decision:** Use a native `button type="button"` beside the hidden file input and add a visible associated label to pasted-text textarea.
 - **Alternatives considered:** Add `role`, `tabIndex`, and custom keyboard handlers to the `div`.
 - **Consequences:** Browser-native focus, keyboard activation, and screen-reader semantics replace custom behavior.
+
+## 2026-08-08 — Chapter-tabbed view: backend links charts to chapters
+
+- **Context:** Chapter list was informational but not navigable. Students couldn't jump to specific sections. True tabbed view requires chapter-segmented text and chart-chapter linking.
+- **Decision:** Add `chapter_id` to charts table (migration 004). Services `Chart` gets `ChapterIndex` field. Repository `Chart` gets `ChapterID` field. Handler builds `chapterIndexToID` map in `saveResult` to link charts to chapters. Frontend shows horizontal scrollable tabs when 2+ chapters exist.
+- **Alternatives considered:** Anchor scroll (simpler but less focused); sticky sidebar (more chrome); tabbed view without backend changes (fragile text splitting).
+- **Consequences:** DB schema change requires reset. Backend changes are minimal (struct fields + mapping logic). Frontend gets proper tabbed interface with ARIA accessibility. Charts are now scoped to chapters in the API response.
+
+## 2026-08-08 — UX copy: "We couldn't..." pattern for errors
+
+- **Context:** Error messages used internal jargon ("simplification step", "text extraction", "chart extraction") that students don't understand. Some messages were vague ("Something went wrong").
+- **Decision:** Rewrite all error messages to use "We couldn't..." pattern with student-friendly language. Processing text uses "checking it against the original" instead of "verifying key statements against source". Chart empty states simplified.
+- **Alternatives considered:** Keep technical terms but add explanations; use generic "Error occurred" messages.
+- **Consequences:** All error messages are now comprehensible to first-time students. Consistent voice across the product. Recovery hints added where helpful ("It may be image-only or corrupted").
+
+## 2026-08-08 — Result page hardening: clipboard + keyboard
+
+- **Context:** Clipboard fallback was silent `catch {}` — user clicks copy, nothing happens, no feedback. Share dialog had no Escape dismiss or autoFocus.
+- **Decision:** Add clipboard error feedback ("Couldn't copy automatically. Select the link and press Ctrl+C / Cmd+C."). Add Escape key handler to share dialog. Add autoFocus to share input. Add `aria-label` to share input.
+- **Alternatives considered:** Keep silent fallback; add toast notifications; use `document.execCommand('copy')` as fallback.
+- **Consequences:** User gets clear feedback when clipboard fails. Keyboard-only users can dismiss share dialog. Screen readers get proper labels.
+
+## 2026-08-08 — PipelineOutput chapters-first insertion order
+
+- **Context:** Original `saveResult` inserted charts before chapters. New requirement: link charts to chapters via `chapter_id`. Chapters must be inserted first to get their IDs.
+- **Decision:** Restructure `saveResult` to insert chapters first, build `chapterIndexToID` map, then insert charts with `chapter_id` linked.
+- **Alternatives considered:** Generate chapter IDs in pipeline (before chart insertion); use display order as chapter reference.
+- **Consequences:** Charts are properly linked to chapters. Insertion order is now chapters → charts (was charts → chapters). No functional change to existing behavior.
