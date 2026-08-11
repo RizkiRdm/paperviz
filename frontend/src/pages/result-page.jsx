@@ -8,7 +8,12 @@ import { ArrowLeft, Copy, Check, Sparkles, RefreshCw, BarChart2, Link2, X } from
 import { NotFoundPage } from "@/pages/not-found-page"
 
 const POLL_INTERVAL_MS = 2000
-const POLL_TIMEOUT_MS = 120000
+// Pipeline (Gemini simplify → verify → chapters → charts) routinely exceeds
+// 2 minutes on real papers, esp. with rate-limit retries. Past POLL_SOFT_WARN_MS
+// we keep polling and only surface a "taking longer" note; POLL_TIMEOUT_MS is a
+// safety cap, not the normal path.
+const POLL_SOFT_WARN_MS = 120000
+const POLL_TIMEOUT_MS = 600000
 const COPY_FEEDBACK_MS = 2000
 
 const READING_LEVEL_LABELS = {
@@ -99,6 +104,7 @@ export function ResultPage() {
   const [notFound, setNotFound] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
+  const [takingLong, setTakingLong] = useState(false)
   const [retryNonce, setRetryNonce] = useState(0)
   const [showShare, setShowShare] = useState(false)
   const [showClaims, setShowClaims] = useState(false)
@@ -112,6 +118,7 @@ export function ResultPage() {
   useEffect(() => {
     let cancelled = false
     setTimedOut(false)
+    setTakingLong(false)
     pollStartRef.current = Date.now()
 
     async function poll() {
@@ -120,7 +127,11 @@ export function ResultPage() {
         if (cancelled) return
         setDoc(fetched)
         if (fetched.status === "processing") {
-          if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
+          const elapsed = Date.now() - pollStartRef.current
+          if (elapsed > POLL_SOFT_WARN_MS) {
+            setTakingLong(true)
+          }
+          if (elapsed > POLL_TIMEOUT_MS) {
             setTimedOut(true)
             return
           }
@@ -211,7 +222,9 @@ const STAGE_LABELS = {
             {stageLabel || "Simplifying & Verifying..."}
           </h2>
           <p className="mt-2 text-xs text-[#737373] leading-relaxed">
-            Reading your paper, creating a plain-language summary, and checking it against the original.
+            {takingLong
+              ? "Still working — large papers with many figures can take a few minutes. This page refreshes automatically."
+              : "Reading your paper, creating a plain-language summary, and checking it against the original."}
           </p>
         </div>
       </div>

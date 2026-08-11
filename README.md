@@ -7,7 +7,7 @@ Upload a PDF. Get a plain-language summary with re-visualized charts.
 ## Quick Start
 
 ```bash
-# Prerequisites: Go 1.24+, Node.js 18+, npm 9+
+# Prerequisites: Go 1.25+, Node.js 18+, npm 9+
 # Get a Gemini API key: https://aistudio.google.com/apikey
 
 # 1. Configure
@@ -55,17 +55,19 @@ Volume `paperviz-data` persists the SQLite database across restarts.
 
 ## How It Works
 
-1. Upload a PDF (text-layer only, no OCR)
+1. Upload a PDF (text-layer only, no OCR) or paste text
 2. Backend extracts text + chart images
-3. Gemini simplifies content to chosen reading level (ELI5 / Simplified / Original)
-4. Charts are re-rendered server-side; plain-language annotation overlaid
+3. Gemini simplifies content to chosen reading level (ELI5 / Simplified), then verifies claims against the original
+4. Simplified text is split into chapters; charts are re-generated per chapter (or re-rendered from captured images)
 5. Shareable link expires after 7 days of inactivity
+
+Processing runs in the background — the result page polls until it completes, so a large paper (with rate-limit retries) can take a few minutes. The page shows a "still working" note past ~2 minutes instead of giving up.
 
 ## Tech Stack
 
-- **Backend:** Go 1.24+, chi router, modernc.org/sqlite (pure Go, no CGO)
+- **Backend:** Go 1.25+, chi router, modernc.org/sqlite (pure Go, no CGO)
 - **Frontend:** React 19, Vite 8, Tailwind CSS v4, Recharts
-- **LLM:** Google Gemini API (direct HTTP client, no SDK)
+- **LLM:** Google Gemini API (direct HTTP client, no SDK) — single-slot serialization + exponential-backoff retries to stay inside free-tier rate limits
 - **PDF:** pdfcpu + ledongthuc/pdf (in-memory, no disk writes)
 
 ## Deployment

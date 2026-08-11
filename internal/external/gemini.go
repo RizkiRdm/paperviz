@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"strings"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -23,24 +24,53 @@ const geminiCallTimeout = 120 * time.Second
 type GeminiClient struct {
 	apiKey     string
 	model      string
+	endpoint   string // geminiEndpoint by default; overridable in tests
 	httpClient *http.Client
+	// sem serializes all Gemini calls through one client. Multiple document
+	// pipelines run concurrently (one goroutine per upload); without a cap,
+	// their overlapping calls blow past free-tier RPM limits and every call
+	// 429s, which then compounds through the retry loop. A single-slot
+	// semaphore keeps throughput at exactly one in-flight call.
+	sem chan struct{}
+	// Retry schedule. Production defaults below; tests shrink them so
+	// backoff sleeps don't slow the suite.
+	retries     int
+	retryBudget time.Duration
+	backoffBase time.Duration
+	backoffCeil time.Duration
 }
+
+// Retry production defaults: up to 5 attempts, 90s total budget, exponential
+// 2s/4s/8s/16s… capped at 32s per wait. These bound how long a persistently
+// failing upstream can stall a document's pipeline (see Generate).
+const (
+	defaultRetries     = 5
+	defaultRetryBudget = 90 * time.Second
+	defaultBackoffBase = 2 * time.Second
+	defaultBackoffCeil = 32 * time.Second
+)
 
 // NewGeminiClient constructs a client with explicit transport timeouts so
 // long-running generations don't hang on stale TCP connections. apiKey MUST
 // come from an environment variable — never hardcoded (ARCHITECTURE.md §5).
 func NewGeminiClient(apiKey, model string) *GeminiClient {
 	return &GeminiClient{
-		apiKey: apiKey,
-		model:  model,
+		apiKey:   apiKey,
+		model:    model,
+		endpoint: geminiEndpoint,
 		httpClient: &http.Client{
-			Timeout:   geminiCallTimeout, // > per-attempt context (90s)
+			Timeout: geminiCallTimeout, // > per-attempt context (90s)
 			Transport: &http.Transport{
 				IdleConnTimeout:       90 * time.Second,
 				ResponseHeaderTimeout: 100 * time.Second,
 				DisableKeepAlives:     false,
 			},
 		},
+		sem:         make(chan struct{}, 1),
+		retries:     defaultRetries,
+		retryBudget: defaultRetryBudget,
+		backoffBase: defaultBackoffBase,
+		backoffCeil: defaultBackoffCeil,
 	}
 }
 
@@ -70,20 +100,41 @@ type geminiResponse struct {
 	} `json:"candidates"`
 }
 
+// geminiErrorBody is the error envelope Gemini returns for non-2xx responses.
+type geminiErrorBody struct {
+	Error struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Status  string `json:"status"`
+	} `json:"error"`
+}
+
 // Generate sends a single prompt and returns the model's text response.
 // If asJSON is true, the model is instructed to return only valid JSON
 // (used by claim-extraction and chart-data-extraction prompts).
 // If maxTokens > 0, the response is capped at that many output tokens
 // (used by ELI5 mode to prevent connection resets on long generations).
 //
-// Retries up to maxRetries times with exponential backoff for transient
-// failures (503, 429, timeout, connection reset). Client errors (400/401/403)
-// return immediately.
-const maxRetries = 10
-
+// Retries transient failures (503, per-minute rate limits, timeout,
+// connection reset) with exponential backoff, honoring Retry-After when the
+// server sends one, and bounded by a total budget so a stuck upstream can't
+// stall the pipeline for minutes. Non-retryable errors (400/401/403, daily
+// quota exhaustion) return immediately — quota_exceeded never recovers by
+// retrying, per Gemini API error semantics.
 func (c *GeminiClient) Generate(ctx context.Context, prompt string, asJSON bool, maxTokens int) (string, error) {
+	// Serialize calls so concurrent document pipelines can't self-inflict
+	// rate limits. Context-aware: if the caller cancels while queued, fail
+	// fast instead of silently holding the slot.
+	select {
+	case c.sem <- struct{}{}:
+		defer func() { <-c.sem }()
+	case <-ctx.Done():
+		return "", fmt.Errorf("gemini generate: waiting for capacity: %w", ctx.Err())
+	}
+
 	var lastErr error
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	budgetStart := time.Now()
+	for attempt := 0; attempt < c.retries; attempt++ {
 		attemptCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 		start := time.Now()
 		text, err := c.generateOnce(attemptCtx, prompt, asJSON, maxTokens)
@@ -110,33 +161,71 @@ func (c *GeminiClient) Generate(ctx context.Context, prompt string, asJSON bool,
 			lastErr = err
 		}
 
-		// Non-retryable errors (4xx client errors, parse failures) → give up.
+		// Non-retryable errors (4xx client errors, quota exhaustion, parse
+		// failures) → give up immediately.
 		if !isRetryable(lastErr) {
 			return "", lastErr
 		}
 
-		if attempt < maxRetries-1 {
-			backoff := time.Duration(2<<attempt) * time.Second // 2s, 4s, 8s…
-			if backoff > 32*time.Second {
-				backoff = 32 * time.Second
-			}
-			slog.Info("gemini retry backoff", "attempt", attempt+1, "wait_s", int(backoff.Seconds()))
-			time.Sleep(backoff)
+		// Last attempt exhausted → give up, no point sleeping.
+		if attempt == c.retries-1 {
+			break
+		}
+
+		backoff := time.Duration(2<<attempt) * c.backoffBase
+		if backoff > c.backoffCeil {
+			backoff = c.backoffCeil
+		}
+		// Honor the server's Retry-After when it's more conservative than
+		// our exponential schedule.
+		if retryAfter, ok := retryAfterFrom(lastErr); ok && retryAfter > backoff {
+			backoff = retryAfter
+		}
+		// Never sleep past the overall retry budget — a dying upstream must
+		// not hold the pipeline hostage.
+		if remaining := c.retryBudget - time.Since(budgetStart); backoff > remaining {
+			backoff = remaining
+		}
+		if backoff <= 0 {
+			break
+		}
+
+		slog.Info("gemini retry backoff", "attempt", attempt+1, "wait_s", int(backoff.Seconds()))
+		// Context-aware sleep: an expired pipeline timeout cancels the
+		// wait instead of blocking until the backoff elapses.
+		select {
+		case <-time.After(backoff):
+		case <-ctx.Done():
+			return "", fmt.Errorf("gemini generate: retry aborted: %w", ctx.Err())
 		}
 	}
-	return "", fmt.Errorf("gemini generate failed after %d attempts: %w", maxRetries, lastErr)
+	return "", fmt.Errorf("gemini generate failed after %d attempts: %w", c.retries, lastErr)
 }
 
+// retryableError marks an error worth retrying and optionally carries the
+// server-suggested wait (Retry-After) so the caller can honor it.
+type retryableError struct {
+	msg        string
+	retryAfter time.Duration
+}
+
+func (e *retryableError) Error() string { return e.msg }
+
 // isRetryable reports whether a Gemini error is worth retrying.
-// 503 (server overload), 429 (rate limit), timeouts, and transient network
-// errors (connection reset, refused, DNS failures) are retryable.
-// 4xx client errors (400, 401, 403) are not — retrying won't help.
+// 503 (server overload), per-minute 429 rate limits, timeouts, and transient
+// network errors (connection reset, refused, DNS failures) are retryable.
+// 4xx client errors (400, 401, 403) and daily quota exhaustion are not —
+// retrying won't help.
 func isRetryable(err error) bool {
+	var re *retryableError
+	if errors.As(err, &re) {
+		return true
+	}
 	if errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
 	errStr := err.Error()
-	if strings.Contains(errStr, "status 503") || strings.Contains(errStr, "429") {
+	if strings.Contains(errStr, "status 503") || strings.Contains(errStr, "status 429") {
 		return true
 	}
 	// Transient network-level errors — typically "connection reset by peer",
@@ -148,6 +237,40 @@ func isRetryable(err error) bool {
 		return true
 	}
 	return false
+}
+
+func retryAfterFrom(err error) (time.Duration, bool) {
+	var re *retryableError
+	if errors.As(err, &re) && re.retryAfter > 0 {
+		return re.retryAfter, true
+	}
+	return 0, false
+}
+
+// isQuotaExhausted reports whether a 429 body indicates daily-quota
+// exhaustion. Gemini returns 429 for both per-minute rate limits (retry
+// helps) and daily quota exhaustion (retrying is pointless — the quota only
+// resets on a schedule). The two are only distinguishable via the message.
+func isQuotaExhausted(body []byte) bool {
+	var eb geminiErrorBody
+	if err := json.Unmarshal(body, &eb); err != nil || eb.Error.Message == "" {
+		return false
+	}
+	msg := strings.ToLower(eb.Error.Message)
+	return strings.Contains(msg, "quota") && (strings.Contains(msg, "daily") || strings.Contains(msg, "exhaust"))
+}
+
+// parseRetryAfter converts a Retry-After header value (seconds, or HTTP-date
+// which we don't parse) into a duration. Returns 0 if absent/unparseable.
+func parseRetryAfter(v string) time.Duration {
+	if v == "" {
+		return 0
+	}
+	secs, err := strconv.Atoi(v)
+	if err != nil || secs <= 0 {
+		return 0
+	}
+	return time.Duration(secs) * time.Second
 }
 
 func (c *GeminiClient) generateOnce(ctx context.Context, prompt string, asJSON bool, maxTokens int) (string, error) {
@@ -170,7 +293,7 @@ func (c *GeminiClient) generateOnce(ctx context.Context, prompt string, asJSON b
 		return "", fmt.Errorf("marshal gemini request: %w", err)
 	}
 
-  url := fmt.Sprintf(geminiEndpoint, c.model)
+	url := fmt.Sprintf(c.endpoint, c.model)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return "", fmt.Errorf("build gemini request: %w", err)
@@ -191,9 +314,20 @@ func (c *GeminiClient) generateOnce(ctx context.Context, prompt string, asJSON b
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		slog.Error("Gemini rate limited by server", "stage", "gemini_generate")
-		return "", fmt.Errorf("gemini rate limited (429): status=%d", resp.StatusCode)
+		if isQuotaExhausted(body) {
+			// Daily quota hit — retrying cannot succeed; fail fast so the
+			// pipeline marks the document failed instead of sleeping ~minutes.
+			return "", fmt.Errorf("gemini quota exhausted (429): status=%d", resp.StatusCode)
+		}
+		return "", &retryableError{
+			msg:        fmt.Sprintf("gemini rate limited (429): status=%d", resp.StatusCode),
+			retryAfter: parseRetryAfter(resp.Header.Get("Retry-After")),
+		}
 	}
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusServiceUnavailable {
+			return "", &retryableError{msg: fmt.Sprintf("gemini returned status %d", resp.StatusCode)}
+		}
 		return "", fmt.Errorf("gemini returned status %d", resp.StatusCode)
 	}
 

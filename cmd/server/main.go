@@ -8,16 +8,44 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"paperviz/internal/external"
 	"paperviz/internal/handlers"
 	"paperviz/internal/repository"
 	"paperviz/internal/services"
 )
+
+// loadMigrations reads every migration SQL file into a versioned map, in
+// declaration order. Kept separate from main so tests can assert the full
+// migration chain (including 004) is registered — a missing registration
+// silently ships a schema the repository code already depends on.
+// migrationsDir is relative to the process working directory (repo root in
+// production; tests pass an absolute path since `go test` runs per-package).
+func loadMigrations(migrationsDir string) (map[int]string, error) {
+	migrations := make(map[int]string)
+
+	paths := map[int]string{
+		1: "001_init.sql",
+		2: "002_users.sql",
+		3: "003_chapters.sql",
+		4: "004_chapter_charts.sql",
+	}
+
+	for version, file := range paths {
+		sql, err := repository.ReadMigration(filepath.Join(migrationsDir, file))
+		if err != nil {
+			return nil, fmt.Errorf("read migration %03d: %w", version, err)
+		}
+		migrations[version] = sql
+	}
+	return migrations, nil
+}
 
 func main() {
 	logFile := os.Getenv("LOG_FILE")
@@ -65,28 +93,11 @@ func main() {
 		port = "8080"
 	}
 
-	migrations := make(map[int]string)
-
-	migration1SQL, err := repository.ReadMigration("migrations/001_init.sql")
+	migrations, err := loadMigrations("migrations")
 	if err != nil {
-		slog.Error("failed to read migration 001", "error", err)
+		slog.Error("failed to load migrations", "error", err)
 		os.Exit(1)
 	}
-	migrations[1] = migration1SQL
-
-	migration2SQL, err := repository.ReadMigration("migrations/002_users.sql")
-	if err != nil {
-		slog.Error("failed to read migration 002", "error", err)
-		os.Exit(1)
-	}
-	migrations[2] = migration2SQL
-
-	migration3SQL, err := repository.ReadMigration("migrations/003_chapters.sql")
-	if err != nil {
-		slog.Error("failed to read migration 003", "error", err)
-		os.Exit(1)
-	}
-	migrations[3] = migration3SQL
 
 	db, err := repository.Open(dbPath, migrations)
 	if err != nil {
