@@ -35,6 +35,7 @@ func loadMigrations(migrationsDir string) (map[int]string, error) {
 		2: "002_users.sql",
 		3: "003_chapters.sql",
 		4: "004_chapter_charts.sql",
+		5: "005_evidence.sql",
 	}
 
 	for version, file := range paths {

@@ -46,3 +46,28 @@ func ExtractFromPDF(pdfBytes []byte) (ExtractResult, error) {
 
 	return ExtractResult{Text: text, Pages: pages, Charts: charts}, nil
 }
+
+// PDFDocument is a deep domain object encapsulating extracted PDF text,
+// per-page text mapping, and bounded chart images.
+type PDFDocument struct {
+	Text   string
+	Pages  map[int]string
+	Charts []ExtractedChart
+}
+
+// ParsePDF parses PDF bytes, extracts text, pages, and bounded chart images.
+func ParsePDF(pdfBytes []byte, maxCharts int) (*PDFDocument, error) {
+	res, err := ExtractFromPDF(pdfBytes)
+	if err != nil {
+		return nil, err
+	}
+	charts := res.Charts
+	if len(charts) > maxCharts {
+		charts = charts[:maxCharts]
+	}
+	return &PDFDocument{
+		Text:   res.Text,
+		Pages:  res.Pages,
+		Charts: charts,
+	}, nil
+}

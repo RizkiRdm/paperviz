@@ -342,3 +342,58 @@ func (c *GeminiClient) generateOnce(ctx context.Context, prompt string, asJSON b
 
 	return parsed.Candidates[0].Content.Parts[0].Text, nil
 }
+
+// ExtractJSON sends a JSON-requested prompt to Gemini, strips markdown code fences,
+// handles candidate JSON recovery (substring trimming), and unmarshals into T.
+func ExtractJSON[T any](ctx context.Context, client *GeminiClient, prompt string, maxTokens int) (T, error) {
+	var zero T
+	raw, err := client.Generate(ctx, prompt, true, maxTokens)
+	if err != nil {
+		return zero, fmt.Errorf("gemini generate json: %w", err)
+	}
+
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || trimmed == "null" || trimmed == "[]" {
+		return zero, fmt.Errorf("empty json response")
+	}
+
+	trimmed = stripJSONFences(trimmed)
+
+	var parsed T
+	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
+		if strings.HasPrefix(trimmed, "{") {
+			if idx := strings.LastIndex(trimmed, "}"); idx > 0 {
+				candidate := trimmed[:idx+1]
+				if err := json.Unmarshal([]byte(candidate), &parsed); err == nil {
+					return parsed, nil
+				}
+			}
+		} else if strings.HasPrefix(trimmed, "[") {
+			if idx := strings.LastIndex(trimmed, "]"); idx > 0 {
+				candidate := trimmed[:idx+1]
+				if err := json.Unmarshal([]byte(candidate), &parsed); err == nil {
+					return parsed, nil
+				}
+			}
+		}
+		return zero, fmt.Errorf("unmarshal json response %q: %w", trimmed, err)
+	}
+
+	return parsed, nil
+}
+
+func stripJSONFences(s string) string {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "```") {
+		return s
+	}
+	nl := strings.Index(s, "\n")
+	if nl < 0 {
+		return s
+	}
+	s = s[nl+1:]
+	if idx := strings.LastIndex(s, "```"); idx >= 0 {
+		s = s[:idx]
+	}
+	return strings.TrimSpace(s)
+}

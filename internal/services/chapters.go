@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -44,21 +43,10 @@ type chapterJSON struct {
 
 func DetectChapters(ctx context.Context, client *external.GeminiClient, simplifiedText string) ([]Chapter, error) {
 	prompt := fmt.Sprintf(chapterDetectionPrompt, maxChapters, simplifiedText)
-	raw, err := client.Generate(ctx, prompt, true, 0)
+	parsed, err := external.ExtractJSON[[]chapterJSON](ctx, client, prompt, 0)
 	if err != nil {
-		return nil, fmt.Errorf("detect chapters: %w", err)
-	}
-
-	trimmed := strings.TrimSpace(raw)
-	trimmed = stripJSONFences(trimmed)
-	if trimmed == "" || trimmed == "[]" || trimmed == "null" {
-		slog.Info("chapter detection: no chapters found", "stage", "chapters")
+		slog.Info("chapter detection: no chapters found or failed", "stage", "chapters", "error", err)
 		return nil, nil
-	}
-
-	var parsed []chapterJSON
-	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
-		return nil, fmt.Errorf("parse chapters JSON: %w", err)
 	}
 
 	if len(parsed) > maxChapters {

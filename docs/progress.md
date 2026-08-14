@@ -2,13 +2,19 @@
 
 ## Current
 
-- **Chapter-tabbed view:** Implemented. Backend links charts to chapters; frontend shows horizontal scrollable tabs.
-- **Current work:** Chapter-tabbed view committed. DB reset required (migration 004).
+- **Chunk 1.1 (Evidence Provenance):** Backend data model done — migration 005, Evidence type, EvidenceRepo (Insert/ListByPaper). Pipeline wiring + frontend display + repo tests PENDING.
+- **Chunk 0.2 (Product Flow Audit):** Complete — `docs/product/current-user-flow.md`.
+- **Architecture candidates:** 1–5 complete (intake, ExtractJSON, PDFDocument seam, useDocumentPoll hook, AuthForm consolidation).
+- **Current work:** Chunk 1.1 backend complete. Next: finish 1.1 (wire evidence into pipeline/GET + frontend + tests), then Chunk 1.2 (Original vs Explained Figure).
 - **Blockers:** Live Gemini regression tests still require a valid API key.
-- **Next milestone:** DB reset + rebuild + test chapter-tabbed view. Then: contextual help tooltips, processing progress indicator.
+- **Next milestone:** Finish Chunk 1.1, then Chunk 1.2.
 
 ## Changelog
 
+- **2026-08-14:** Chunk 1.1 (Evidence Provenance) backend — migration 005_evidence.sql, Evidence struct, EvidenceRepo, registered migration 5, updated migration-count test. 49/49 tests pass. (Frontend display + pipeline population pending.)
+- **2026-08-14:** Chunk 0.2 (Product Flow Audit) — `docs/product/current-user-flow.md` delivered. No behavior changes. Mapped upload → intake → pipeline → polling → result → share journey, ranked abandonment risks, identified aha moments.
+- **2026-08-14:** Architecture candidates 3–5 — Candidate 3: `PDFDocument`/`ParsePDF` seam in `extraction.go`, pipeline uses it. Candidate 4: `useDocumentPoll` hook extracted from ResultPage. Candidate 5: `AuthForm` + `useAuthSubmit` consolidate login/signup (~40 lines/page).
+- **2026-08-14:** Architecture candidates 1–2 (uncommitted until now) — Candidate 1: `internal/services/intake.go` transactional intake, thin `documents.go` handler. Candidate 2: `external.ExtractJSON[T]` for structured LLM extraction (fence stripping + JSON recovery), charts/chapters/verification refactored onto it.
 - **2026-08-08:** UX copy clarified — error messages use "We couldn't..." pattern, processing text uses student-friendly language, chart empty states simplified. Impeccable commands run: init (PRODUCT.md), critique (29/36), harden (clipboard + keyboard), shape (chapter tabs), clarify (copy). Chapter-tabbed view implemented: migration 004 (chapter_id on charts), services Chart.ChapterIndex, repository Chart.ChapterID, handler exposes content + chapter_id, frontend horizontal tabs with ARIA roles + keyboard navigation. Fixed DB startup error (stale DB + migration gap), fixed JSONL logger error rendering, added logger regression test.
 - **2026-08-07:** P0 Core Features COMPLETE — 7 chunks across 2 batches. Batch A: claim_diff in GET response (A1), expandable claim comparison UI (A2). Batch B: chapters migration (B1), ChapterRepo + type (B2), pipeline carries chapters (B3), save chapters + expose in API (B4), chapter summary card (B5). All committed and pushed.
 - **2026-08-06:** Phase 1 SaaS Foundation COMPLETE — All 10 chunks across 7 phases. Backend: users table, sessions table, auth handlers (signup/login/logout/me), RequireAuth/OptionalAuth middleware, document ownership, paginated list endpoint. Frontend: react-router-dom, login/signup pages, dashboard page with auth check, NotFoundPage, copy-link verification. Responsive smoke test passed (no fixed-width issues). Both Go and frontend builds pass.

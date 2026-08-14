@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "skills": {
+    "golang-patterns": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "autoskills-registry",
+      "computedHash": "669ccfb110e3a3932669684801fc8992cda87ec6d9c1fd72ff13ae9f5e7c748e"
+    },
+    "golang-testing": {
+      "source": "affaan-m/everything-claude-code",
+      "sourceType": "autoskills-registry",
+      "computedHash": "4c1e0c6805760534d8fd1a9fa2e4b5eb700b402f054254383437bd679d341cbd"
+    },
+    "improve-codebase-architecture": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "computedHash": "bce096b49db40761adb1d5348f064c303fc152e4e50fc3fd81b79df8b6cf137f"
+    }
+  }
+}

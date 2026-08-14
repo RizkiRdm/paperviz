@@ -1,5 +1,12 @@
 # Lessons and Mistakes
 
+## 2026-08-14 — Migration-count test broke after adding migration 005
+
+- **Problem:** `go test` failed after adding `migrations/005_evidence.sql` — `TestLoadMigrationsRegistersChapterCharts` expected exactly 4 migrations.
+- **Root cause:** `cmd/server/main_test.go` asserts `len(migrations) == len(want)`; adding a migration without updating the test's expected map fails the count assertion.
+- **Fix:** Added `5: {"CREATE TABLE evidence"}` to the expected map. 49/49 tests pass.
+- **Prevention:** Any new migration must be added to BOTH `loadMigrations` (main.go) AND the migration-count test map. Run `go test ./...` after every migration.
+
 ## 2026-08-02 — Static import remained inside lazy wrapper
 
 - **Problem:** First Recharts fix moved the static import to a lazy-loaded file, but React Doctor still reported it.

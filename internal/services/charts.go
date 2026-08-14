@@ -183,66 +183,17 @@ func reVisualizeOne(ctx context.Context, client *external.GeminiClient, ec Extra
 // charts.chart_data (ARCHITECTURE.md Section 3).
 func tryExtractChartData(ctx context.Context, client *external.GeminiClient, text string) (dataJSON string, ok bool) {
 	prompt := fmt.Sprintf(chartDataExtractionPrompt, text)
-	raw, err := client.Generate(ctx, prompt, true, 0)
+	parsed, err := external.ExtractJSON[chartDataJSON](ctx, client, prompt, 0)
+	if err != nil || len(parsed.Labels) == 0 || len(parsed.Values) == 0 {
+		return "", false
+	}
+
+	b, err := json.Marshal(parsed)
 	if err != nil {
 		return "", false
 	}
 
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "null" {
-		return "", false
-	}
-
-	// Strip markdown code fences — smaller models sometimes wrap JSON in
-	// ```json … ``` blocks that would cause json.Unmarshal to fail.
-	trimmed = stripJSONFences(trimmed)
-
-	var parsed chartDataJSON
-	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
-		if strings.HasPrefix(trimmed, "{") {
-			if idx := strings.LastIndex(trimmed, "}"); idx > 0 {
-				candidate := trimmed[:idx+1]
-				if err := json.Unmarshal([]byte(candidate), &parsed); err == nil {
-					trimmed = candidate
-					goto parsedOK
-				}
-			}
-		}
-		slog.Error("per-chart JSON parse failed",
-			"stage", "chart",
-			"error", err,
-			"page_text_bytes", len(text),
-		)
-		return "", false
-	}
-
-parsedOK:
-	if len(parsed.Labels) == 0 || len(parsed.Values) == 0 {
-		return "", false
-	}
-
-	return trimmed, true
-}
-
-// stripJSONFences removes markdown code fences (```json … ``` or ``` … ```)
-// surrounding a JSON string, which smaller LLMs sometimes add even when
-// instructed not to.
-func stripJSONFences(s string) string {
-	s = strings.TrimSpace(s)
-	if !strings.HasPrefix(s, "```") {
-		return s
-	}
-	// Skip the opening fence line (```json or ```)
-	nl := strings.Index(s, "\n")
-	if nl < 0 {
-		return s
-	}
-	s = s[nl+1:]
-	// Remove closing fence if present
-	if idx := strings.LastIndex(s, "```"); idx >= 0 {
-		s = s[:idx]
-	}
-	return strings.TrimSpace(s)
+	return string(b), true
 }
 
 // annotateImage calls Gemini to write a short plain-language caption for a
@@ -300,18 +251,9 @@ type chapterChartJSON struct {
 
 func GenerateChapterChart(ctx context.Context, client *external.GeminiClient, chapter Chapter, displayOrder int) (chart Chart, ok bool, degraded bool) {
 	prompt := fmt.Sprintf(chapterChartPrompt, chapter.Title, chapter.Summary, chapter.Excerpt)
-	raw, err := client.Generate(ctx, prompt, true, 0)
+	parsed, err := external.ExtractJSON[chapterChartJSON](ctx, client, prompt, 0)
 	if err != nil {
 		slog.Error("chapter chart generation failed", "stage", "chart", "chapter", chapter.Title, "error", err)
-		return Chart{}, false, true
-	}
-
-	trimmed := strings.TrimSpace(raw)
-	trimmed = stripJSONFences(trimmed)
-
-	var parsed chapterChartJSON
-	if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
-		slog.Error("chapter chart JSON parse failed", "stage", "chart", "chapter", chapter.Title, "error", err)
 		return Chart{}, false, true
 	}
 

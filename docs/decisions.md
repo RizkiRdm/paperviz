@@ -141,3 +141,46 @@ Historical entries are append-only. Deprecate decisions instead of deleting them
 - **Decision:** Restructure `saveResult` to insert chapters first, build `chapterIndexToID` map, then insert charts with `chapter_id` linked.
 - **Alternatives considered:** Generate chapter IDs in pipeline (before chart insertion); use display order as chapter reference.
 - **Consequences:** Charts are properly linked to chapters. Insertion order is now chapters → charts (was charts → chapters). No functional change to existing behavior.
+
+## 2026-08-14 — Candidate 1: transactional document intake in services
+
+- **Context:** Handler `documents.go` did validation + DB insert inline; mixed HTTP and business logic in one layer.
+- **Decision:** New `internal/services/intake.go` `ValidateAndInsert` owns extraction validation (no-text-layer, size, MIME) + transactional row insert. Handler is now a thin adapter.
+- **Alternatives considered:** Keep logic in handler; move only validation to service.
+- **Consequences:** Handler shrinks; business rules live in services layer per ARCHITECTURE.md. One place to test intake.
+
+## 2026-08-14 — Candidate 2: external.ExtractJSON[T] generic LLM extraction
+
+- **Context:** charts/chapters/verification each re-implemented prompt→JSON parsing with ad-hoc fence stripping and error recovery.
+- **Decision:** Add `ExtractJSON[T]` to `internal/external/gemini.go` — generic typed extraction with fence stripping + JSON recovery. All three services refactored onto it.
+- **Alternatives considered:** Keep per-service parsing; add a JSON schema lib.
+- **Consequences:** Single parsing path, less drift. DiffClaims call count unchanged (2). No new deps.
+
+## 2026-08-14 — Candidate 3: PDFDocument/ParsePDF extraction seam
+
+- **Context:** `pipeline.go` mixed extraction (ExtractFromPDF + manual chart capping) inline; PDF details leaked into orchestration.
+- **Decision:** `PDFDocument` domain object + `ParsePDF(pdfBytes, maxCharts)` in `extraction.go` encapsulate text/pages/charts + cap. Pipeline calls ParsePDF.
+- **Alternatives considered:** Keep capping in pipeline; move only the cap into a helper.
+- **Consequences:** Pipeline only sees the bounded document object. Chart cap is a service-internal concern.
+
+## 2026-08-14 — Candidate 4: useDocumentPoll hook
+
+- **Context:** ResultPage owned 6 pieces of polling state (doc, error, notFound, timedOut, takingLong, retryNonce) inline; effect + timers tangled with render.
+- **Decision:** Extract `frontend/src/hooks/use-document-poll.js` returning `{ doc, error, notFound, timedOut, takingLong, retry }`. ResultPage keeps only UI state.
+- **Alternatives considered:** Keep inline; context provider.
+- **Consequences:** Polling lifecycle (interval, soft warn, timeout, cleanup) testable in isolation. ResultPage shrinks.
+
+## 2026-08-14 — Candidate 5: AuthForm + useAuthSubmit consolidation
+
+- **Context:** Login and Signup pages duplicated the same form shell, input styling, error mapping, and submit fetch logic (~113 lines each).
+- **Decision:** Shared `AuthForm` component (uncontrolled inputs) + `useAuthSubmit(endpoint, errorMessages)` hook returning `{ error, isSubmitting, submit, setError }`. Pages become ~40-line wrappers.
+- **Alternatives considered:** Form library; keep duplication.
+- **Consequences:** One place for auth form styling per DESIGN.md. Uncontrolled inputs avoid state noise. Submit returns boolean so caller controls redirect.
+
+## 2026-08-14 — Evidence model: dedicated table over inline fields
+
+- **Context:** Chunk 1.1 requires reusable provenance — paper_id, page, figure_id, table_id, section, source_text, source_reference.
+- **Decision:** New `evidence` table (migration 005) FK-cascading to documents. EvidenceRepo with Insert/ListByPaper. Follows existing repo patterns.
+- **Alternatives considered:** JSON column on documents; embed in simplified_text markdown.
+- **Consequences:** Queryable, indexable provenance per paper. Clean seam for Chunk 8.2 Evidence Graph later. Schema change requires migration 005 (already registered).
+

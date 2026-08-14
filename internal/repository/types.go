@@ -2,13 +2,13 @@ package repository
 
 // Document mirrors the documents table (ARCHITECTURE.md Section 3).
 type Document struct {
-	ID                     string
-	CreatedAt              int64
-	LastAccessedAt         int64
-	Status                 string // processing | complete | failed | verification_failed
-	SourceType             string // pdf | pasted_text
-	ReadingLevel           string // simplified | eli5
-	OriginalText           string
+	ID                      string
+	CreatedAt               int64
+	LastAccessedAt          int64
+	Status                  string // processing | complete | failed | verification_failed
+	SourceType              string // pdf | pasted_text
+	ReadingLevel            string // simplified | eli5
+	OriginalText            string
 	SimplifiedText          *string
 	ErrorMessage            *string
 	ChartExtractionDegraded bool
@@ -47,6 +47,18 @@ type Chapter struct {
 	Summary      string
 	Excerpt      string
 	DisplayOrder int
+}
+
+// Evidence mirrors the evidence table.
+type Evidence struct {
+	ID              string
+	PaperID         string
+	Page            *int
+	FigureID        *string
+	TableID         *string
+	Section         *string
+	SourceText      string
+	SourceReference string
 }
 
 // Status enum values, per ARCHITECTURE.md Section 3 CHECK constraint.

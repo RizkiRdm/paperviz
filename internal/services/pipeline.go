@@ -22,9 +22,9 @@ const maxImageChartsPerDocument = 5
 // pipeline skipped, no table/figure data available from plain text").
 type PipelineInput struct {
 	OriginalText string
-	SourceType   string // "pdf" | "pasted_text"
-	ReadingLevel string // "simplified" | "eli5"
-	PDFBytes     []byte // nil for pasted_text; used only for chart extraction
+	SourceType   string             // "pdf" | "pasted_text"
+	ReadingLevel string             // "simplified" | "eli5"
+	PDFBytes     []byte             // nil for pasted_text; used only for chart extraction
 	OnStage      func(stage string) // called at each pipeline stage transition
 }
 
@@ -47,9 +47,13 @@ const (
 // early return corresponds to one of ARCHITECTURE.md Section 6's Failure
 // Scenarios — the comment above each return says which one.
 func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in PipelineInput) PipelineOutput {
- stage := func(s string) { if in.OnStage != nil { in.OnStage(s) } }
+	stage := func(s string) {
+		if in.OnStage != nil {
+			in.OnStage(s)
+		}
+	}
 
- stage("simplifying")
+	stage("simplifying")
 	simplifiedText, err := Simplify(ctx, gemini, in.OriginalText, in.ReadingLevel)
 	if err != nil {
 		// Failure Scenario 2: Gemini call times out after retry -> status
@@ -62,13 +66,13 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	}
 
 	// Stage 2: Verify. Runs BEFORE chart processing (ARCHITECTURE.md
-		// Section 6 sequence diagram) — a document that fails claim-diff never
-		// reaches the chart pipeline, since it won't be published as complete
-		// regardless of chart quality.
-		//
-		// Stagger between Gemini-heavy stages so free-tier rate limits recover.
-		time.Sleep(3 * time.Second)
- stage("verifying")
+	// Section 6 sequence diagram) — a document that fails claim-diff never
+	// reaches the chart pipeline, since it won't be published as complete
+	// regardless of chart quality.
+	//
+	// Stagger between Gemini-heavy stages so free-tier rate limits recover.
+	time.Sleep(3 * time.Second)
+	stage("verifying")
 	verifyResult, err := DiffClaims(ctx, gemini, in.OriginalText, simplifiedText)
 	if err != nil {
 		slog.Error("pipeline stage failed", "stage", "verify", "error", err)
@@ -101,7 +105,7 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	// Supplemental path: for PDFs that DO have embedded chart images,
 	// run per-image data extraction on top of the chapter charts.
 	time.Sleep(3 * time.Second)
- stage("generating_charts")
+	stage("generating_charts")
 	var charts []Chart
 	var chartDegraded bool
 
@@ -130,22 +134,13 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 
 	// Supplemental: image-based extraction (PDFs with embedded chart images).
 	if in.SourceType == "pdf" && len(in.PDFBytes) > 0 {
-		extracted, err := ExtractFromPDF(in.PDFBytes)
+		pdfDoc, err := ParsePDF(in.PDFBytes, maxImageChartsPerDocument)
 		if err == nil {
-			pages := pageText(extracted.Pages)
+			pages := pageText(pdfDoc.Pages)
 			if pages == nil {
-				pages = pageText{1: extracted.Text}
+				pages = pageText{1: pdfDoc.Text}
 			}
-			imagesToProcess := extracted.Charts
-			if len(imagesToProcess) > maxImageChartsPerDocument {
-				slog.Info("pipeline: capping image chart extraction",
-					"stage", "chart",
-					"total_images_found", len(imagesToProcess),
-					"processing", maxImageChartsPerDocument,
-				)
-				imagesToProcess = imagesToProcess[:maxImageChartsPerDocument]
-			}
-			imageCharts := ReVisualizeCharts(ctx, gemini, imagesToProcess, pages)
+			imageCharts := ReVisualizeCharts(ctx, gemini, pdfDoc.Charts, pages)
 			// Offset display order to append after text-scan charts.
 			offset := len(charts)
 			for i := range imageCharts {

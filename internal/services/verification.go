@@ -71,14 +71,9 @@ type claimComparisonResult struct {
 // before the merge (2 single-extraction + 1 comparison).
 func DiffClaims(ctx context.Context, client *external.GeminiClient, originalText, simplifiedText string) (VerifyResult, error) {
 	prompt := fmt.Sprintf(dualClaimExtractionPrompt, originalText, simplifiedText)
-	raw, err := client.Generate(ctx, prompt, true, 0)
+	dual, err := external.ExtractJSON[dualClaimExtractionResult](ctx, client, prompt, 0)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("extract claims: %w", err)
-	}
-
-	var dual dualClaimExtractionResult
-	if err := json.Unmarshal([]byte(raw), &dual); err != nil {
-		return VerifyResult{}, fmt.Errorf("parse dual claims JSON: %w", err)
 	}
 
 	originalJSON, err := json.Marshal(dual.OriginalClaims)
@@ -91,14 +86,9 @@ func DiffClaims(ctx context.Context, client *external.GeminiClient, originalText
 	}
 
 	prompt = fmt.Sprintf(claimComparisonPrompt, originalJSON, simplifiedJSON)
-	raw, err = client.Generate(ctx, prompt, true, 0)
+	comparison, err := external.ExtractJSON[claimComparisonResult](ctx, client, prompt, 0)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("compare claims: %w", err)
-	}
-
-	var comparison claimComparisonResult
-	if err := json.Unmarshal([]byte(raw), &comparison); err != nil {
-		return VerifyResult{}, fmt.Errorf("parse comparison JSON: %w", err)
 	}
 
 	return VerifyResult{

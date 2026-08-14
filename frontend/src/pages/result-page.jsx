@@ -3,17 +3,10 @@ import { useParams, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { VerificationBadge, WarningBanner, ErrorBanner, ClaimComparisonPanel } from "@/components/ui/status-banners"
 import { ChartCard } from "@/components/chart-card"
-import { getDocument } from "@/lib/api"
+import { useDocumentPoll } from "@/hooks/use-document-poll"
 import { ArrowLeft, Copy, Check, Sparkles, RefreshCw, BarChart2, Link2, X } from "lucide-react"
 import { NotFoundPage } from "@/pages/not-found-page"
 
-const POLL_INTERVAL_MS = 2000
-// Pipeline (Gemini simplify → verify → chapters → charts) routinely exceeds
-// 2 minutes on real papers, esp. with rate-limit retries. Past POLL_SOFT_WARN_MS
-// we keep polling and only surface a "taking longer" note; POLL_TIMEOUT_MS is a
-// safety cap, not the normal path.
-const POLL_SOFT_WARN_MS = 120000
-const POLL_TIMEOUT_MS = 600000
 const COPY_FEEDBACK_MS = 2000
 
 const READING_LEVEL_LABELS = {
@@ -99,61 +92,14 @@ export function ResultPage() {
   const { documentId } = useParams()
   const navigate = useNavigate()
   const onBack = () => navigate("/")
-  const [doc, setDoc] = useState(null)
-  const [error, setError] = useState(null)
-  const [notFound, setNotFound] = useState(false)
+  const { doc, error, notFound, timedOut, takingLong, retry } = useDocumentPoll(documentId)
   const [showOriginal, setShowOriginal] = useState(false)
-  const [timedOut, setTimedOut] = useState(false)
-  const [takingLong, setTakingLong] = useState(false)
-  const [retryNonce, setRetryNonce] = useState(0)
   const [showShare, setShowShare] = useState(false)
   const [showClaims, setShowClaims] = useState(false)
   const [textCopied, setTextCopied] = useState(false)
-  const pollTimer = useRef(null)
-  const pollStartRef = useRef(Date.now())
   const copyTimerRef = useRef(null)
 
   useEffect(() => () => clearTimeout(copyTimerRef.current), [])
-
-  useEffect(() => {
-    let cancelled = false
-    setTimedOut(false)
-    setTakingLong(false)
-    pollStartRef.current = Date.now()
-
-    async function poll() {
-      try {
-        const fetched = await getDocument(documentId)
-        if (cancelled) return
-        setDoc(fetched)
-        if (fetched.status === "processing") {
-          const elapsed = Date.now() - pollStartRef.current
-          if (elapsed > POLL_SOFT_WARN_MS) {
-            setTakingLong(true)
-          }
-          if (elapsed > POLL_TIMEOUT_MS) {
-            setTimedOut(true)
-            return
-          }
-          pollTimer.current = setTimeout(poll, POLL_INTERVAL_MS)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          if (err.code === "not_found") {
-            setNotFound(true)
-          } else {
-            setError(
-              err.code === "network_timeout"
-                ? "The request timed out. Please check your connection."
-                : "We couldn't load this document. Please try again."
-            )
-          }
-        }
-      }
-    }
-    poll()
-    return () => { cancelled = true; clearTimeout(pollTimer.current) }
-  }, [documentId, retryNonce])
 
   async function handleCopyText() {
     const text = showOriginal ? doc.original_text : doc.simplified_text
@@ -177,7 +123,7 @@ export function ResultPage() {
         <div className="max-w-md rounded-[16px] border border-[#e5e5e5] bg-white p-8 shadow-xs">
           <p className="text-sm text-[#737373]">Processing is taking longer than expected.</p>
           <div className="mt-6 flex flex-col gap-2">
-            <Button onClick={() => setRetryNonce((n) => n + 1)} variant="primary">
+            <Button onClick={retry} variant="primary">
               <RefreshCw className="h-4 w-4 mr-2" /> Check Status Again
             </Button>
             <Button onClick={onBack} variant="secondary">

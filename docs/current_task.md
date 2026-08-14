@@ -2,56 +2,52 @@
 
 ## Objective
 
-Chapter-tabbed view implemented. Awaiting DB reset + rebuild + testing.
+Chunk 1.1 (Evidence Provenance) — make every AI-generated explanation traceable to the original paper. Backend data model complete; frontend display + pipeline population + repo tests pending.
 
 ## Requirements
 
-- **Backend:**
-  - Migration 004: `chapter_id` column on charts table
-  - Services `Chart.ChapterIndex` field
-  - Repository `Chart.ChapterID` field
-  - `Insert` + `ListByDocument` handle `chapter_id`
-  - Handler exposes `content` on chapters, `chapter_id` on charts
-  - `saveResult` links charts to chapters via `chapterIndexToID` map
+- **Backend (DONE):**
+  - Migration 005: `evidence` table (`id`, `paper_id` FK cascade, `page`, `figure_id`, `table_id`, `section`, `source_text`, `source_reference`)
+  - `repository.Evidence` type in `types.go`
+  - `repository/evidence.go`: `EvidenceRepo` with `Insert` + `ListByPaper`
+  - Migration 5 registered in `cmd/server/main.go` `loadMigrations`; migration-count test updated
 
-- **Frontend:**
-  - Horizontal scrollable tabs (only when 2+ chapters)
-  - ARIA roles: `tablist`, `tab`, `tabpanel`
-  - Keyboard navigation (arrow keys)
-  - Chapter-scoped content + charts
-  - Fallback to linear view when 0-1 chapters
+- **Backend (PENDING):**
+  - Populate evidence during pipeline (source_text/page/section extracted where available)
+  - Expose evidence in `GET /api/documents/:id` response
+  - Table-driven repo tests (min 1 success + 1 error case per AGENTS.md)
 
-- **UX copy:**
-  - Error messages use "We couldn't..." pattern
-  - Processing text uses student-friendly language
-  - Chart empty states simplified
+- **Frontend (PENDING):**
+  - Display evidence alongside summaries/charts with provenance (page, section, source ref)
 
 ## Constraints
 
-- DB reset required for migration 004 (schema change)
-- Rebuild required after DB reset
-- Live Gemini regression tests still outstanding
+- Reusable Evidence model per roadmap Chunk 1.1 — don't over-engineer schema
+- Follow `handlers → services → repository/external` layering
+- DB reset not required if migration runner applies 005 cleanly (verify)
+- Existing functionality must remain intact
 
 ## Relevant Files
 
-- `migrations/004_chapter_charts.sql` — new migration
-- `internal/services/types.go` — Chart.ChapterIndex field
-- `internal/services/charts.go` — GenerateChapterChart sets ChapterIndex
-- `internal/repository/types.go` — Chart.ChapterID field
-- `internal/repository/charts.go` — Insert + ListByDocument handle chapter_id
-- `internal/handlers/documents.go` — chapterResponse.Content, chartResponse.ChapterID, saveResult links charts to chapters
-- `frontend/src/pages/result-page.jsx` — tabbed chapter view with ARIA + keyboard nav
+- `migrations/005_evidence.sql` — new evidence table
+- `internal/repository/types.go` — Evidence struct
+- `internal/repository/evidence.go` — EvidenceRepo
+- `cmd/server/main.go` — registered migration 5
+- `cmd/server/main_test.go` — migration count updated
+- `internal/services/pipeline.go` — where evidence population will hook in
+- `internal/handlers/documents.go` — where evidence will be exposed in GET
+- `frontend/src/pages/result-page.jsx` — where evidence will display
 
 ## Progress
 
-- All backend + frontend changes implemented.
-- Tests pass (21/21).
-- Design detector clean (0 findings).
-- Committed but not yet pushed.
+- Migration 005 created + registered. Evidence type + repo methods added.
+- 49/49 tests pass, build succeeds.
+- Chunk 0.2 audit deliverable: `docs/product/current-user-flow.md`.
 
 ## Next Action
 
-1. DB reset: `rm paperviz.db*`
-2. Rebuild: `go build -o paperviz ./cmd/server`
-3. Test: Upload PDF with chapters → verify tabbed view
-4. Push: `git push`
+1. Decide evidence population source (chapter text? chart annotations? per-page PDF text via `ExtractTextByPage`)
+2. Wire evidence into pipeline output + persistence in `saveResult`
+3. Expose evidence in GET response; render in result page
+4. Add EvidenceRepo + integration tests
+5. Then start Chunk 1.2 (Original vs Explained Figure)

@@ -10,13 +10,28 @@
 # Go build artifacts
 /server
 /cmd/server/server
+/paperviz
 
 # Frontend build output and dependencies
 frontend/node_modules/
 frontend/dist/
+frontend/.agents/
 
 # CodeGraph index
 .codegraph/
+
+# graphify knowledge-graph output (regenerable via `graphify update .`)
+graphify-out/
+
+# AI tooling workspace sync (not project source)
+.agents/
+.claude/
+.codex/
+.gemini/
+.impeccable/
+.omo/
+.opencode/
+.playwright-mcp/
 
 # Air live-reload artifacts
 tmp/

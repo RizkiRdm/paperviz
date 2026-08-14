@@ -8,11 +8,9 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -60,9 +58,9 @@ type createDocumentResponse struct {
 
 type listDocumentResponse struct {
 	Documents []documentSummary `json:"documents"`
-	Total    int               `json:"total"`
-	Limit    int               `json:"limit"`
-	Offset   int               `json:"offset"`
+	Total     int               `json:"total"`
+	Limit     int               `json:"limit"`
+	Offset    int               `json:"offset"`
 }
 
 type documentSummary struct {
@@ -104,13 +102,10 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var originalText, sourceType string
 	var pdfBytes []byte
 
 	if hasFile {
 		defer file.Close()
-		sourceType = repository.SourceTypePDF
-
 		if header.Size > maxUploadBytes {
 			writeError(w, http.StatusBadRequest, "file_too_large")
 			return
@@ -131,50 +126,21 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid_file_type")
 			return
 		}
-
-		originalText, err = external.ExtractText(pdfBytes)
-		if err != nil {
-			if errors.Is(err, external.ErrNoTextLayer) {
-				writeError(w, http.StatusUnprocessableEntity, "no_text_layer")
-				return
-			}
-			slog.Error("pdf extraction failed", "error", err)
-			writeError(w, http.StatusBadRequest, "invalid_file_type")
-			return
-		}
-	} else {
-		sourceType = repository.SourceTypePastedText
-		originalText = pastedText
 	}
 
-	id, err := repository.NewID()
-	if err != nil {
-		slog.Error("id generation failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	now := time.Now().Unix()
 	var userID *string
 	if uid := UserIDFromContext(r.Context()); uid != "" {
 		userID = &uid
 	}
 
-	doc := repository.Document{
-		ID:             id,
-		CreatedAt:      now,
-		LastAccessedAt: now,
-		Status:         repository.StatusProcessing,
-		SourceType:     sourceType,
-		ReadingLevel:   readingLevel,
-		OriginalText:   originalText,
-		UserID:         userID,
-	}
-
-	docRepo := repository.NewDocumentRepo(h.db)
-	if err := docRepo.Insert(doc); err != nil {
-		slog.Error("insert document failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
+	intakeResult, errCode, err := services.ValidateAndInsert(h.db, readingLevel, hasFile, pdfBytes, pastedText, userID)
+	if err != nil {
+		if errCode == "no_text_layer" {
+			writeError(w, http.StatusUnprocessableEntity, "no_text_layer")
+			return
+		}
+		slog.Error("document intake validation/insertion failed", "error", err)
+		writeError(w, http.StatusBadRequest, errCode)
 		return
 	}
 
@@ -182,155 +148,21 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// request context (which dies when this handler returns) and given its
 	// own bounded lifetime instead, so a slow Gemini call doesn't get
 	// cancelled just because the HTTP response already went out.
-	go h.runPipelineAndSave(id, services.PipelineInput{
-		OriginalText: originalText,
-		SourceType:   sourceType,
+	go h.runPipelineAndSave(intakeResult.DocumentID, services.PipelineInput{
+		OriginalText: intakeResult.OriginalText,
+		SourceType:   intakeResult.SourceType,
 		ReadingLevel: readingLevel,
-		PDFBytes:     pdfBytes,
+		PDFBytes:     intakeResult.PDFBytes,
 	})
 
-	writeJSON(w, http.StatusCreated, createDocumentResponse{DocumentID: id, Status: repository.StatusProcessing})
+	writeJSON(w, http.StatusCreated, createDocumentResponse{DocumentID: intakeResult.DocumentID, Status: repository.StatusProcessing})
 }
-
-// backgroundPipelineTimeout bounds the whole background run (all pipeline
-// stages combined), independent of the request that triggered it.
-const backgroundPipelineTimeout = 20 * time.Minute
 
 // runPipelineAndSave runs the full pipeline and persists the result. Errors
 // are logged, not returned — there is no HTTP request left to answer by the
 // time this runs; the client learns the outcome via the next GET poll.
 func (h *DocumentHandler) runPipelineAndSave(documentID string, input services.PipelineInput) {
-	ctx, cancel := context.WithTimeout(context.Background(), backgroundPipelineTimeout)
-	defer cancel()
-
-	input.OnStage = func(stage string) {
-		docRepo := repository.NewDocumentRepo(h.db)
-		s := stage
-		if err := docRepo.UpdateStage(documentID, &s); err != nil {
-			slog.Error("update processing stage failed", "document_id", documentID, "stage", stage, "error", err)
-		}
-	}
-
-	output := services.RunPipeline(ctx, h.gemini, input)
-
-	if err := h.saveResult(documentID, output); err != nil {
-		slog.Error("save pipeline result failed", "document_id", documentID, "error", err)
-	}
-}
-
-// saveResult writes the full pipeline outcome (document status/text +
-// charts + claim_diff) in a single transaction, per ARCHITECTURE.md Section
-// 4 Transaction Policy: "Each document's full write MUST occur within a
-// single SQLite transaction. Partial writes on failure are PROHIBITED."
-func (h *DocumentHandler) saveResult(documentID string, output services.PipelineOutput) error {
-	tx, err := h.db.Begin()
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback() // no-op if Commit succeeds below
-
-	docRepo := repository.NewDocumentRepo(tx)
-
-	if output.Status == repository.StatusFailed {
-		errMsg := output.ErrorMessage
-		if err := docRepo.UpdateStatus(documentID, repository.StatusFailed, nil, &errMsg, false); err != nil {
-			return err
-		}
-		return tx.Commit()
-	}
-
-	simplified := output.SimplifiedText
-	if err := docRepo.UpdateStatus(documentID, output.Status, &simplified, nil, output.ChartExtractionDegraded); err != nil {
-		return err
-	}
-
-	// Persist the claim-diff result whenever verification actually ran
-	// (i.e. we're not in the pipelineStatusFailed branch above, which
-	// returns before reaching here).
-	claimDiffRepo := repository.NewClaimDiffRepo(tx)
-	originalClaimsJSON, err := json.Marshal(output.Verify.OriginalClaims)
-	if err != nil {
-		return fmt.Errorf("marshal original claims: %w", err)
-	}
-	simplifiedClaimsJSON, err := json.Marshal(output.Verify.SimplifiedClaims)
-	if err != nil {
-		return fmt.Errorf("marshal simplified claims: %w", err)
-	}
-	claimDiffID, err := repository.NewID()
-	if err != nil {
-		return fmt.Errorf("generate claim_diff id: %w", err)
-	}
-	detail := output.Verify.MismatchDetail
-	if err := claimDiffRepo.Insert(repository.ClaimDiff{
-		ID:               claimDiffID,
-		DocumentID:       documentID,
-		OriginalClaims:   string(originalClaimsJSON),
-		SimplifiedClaims: string(simplifiedClaimsJSON),
-		MismatchDetected: output.Verify.MismatchDetected,
-		MismatchDetail:   &detail,
-	}); err != nil {
-		return err
-	}
-
-	// Insert chapters first to get their IDs, then link charts to chapters.
-	chapterRepo := repository.NewChapterRepo(tx)
-	chapterIndexToID := make(map[int]string, len(output.Chapters))
-	for i, ch := range output.Chapters {
-		chapterID, err := repository.NewID()
-		if err != nil {
-			return fmt.Errorf("generate chapter id: %w", err)
-		}
-		if err := chapterRepo.Insert(repository.Chapter{
-			ID:           chapterID,
-			DocumentID:   documentID,
-			Title:        ch.Title,
-			Summary:      ch.Summary,
-			Excerpt:      ch.Excerpt,
-			DisplayOrder: i,
-		}); err != nil {
-			return err
-		}
-		chapterIndexToID[i] = chapterID
-	}
-
-	// Charts only exist when status is complete (verification_failed stops
-	// the pipeline before chart processing — see services/pipeline.go).
-	chartRepo := repository.NewChartRepo(tx)
-	for _, c := range output.Charts {
-		chartID, err := repository.NewID()
-		if err != nil {
-			return fmt.Errorf("generate chart id: %w", err)
-		}
-		var chartDataPtr, annotationPtr *string
-		if c.ChartData != "" {
-			chartDataPtr = &c.ChartData
-		}
-		if c.Annotation != "" {
-			annotationPtr = &c.Annotation
-		}
-		pageNum := c.PageNumber
-		var chapterIDPtr *string
-		if c.ChapterIndex >= 0 {
-			if id, ok := chapterIndexToID[c.ChapterIndex]; ok {
-				chapterIDPtr = &id
-			}
-		}
-		if err := chartRepo.Insert(repository.Chart{
-			ID:           chartID,
-			DocumentID:   documentID,
-			SourceMethod: c.SourceMethod,
-			ChartData:    chartDataPtr,
-			ImageBlob:    c.ImageBlob,
-			Annotation:   annotationPtr,
-			PageNumber:   &pageNum,
-			DisplayOrder: c.DisplayOrder,
-			ChapterID:    chapterIDPtr,
-		}); err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
+	services.RunPipelineAndPersist(h.db, h.gemini, documentID, input)
 }
 
 // chartResponse is the wire shape for one chart in the GET response.
@@ -366,15 +198,15 @@ type chapterResponse struct {
 // getDocumentResponse matches ARCHITECTURE.md Section E's Get Document
 // contract exactly.
 type getDocumentResponse struct {
-	ID                     string            `json:"id"`
-	Status                 string            `json:"status"`
-	ReadingLevel           string            `json:"reading_level"`
-	SimplifiedText          *string           `json:"simplified_text"`
-	OriginalText            string            `json:"original_text"`
-	Charts                  []chartResponse   `json:"charts"`
-	ErrorMessage            *string           `json:"error_message"`
-	ChartExtractionDegraded bool              `json:"chart_extraction_degraded"`
-	ProcessingStage         *string           `json:"processing_stage,omitempty"`
+	ID                      string             `json:"id"`
+	Status                  string             `json:"status"`
+	ReadingLevel            string             `json:"reading_level"`
+	SimplifiedText          *string            `json:"simplified_text"`
+	OriginalText            string             `json:"original_text"`
+	Charts                  []chartResponse    `json:"charts"`
+	ErrorMessage            *string            `json:"error_message"`
+	ChartExtractionDegraded bool               `json:"chart_extraction_degraded"`
+	ProcessingStage         *string            `json:"processing_stage,omitempty"`
 	ClaimDiff               *claimDiffResponse `json:"claim_diff,omitempty"`
 	Chapters                []chapterResponse  `json:"chapters,omitempty"`
 }
@@ -459,9 +291,9 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, getDocumentResponse{
-		ID:                     doc.ID,
-		Status:                 doc.Status,
-		ReadingLevel:           doc.ReadingLevel,
+		ID:                      doc.ID,
+		Status:                  doc.Status,
+		ReadingLevel:            doc.ReadingLevel,
 		SimplifiedText:          doc.SimplifiedText,
 		OriginalText:            doc.OriginalText,
 		Charts:                  chartResponses,
@@ -512,8 +344,8 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, listDocumentResponse{
 		Documents: summaries,
-		Total:    len(summaries),
-		Limit:    limit,
-		Offset:   offset,
+		Total:     len(summaries),
+		Limit:     limit,
+		Offset:    offset,
 	})
 }
