@@ -343,7 +343,7 @@ const STAGE_LABELS = {
               </div>
               <div className="flex flex-col gap-4">
                 {chapterCharts.map((chart) => (
-                  <ChartCard key={chart.id} chart={chart} />
+                  <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} />
                 ))}
               </div>
             </section>

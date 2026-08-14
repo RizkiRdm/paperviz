@@ -235,13 +235,25 @@ GET /api/documents/:id
   "simplified_text": "...",
   "original_text": "...",
   "charts": [
-    { "id": "...", "source_method": "data_extracted", "chart_data": {...}, "annotation": "..." }
+    { "id": "...", "source_method": "data_extracted", "chart_data": {...}, "annotation": "...", "image_url": "/api/documents/:id/charts/:chartId/image" }
   ],
   "error_message": null
 }
 
 404: document not found or expired.
 ```
+
+**API Contract — Get Chart Image**
+```json
+GET /api/documents/:id/charts/:chartId/image
+
+200 Response:
+Raw image bytes, Content-Type: image/png | image/jpeg | image/gif | image/webp
+
+404: chart not found, image not available for that document, or document expired.
+```
+
+**API Contract — Get Document (cont.)** This endpoint serves the ORIGINAL figure captured from the PDF. Lookup is scoped to the parent document (`WHERE id = ? AND document_id = ?`) so a bare chart ID cannot read another document's figure. Only charts with `source_method: "image_fallback"` carry an `image_url`.
 
 **Error Contract**: All error responses use `{ "error": "<snake_case_code>" }`. STRICT: no raw error strings/stack traces exposed to client.
 

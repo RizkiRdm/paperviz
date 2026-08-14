@@ -141,7 +141,7 @@ export default function DataChart({ chartData, title }) {
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-[#0a0a0a]">{chartData.title || title}</h3>
         <span className="rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
-          Re-visualized
+          PaperViz AI Interpretation
         </span>
       </div>
       <div className="h-60 w-full pt-2">

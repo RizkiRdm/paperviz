@@ -24,9 +24,9 @@ func TestChartValuesUnmarshal(t *testing.T) {
 			want: chartValues{42},
 		},
 		{
-			name:    "empty array",
-			json:    `[]`,
-			want:    chartValues{},
+			name: "empty array",
+			json: `[]`,
+			want: chartValues{},
 		},
 		{
 			name: "comma-separated string",

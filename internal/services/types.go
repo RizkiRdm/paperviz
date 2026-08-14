@@ -59,11 +59,11 @@ type VerifyResult struct {
 // repository.Document.Status, redeclared here for the same layer-boundary
 // reason documented in charts.go.
 type PipelineOutput struct {
-	Status                 string // "complete" | "failed" | "verification_failed"
-	SimplifiedText         string
-	ErrorMessage           string
-	Verify                 VerifyResult
-	Charts                 []Chart
+	Status                  string // "complete" | "failed" | "verification_failed"
+	SimplifiedText          string
+	ErrorMessage            string
+	Verify                  VerifyResult
+	Charts                  []Chart
 	ChartExtractionDegraded bool
-	Chapters               []Chapter
+	Chapters                []Chapter
 }

@@ -42,6 +42,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	r.Route("/api/documents", func(r chi.Router) {
 		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth).Post("/", docHandler.Create)
 		r.Get("/{id}", docHandler.Get)
+		r.Get("/{id}/charts/{chartId}/image", docHandler.GetChartImage)
 		r.With(authMiddleware.RequireAuth).Get("/", docHandler.List)
 	})
 

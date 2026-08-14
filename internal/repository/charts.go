@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -63,4 +64,23 @@ func (r *ChartRepo) ListByDocument(documentID string) ([]Chart, error) {
 		return nil, fmt.Errorf("iterate charts: %w", err)
 	}
 	return charts, nil
+}
+
+// GetByDocumentAndID returns a single chart, scoped to its parent document
+// so a chart ID alone cannot be used to read another document's figure.
+// Returns ErrNotFound if no row matches either the id or the document scope.
+func (r *ChartRepo) GetByDocumentAndID(documentID, chartID string) (*Chart, error) {
+	row := r.db.QueryRow(
+		`SELECT id, document_id, source_method, chart_data, image_blob, annotation, page_number, display_order, chapter_id
+		FROM charts WHERE id = ? AND document_id = ?`, chartID, documentID,
+	)
+	var c Chart
+	err := row.Scan(&c.ID, &c.DocumentID, &c.SourceMethod, &c.ChartData, &c.ImageBlob, &c.Annotation, &c.PageNumber, &c.DisplayOrder, &c.ChapterID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get chart by document: %w", err)
+	}
+	return &c, nil
 }

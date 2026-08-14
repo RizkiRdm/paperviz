@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -175,6 +176,7 @@ type chartResponse struct {
 	Annotation   *string         `json:"annotation,omitempty"`
 	PageNumber   *int            `json:"page_number,omitempty"`
 	ChapterID    *string         `json:"chapter_id,omitempty"`
+	ImageURL     *string         `json:"image_url,omitempty"`
 }
 
 // claimDiffResponse is the wire shape for claim-diff verification data.
@@ -257,6 +259,10 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 		if c.ChartData != nil && *c.ChartData != "" {
 			cr.ChartData = json.RawMessage(*c.ChartData)
+		}
+		if len(c.ImageBlob) > 0 {
+			imageURL := fmt.Sprintf("/api/documents/%s/charts/%s/image", id, c.ID)
+			cr.ImageURL = &imageURL
 		}
 		chartResponses = append(chartResponses, cr)
 	}
@@ -348,4 +354,44 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 		Limit:     limit,
 		Offset:    offset,
 	})
+}
+
+// GetChartImage serves the original chart image bytes for a document's
+// chart. The lookup is scoped to the parent document so a bare chart ID
+// cannot be used to read another document's figure; a missing image or
+// unrecognized format both resolve to 404/500 rather than leaking partial
+// state.
+func (h *DocumentHandler) GetChartImage(w http.ResponseWriter, r *http.Request) {
+	docID := chi.URLParam(r, "id")
+	chartID := chi.URLParam(r, "chartId")
+
+	chartRepo := repository.NewChartRepo(h.db)
+	chart, err := chartRepo.GetByDocumentAndID(docID, chartID)
+	if errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	}
+	if err != nil {
+		slog.Error("get chart image failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	if len(chart.ImageBlob) == 0 {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	}
+
+	mime := detectImageMIME(chart.ImageBlob)
+	if mime == "" {
+		slog.Error("chart image has unrecognized format", "chart_id", chartID)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	w.Header().Set("Content-Type", mime)
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(chart.ImageBlob); err != nil {
+		slog.Error("write chart image failed", "chart_id", chartID, "error", err)
+	}
 }

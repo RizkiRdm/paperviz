@@ -2,52 +2,52 @@
 
 ## Objective
 
-Chunk 1.1 (Evidence Provenance) — make every AI-generated explanation traceable to the original paper. Backend data model complete; frontend display + pipeline population + repo tests pending.
+Chunk 1.2 (Original vs Explained Figure) — users clearly distinguish original evidence from generated interpretation, with provenance. Backend + frontend + tests complete. Chunk 1.1 (Evidence Provenance) backend model done; pipeline population + GET exposure + frontend display still pending.
 
 ## Requirements
 
-- **Backend (DONE):**
-  - Migration 005: `evidence` table (`id`, `paper_id` FK cascade, `page`, `figure_id`, `table_id`, `section`, `source_text`, `source_reference`)
-  - `repository.Evidence` type in `types.go`
-  - `repository/evidence.go`: `EvidenceRepo` with `Insert` + `ListByPaper`
-  - Migration 5 registered in `cmd/server/main.go` `loadMigrations`; migration-count test updated
+- **Chunk 1.2 (DONE):**
+  - `GET /api/documents/:id/charts/:chartId/image` serves original figure bytes (MIME-sniffed). Scoped `WHERE id=? AND document_id=?` — bare chart ID can't read another document's figure
+  - `chartResponse` += `image_url` (only `image_fallback` charts)
+  - `ChartRepo.GetByDocumentAndID` + `handlers.detectImageMIME` (PNG/JPEG/GIF/WebP)
+  - Frontend `ChartCard` → 2-zone card: Original Figure (image + neutral badge "Original Figure · Page N") vs "PaperViz AI Interpretation" (blue badge; Recharts or annotation). `data-chart.jsx` badge relabeled
+  - Tests: `handlers/image_test.go` (MIME sniff), `repository/charts_test.go` (GetByDocumentAndID: success/wrong-doc/not-found)
+  - docs/ARCHITECTURE.md API contracts updated
 
-- **Backend (PENDING):**
+- **Chunk 1.1 (PENDING tail):**
   - Populate evidence during pipeline (source_text/page/section extracted where available)
   - Expose evidence in `GET /api/documents/:id` response
-  - Table-driven repo tests (min 1 success + 1 error case per AGENTS.md)
+  - Table-driven repo tests for `EvidenceRepo` (min 1 success + 1 error case per AGENTS.md)
 
-- **Frontend (PENDING):**
-  - Display evidence alongside summaries/charts with provenance (page, section, source ref)
+- **Chunk 1.2 (DONE, provenance note):** Provenance shipped chart-level only (`page_number` + chapter title + `source_method`). Evidence-table provenance deferred to 1.1 tail (decided Opt 1).
 
 ## Constraints
 
 - Reusable Evidence model per roadmap Chunk 1.1 — don't over-engineer schema
 - Follow `handlers → services → repository/external` layering
-- DB reset not required if migration runner applies 005 cleanly (verify)
+- DB reset not required (chunk 1.2 added no schema change — verify)
 - Existing functionality must remain intact
 
 ## Relevant Files
 
-- `migrations/005_evidence.sql` — new evidence table
+- `migrations/005_evidence.sql` — evidence table
 - `internal/repository/types.go` — Evidence struct
-- `internal/repository/evidence.go` — EvidenceRepo
-- `cmd/server/main.go` — registered migration 5
-- `cmd/server/main_test.go` — migration count updated
-- `internal/services/pipeline.go` — where evidence population will hook in
-- `internal/handlers/documents.go` — where evidence will be exposed in GET
-- `frontend/src/pages/result-page.jsx` — where evidence will display
+- `internal/repository/evidence.go` — EvidenceRepo (tests pending)
+- `internal/repository/charts.go` — `GetByDocumentAndID`
+- `internal/handlers/image.go` — `detectImageMIME`
+- `internal/handlers/documents.go` — `GetChartImage`, `chartResponse.image_url`
+- `internal/handlers/router.go` — `/api/documents/{id}/charts/{chartId}/image`
+- `frontend/src/components/chart-card.jsx` — 2-zone Original vs Interpretation card
+- `frontend/src/components/data-chart.jsx` — interpretation badge
+- `frontend/src/pages/result-page.jsx` — chart render site
 
 ## Progress
 
-- Migration 005 created + registered. Evidence type + repo methods added.
-- 49/49 tests pass, build succeeds.
+- Chunk 1.2 complete: original-figure serving endpoint + clear original-vs-interpretation UI + chart-level provenance + tests. 62 Go tests pass, build + frontend build succeed.
+- Chunk 1.1: migration 005 + Evidence type + EvidenceRepo.Insert/ListByPaper done; repo tests started (charts_test.go). Evidence population + GET exposure pending.
 - Chunk 0.2 audit deliverable: `docs/product/current-user-flow.md`.
 
 ## Next Action
 
-1. Decide evidence population source (chapter text? chart annotations? per-page PDF text via `ExtractTextByPage`)
-2. Wire evidence into pipeline output + persistence in `saveResult`
-3. Expose evidence in GET response; render in result page
-4. Add EvidenceRepo + integration tests
-5. Then start Chunk 1.2 (Original vs Explained Figure)
+1. Finish 1.1 tail: populate evidence in pipeline (chapter/image chart source text), expose `evidence` in GET response, render provenance in result page, add EvidenceRepo tests
+2. Then start Chunk 1.3 (Figure Explanation Quality)
