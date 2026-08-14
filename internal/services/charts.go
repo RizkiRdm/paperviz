@@ -147,6 +147,7 @@ func reVisualizeOne(ctx context.Context, client *external.GeminiClient, ec Extra
 	base := Chart{
 		PageNumber:   ec.PageNumber,
 		DisplayOrder: displayOrder,
+		SourceText:   pageContext,
 	}
 
 	// Primary path: try to extract structured chart data from the page text.

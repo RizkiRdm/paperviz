@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"paperviz/internal/external"
@@ -163,6 +164,7 @@ func savePipelineResult(db *sql.DB, documentID string, output PipelineOutput) er
 	}
 
 	chartRepo := repository.NewChartRepo(tx)
+	evidenceRepo := repository.NewEvidenceRepo(tx)
 	for _, c := range output.Charts {
 		chartID, err := repository.NewID()
 		if err != nil {
@@ -194,6 +196,24 @@ func savePipelineResult(db *sql.DB, documentID string, output PipelineOutput) er
 			ChapterID:    chapterIDPtr,
 		}); err != nil {
 			return err
+		}
+
+		if c.PageNumber > 0 && strings.TrimSpace(c.SourceText) != "" {
+			evidenceID, err := repository.NewID()
+			if err != nil {
+				return fmt.Errorf("generate evidence id: %w", err)
+			}
+			reference := fmt.Sprintf("Figure on page %d", c.PageNumber)
+			if err := evidenceRepo.Insert(repository.Evidence{
+				ID:              evidenceID,
+				PaperID:         documentID,
+				Page:            &pageNum,
+				FigureID:        &chartID,
+				SourceText:      c.SourceText,
+				SourceReference: reference,
+			}); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -197,6 +197,16 @@ type chapterResponse struct {
 	DisplayOrder int    `json:"display_order"`
 }
 
+type evidenceResponse struct {
+	ID              string  `json:"id"`
+	Page            *int    `json:"page,omitempty"`
+	FigureID        *string `json:"figure_id,omitempty"`
+	TableID         *string `json:"table_id,omitempty"`
+	Section         *string `json:"section,omitempty"`
+	SourceText      string  `json:"source_text"`
+	SourceReference string  `json:"source_reference"`
+}
+
 // getDocumentResponse matches ARCHITECTURE.md Section E's Get Document
 // contract exactly.
 type getDocumentResponse struct {
@@ -211,6 +221,7 @@ type getDocumentResponse struct {
 	ProcessingStage         *string            `json:"processing_stage,omitempty"`
 	ClaimDiff               *claimDiffResponse `json:"claim_diff,omitempty"`
 	Chapters                []chapterResponse  `json:"chapters,omitempty"`
+	Evidence                []evidenceResponse `json:"evidence,omitempty"`
 }
 
 // Get handles GET /api/documents/:id. On every successful lookup it
@@ -296,6 +307,26 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	evidenceRepo := repository.NewEvidenceRepo(h.db)
+	evidence, err := evidenceRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list evidence failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	evidenceResponses := make([]evidenceResponse, 0, len(evidence))
+	for _, e := range evidence {
+		evidenceResponses = append(evidenceResponses, evidenceResponse{
+			ID:              e.ID,
+			Page:            e.Page,
+			FigureID:        e.FigureID,
+			TableID:         e.TableID,
+			Section:         e.Section,
+			SourceText:      e.SourceText,
+			SourceReference: e.SourceReference,
+		})
+	}
+
 	writeJSON(w, http.StatusOK, getDocumentResponse{
 		ID:                      doc.ID,
 		Status:                  doc.Status,
@@ -308,6 +339,7 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		ProcessingStage:         doc.ProcessingStage,
 		ClaimDiff:               claimDiffResp,
 		Chapters:                chapterResponses,
+		Evidence:                evidenceResponses,
 	})
 }
 

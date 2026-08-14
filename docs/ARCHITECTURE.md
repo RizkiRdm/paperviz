@@ -237,11 +237,16 @@ GET /api/documents/:id
   "charts": [
     { "id": "...", "source_method": "data_extracted", "chart_data": {...}, "annotation": "...", "image_url": "/api/documents/:id/charts/:chartId/image" }
   ],
-  "error_message": null
+  "error_message": null,
+  "evidence": [
+    { "id": "...", "page": 3, "figure_id": "...", "source_text": "...", "source_reference": "Figure on page 3" }
+  ]
 }
 
 404: document not found or expired.
 ```
+
+`evidence` carries original-provenance rows for image-origin charts only (captured from the PDF's page text). Chapter-derived charts have no original page mapping and produce no evidence row.
 
 **API Contract — Get Chart Image**
 ```json

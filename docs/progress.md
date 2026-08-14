@@ -2,15 +2,17 @@
 
 ## Current
 
-- **Chunk 1.1 (Evidence Provenance):** Backend data model done — migration 005, Evidence type, EvidenceRepo (Insert/ListByPaper). Pipeline wiring + frontend display + repo tests PENDING.
+- **Chunk 1.2 (Original vs Explained Figure):** Complete — image-serving endpoint + 2-zone UI + chart-level provenance.
+- **Chunk 1.1 (Evidence Provenance):** Backend complete — model, pipeline population, GET exposure, repo/services tests. Frontend evidence display PENDING.
 - **Chunk 0.2 (Product Flow Audit):** Complete — `docs/product/current-user-flow.md`.
-- **Architecture candidates:** 1–5 complete (intake, ExtractJSON, PDFDocument seam, useDocumentPoll hook, AuthForm consolidation).
-- **Current work:** Chunk 1.1 backend complete. Next: finish 1.1 (wire evidence into pipeline/GET + frontend + tests), then Chunk 1.2 (Original vs Explained Figure).
+- **Current work:** Chunk 1.1 frontend evidence display, then Chunk 1.3 (Figure Explanation Quality).
 - **Blockers:** Live Gemini regression tests still require a valid API key.
-- **Next milestone:** Finish Chunk 1.1, then Chunk 1.2.
+- **Next milestone:** Frontend evidence display; then Chunk 1.3.
 
 ## Changelog
 
+- **2026-08-15:** Chunk 1.1 tail — evidence populated in `savePipelineResult` (image-origin charts, full page text, `Figure on page N` ref), exposed as `evidence[]` in GET, repo + services tests. 67/67 tests pass.
+- **2026-08-15:** Chunk 1.2 (Original vs Explained Figure) — `GET /api/documents/:id/charts/:chartId/image` (MIME-sniffed, document-scoped), `image_url` in GET chart response, ChartCard 2-zone Original Figure vs PaperViz AI Interpretation with provenance badges. 62/62 tests pass. Committed `feb2d71`.
 - **2026-08-14:** Chunk 1.1 (Evidence Provenance) backend — migration 005_evidence.sql, Evidence struct, EvidenceRepo, registered migration 5, updated migration-count test. 49/49 tests pass. (Frontend display + pipeline population pending.)
 - **2026-08-14:** Chunk 0.2 (Product Flow Audit) — `docs/product/current-user-flow.md` delivered. No behavior changes. Mapped upload → intake → pipeline → polling → result → share journey, ranked abandonment risks, identified aha moments.
 - **2026-08-14:** Architecture candidates 3–5 — Candidate 3: `PDFDocument`/`ParsePDF` seam in `extraction.go`, pipeline uses it. Candidate 4: `useDocumentPoll` hook extracted from ResultPage. Candidate 5: `AuthForm` + `useAuthSubmit` consolidate login/signup (~40 lines/page).

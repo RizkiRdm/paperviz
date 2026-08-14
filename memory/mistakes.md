@@ -1,5 +1,19 @@
 # Lessons and Mistakes
 
+## 2026-08-15 — Pre-existing gofmt drift needed normalization before commit
+
+- **Problem:** `gofmt -l` flagged `internal/services/types.go`, `internal/services/charts_test.go`, and a closing block in `charts.go` — files untouched by the current chunk.
+- **Root cause:** Prior commits shipped unformatted alignment (whitespace drift) that `go test` tolerates but `gofmt -l` catches.
+- **Fix:** `gofmt -w` on the flagged files before committing (AGENTS.md mandates gofmt clean).
+- **Prevention:** Run `gofmt -l internal/ cmd/`/`gofmt -l .` as part of validation every time, not just "gofmt on files I edited". Normalize pre-existing drift rather than committing a mixed-format tree.
+
+## 2026-08-15 — Stale LSP diagnostics after import fixes
+
+- **Problem:** After adding a missing import (`errors`, `sql`), the editor's LSP continued reporting "undefined" at the previous line, twice in a row, while the code was already correct.
+- **Root cause:** Language-server diagnostics lag one edit behind on incremental Go analysis; fixes that don't recompile leave stale markers.
+- **Fix:** Ignored LSP output; verified with `go build`/`go vet`/`go test` which passed.
+- **Prevention:** Treat compiler/`go vet` output as authoritative over inline LSP diagnostics after edit cycles; run `go test ./...` before considering a fix complete.
+
 ## 2026-08-14 — Migration-count test broke after adding migration 005
 
 - **Problem:** `go test` failed after adding `migrations/005_evidence.sql` — `TestLoadMigrationsRegistersChapterCharts` expected exactly 4 migrations.

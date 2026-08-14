@@ -32,6 +32,7 @@ type Chart struct {
 	ChartData    string // JSON, empty if not data_extracted
 	ImageBlob    []byte
 	Annotation   string
+	SourceText   string // original page text backing this chart; empty when none available
 	PageNumber   int
 	DisplayOrder int
 	ChapterIndex int // index in chapters array; -1 if not linked to a chapter

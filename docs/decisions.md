@@ -184,3 +184,17 @@ Historical entries are append-only. Deprecate decisions instead of deleting them
 - **Alternatives considered:** JSON column on documents; embed in simplified_text markdown.
 - **Consequences:** Queryable, indexable provenance per paper. Clean seam for Chunk 8.2 Evidence Graph later. Schema change requires migration 005 (already registered).
 
+## 2026-08-15 — Original figure serving: dedicated image endpoint over inline base64
+
+- **Context:** Chunk 1.2 (Original vs Explained Figure) must show the original figure. `charts.image_blob` was stored for `image_fallback` charts but never served (known issue in AGENTS.md).
+- **Decision:** New `GET /api/documents/:id/charts/:chartId/image` serves raw image bytes (Content-Type sniffed from magic bytes — PNG/JPEG/GIF/WebP). Lookup scoped to parent document (`WHERE id=? AND document_id=?`) so a bare chart ID can't read another document's figure. GET chart response carries `image_url` only for `image_fallback` charts.
+- **Alternatives considered:** Inline base64 data URI in the GET response (single round-trip, simpler, but heavier payload, uncacheable).
+- **Consequences:** GET payload stays small; image cacheable per URL; one extra round-trip per figure after processing completes. `image_url` served relative — frontend resolves against origin.
+
+## 2026-08-15 — Evidence population: image-origin charts only, full source text
+
+- **Context:** Chunk 1.1 pipeline population was pending when 1.2 shipped. Chunk 1.2 "show provenance" decision was chart-level metadata (page/chapter/source_method); 1.1 tail then populated the evidence table.
+- **Decision:** `savePipelineResult` writes one evidence row per chart where original source text exists: image-origin charts (`Services.Chart.SourceText` set from per-page PDF text in `reVisualizeOne`), guarded by `PageNumber > 0`. `source_reference` = `"Figure on page N"`, full page text stored as `source_text`. Chapter-derived charts get no row (derived from simplified text, no original page mapping — fabricating would violate Rule 4).
+- **Alternatives considered:** Emit rows for chapter charts using simplified excerpts flagged as derived; inline provenance in markdown.
+- **Consequences:** Honest provenance only where original source exists. `section`/`table_id` columns unused in MVP. Frontend evidence rendering still pending.
+
