@@ -2,15 +2,17 @@
 
 ## Current
 
+- **Chunk 1.3 (Figure Explanation Quality):** Complete — enriched prompts + frontend display + chart_type bugfix.
 - **Chunk 1.2 (Original vs Explained Figure):** Complete — image-serving endpoint + 2-zone UI + chart-level provenance.
 - **Chunk 1.1 (Evidence Provenance):** Backend complete — model, pipeline population, GET exposure, repo/services tests. Frontend evidence display PENDING.
 - **Chunk 0.2 (Product Flow Audit):** Complete — `docs/product/current-user-flow.md`.
-- **Current work:** Chunk 1.1 frontend evidence display, then Chunk 1.3 (Figure Explanation Quality).
+- **Current work:** Chunk 1.1 frontend evidence display, then Chunk 1.4 (Research-Oriented Summary).
 - **Blockers:** Live Gemini regression tests still require a valid API key.
-- **Next milestone:** Frontend evidence display; then Chunk 1.3.
+- **Next milestone:** Frontend evidence display; then Chunk 1.4.
 
 ## Changelog
 
+- **2026-08-15:** Chunk 1.3 (Figure Explanation Quality) — enriched chapterChartPrompt with x_axis, y_axis, key_takeaway, limitations, confidence; extended chapterChartJSON struct (omitempty); frontend displays axis labels, key takeaway card, limitations note, confidence badge; fixed pre-existing chartData.type→chart_data.chart_type bug; fixed Rules of Hooks crash in result-page.jsx (useState after conditional returns). 67/67 tests pass. Committed `b1e329e`.
 - **2026-08-15:** Chunk 1.1 tail — evidence populated in `savePipelineResult` (image-origin charts, full page text, `Figure on page N` ref), exposed as `evidence[]` in GET, repo + services tests. 67/67 tests pass.
 - **2026-08-15:** Chunk 1.2 (Original vs Explained Figure) — `GET /api/documents/:id/charts/:chartId/image` (MIME-sniffed, document-scoped), `image_url` in GET chart response, ChartCard 2-zone Original Figure vs PaperViz AI Interpretation with provenance badges. 62/62 tests pass. Committed `feb2d71`.
 - **2026-08-14:** Chunk 1.1 (Evidence Provenance) backend — migration 005_evidence.sql, Evidence struct, EvidenceRepo, registered migration 5, updated migration-count test. 49/49 tests pass. (Frontend display + pipeline population pending.)

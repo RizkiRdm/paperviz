@@ -10,7 +10,7 @@
 
 ## Medium
 
-- Chunk 1.3: Figure Explanation Quality (chart type, axes, groups, trends, uncertainty, key takeaway in prompts).
+- Chunk 1.4: Research-Oriented Summary (structured research understanding replacing generic summarization).
 - Add contextual help tooltips for VerificationBadge and ClaimComparisonPanel (P2 from critique).
 - Add processing progress indicator or elapsed time (P3 from critique).
 - Run full five-paper manual flow before MVP release.
@@ -21,6 +21,8 @@
 
 ## Completed
 
+- Chunk 1.3 Figure Explanation Quality — enriched prompts, frontend display, chart_type bugfix (2026-08-15).
+- Fixed Rules of Hooks crash in result-page.jsx (2026-08-15).
 - Chunk 1.1 Evidence backend tail — pipeline population for image-origin charts + `evidence` in GET + repo/services tests (2026-08-15).
 - Chunk 1.2 Original vs Explained Figure — image-serving endpoint, 2-zone UI, chart-level provenance (2026-08-15).
 - Chunk 1.1 Evidence backend — migration 005, Evidence type, EvidenceRepo, registered + test updated (2026-08-14).

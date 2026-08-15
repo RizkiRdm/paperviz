@@ -2,7 +2,7 @@
 
 ## Objective
 
-Chunk 1.1 (Evidence Provenance) — make every AI-generated explanation traceable to the original paper. Backend complete (model + pipeline population + GET exposure + tests). Frontend evidence display pending.
+Chunk 1.1 (Evidence Provenance) — frontend evidence display alongside figure explanations. Backend complete (model + pipeline population + GET exposure + tests). Frontend display pending.
 
 ## Requirements
 
@@ -19,6 +19,8 @@ Chunk 1.1 (Evidence Provenance) — make every AI-generated explanation traceabl
 
 - **Chunk 1.2 (DONE):** Original vs Explained Figure — `/api/documents/:id/charts/:chartId/image` endpoint + 2-zone UI + chart-level provenance.
 
+- **Chunk 1.3 (DONE):** Figure Explanation Quality — enriched prompts (x_axis, y_axis, key_takeaway, limitations, confidence), frontend display, chart_type bugfix.
+
 - **Provenance scoping (decided):** Evidence rows only where original source text exists — image-origin charts. Chapter-derived charts have no original page mapping → no fabricated provenance (Rule 4).
 
 ## Constraints
@@ -34,19 +36,21 @@ Chunk 1.1 (Evidence Provenance) — make every AI-generated explanation traceabl
 - `internal/repository/evidence.go` — EvidenceRepo
 - `internal/repository/evidence_test.go` — repo tests
 - `internal/services/types.go` — Chart.SourceText
-- `internal/services/charts.go` — SourceText set from page context
+- `internal/services/charts.go` — SourceText set from page context, enriched chapterChartPrompt
 - `internal/services/intake.go` — `savePipelineResult` evidence insert
 - `internal/services/save_pipeline_result_test.go` — persistence test
 - `internal/handlers/documents.go` — `evidence` in GET
 - `frontend/src/pages/result-page.jsx` — where evidence will display (pending)
+- `frontend/src/components/data-chart.jsx` — chart explanation display
 
 ## Progress
 
-- Chunk 1.1 backend tail complete: pipeline population + GET exposure + repo/services tests. 62 Go tests pass, build + gofmt clean.
+- Chunk 1.3 complete: enriched prompts + frontend display + chart_type bugfix. 67 Go tests pass, build + gofmt clean.
+- Chunk 1.1 backend tail complete: pipeline population + GET exposure + repo/services tests. 67 Go tests pass.
 - Chunk 1.2 complete: original-figure serving endpoint + clear original-vs-interpretation UI + tests.
 - Chunk 0.2 audit deliverable: `docs/product/current-user-flow.md`.
 
 ## Next Action
 
 1. Render `evidence` from GET response in result page (provenance under each figure explanation)
-2. Then start Chunk 1.3 (Figure Explanation Quality)
+2. Then start Chunk 1.4 (Research-Oriented Summary)

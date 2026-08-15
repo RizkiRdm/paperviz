@@ -1,5 +1,19 @@
 # Lessons and Mistakes
 
+## 2026-08-15 — Rules of Hooks violation caused React crash on status transition
+
+- **Problem:** "Something went wrong. Please refresh the page." error on result page when document transitions from `processing` to `complete`.
+- **Root cause:** `useState(hasChapters ? 0 : -1)` placed after conditional early returns in `result-page.jsx`. Hook count changed between renders (28→29) when status flipped, triggering React invariant error caught by ErrorBoundary.
+- **Fix:** Moved `useState` to top of component with other hooks (initialized to `-1`), added `useEffect` to set to `0` when chapters first appear.
+- **Prevention:** All hooks must be declared unconditionally before any early returns. Comment added to prevent regression.
+
+## 2026-08-15 — chartData.type never matched backend JSON key chart_type
+
+- **Problem:** All charts rendered as bar type regardless of what Gemini specified, because `data-chart.jsx` read `chartData.type` but backend JSON used `chart_type`.
+- **Root cause:** Frontend referenced wrong JSON key. Pre-existing bug from initial chart implementation.
+- **Fix:** Changed `chartData.type` to `chartData.chart_type`.
+- **Prevention:** Verify JSON key names match between backend struct tags and frontend property access.
+
 ## 2026-08-15 — Pre-existing gofmt drift needed normalization before commit
 
 - **Problem:** `gofmt -l` flagged `internal/services/types.go`, `internal/services/charts_test.go`, and a closing block in `charts.go` — files untouched by the current chunk.
