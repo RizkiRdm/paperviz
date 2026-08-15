@@ -97,9 +97,16 @@ export function ResultPage() {
   const [showShare, setShowShare] = useState(false)
   const [showClaims, setShowClaims] = useState(false)
   const [textCopied, setTextCopied] = useState(false)
+  const [activeChapter, setActiveChapter] = useState(-1)
   const copyTimerRef = useRef(null)
 
   useEffect(() => () => clearTimeout(copyTimerRef.current), [])
+
+  // Hook must stay above the early returns below, or hook order changes between renders.
+  useEffect(() => {
+    const hasChapters = doc?.chapters && doc.chapters.length > 1
+    if (hasChapters && activeChapter === -1) setActiveChapter(0)
+  }, [doc, activeChapter])
 
   async function handleCopyText() {
     const text = showOriginal ? doc.original_text : doc.simplified_text
@@ -196,7 +203,6 @@ const STAGE_LABELS = {
   const displayedText = showOriginal ? doc.original_text : doc.simplified_text
   const levelLabel = READING_LEVEL_LABELS[doc.reading_level] || doc.reading_level
   const hasChapters = doc.chapters && doc.chapters.length > 1
-  const [activeChapter, setActiveChapter] = useState(hasChapters ? 0 : -1)
 
   const activeChapterData = hasChapters ? doc.chapters[activeChapter] : null
   const chapterContent = activeChapterData?.content || displayedText

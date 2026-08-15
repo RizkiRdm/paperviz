@@ -231,23 +231,42 @@ data, using this rule:
 - "pie": parts of a whole that sum to ~100%% or a fixed total
 - "scatter": relationship between two independent numeric variables
 
+Then provide:
+- x_axis: label for the horizontal axis (e.g. "Model", "Time (months)", "Treatment Group")
+- y_axis: label for the vertical axis (e.g. "Accuracy (%%)", "Revenue ($M)", "Sample Size")
+- key_takeaway: ONE sentence stating the most important finding this chart reveals
+- limitations: ONE sentence noting what the chart does NOT show or what caveats apply
+- confidence: "high" if the data is clearly stated and unambiguous,
+  "medium" if some interpretation was needed,
+  "low" if the numbers are vague, incomplete, or you are uncertain about the extraction
+
 Respond with ONLY JSON in this exact shape:
 {
   "has_chart": true,
   "chart_type": "bar" | "line" | "pie" | "scatter",
   "title": "short descriptive title tied to this chapter",
   "labels": ["label1", "label2", ...],
-  "values": [number1, number2, ...]
+  "values": [number1, number2, ...],
+  "x_axis": "horizontal axis label",
+  "y_axis": "vertical axis label",
+  "key_takeaway": "one sentence — most important finding",
+  "limitations": "one sentence — what the chart does NOT show",
+  "confidence": "high" | "medium" | "low"
 }
 
 Do not return any explanatory text outside of this JSON.`
 
 type chapterChartJSON struct {
-	HasChart  bool        `json:"has_chart"`
-	ChartType string      `json:"chart_type"`
-	Title     string      `json:"title"`
-	Labels    []string    `json:"labels"`
-	Values    chartValues `json:"values"`
+	HasChart    bool        `json:"has_chart"`
+	ChartType   string      `json:"chart_type"`
+	Title       string      `json:"title"`
+	Labels      []string    `json:"labels"`
+	Values      chartValues `json:"values"`
+	XAxis       string      `json:"x_axis,omitempty"`
+	YAxis       string      `json:"y_axis,omitempty"`
+	KeyTakeaway string      `json:"key_takeaway,omitempty"`
+	Limitations string      `json:"limitations,omitempty"`
+	Confidence  string      `json:"confidence,omitempty"`
 }
 
 func GenerateChapterChart(ctx context.Context, client *external.GeminiClient, chapter Chapter, displayOrder int) (chart Chart, ok bool, degraded bool) {

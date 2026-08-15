@@ -17,7 +17,7 @@ export default function DataChart({ chartData, title }) {
   if (loadFailed) return <p className="text-xs text-[#dc2626]">Chart could not be loaded.</p>
   if (!recharts) return <p className="text-xs text-[#737373]">Loading chart component…</p>
 
-  const type = chartData.type || "bar"
+  const type = chartData.chart_type || "bar"
   const rows = (chartData.labels || []).map((label, i) => ({
     name: label,
     value: chartData.values?.[i] ?? 0,
@@ -140,15 +140,41 @@ export default function DataChart({ chartData, title }) {
     <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-[#0a0a0a]">{chartData.title || title}</h3>
-        <span className="rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
-          PaperViz AI Interpretation
-        </span>
+        <div className="flex items-center gap-2">
+          {chartData.confidence && chartData.confidence !== "high" && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              chartData.confidence === "low"
+                ? "bg-[#fef3c7] text-[#92400e]"
+                : "bg-[#f5f5f5] text-[#737373]"
+            }`}>
+              {chartData.confidence === "low" ? "Low Confidence" : "Interpreted"}
+            </span>
+          )}
+          <span className="rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
+            PaperViz AI Interpretation
+          </span>
+        </div>
       </div>
       <div className="h-60 w-full pt-2">
         <recharts.ResponsiveContainer width="100%" height="100%">
           {renderChart()}
         </recharts.ResponsiveContainer>
       </div>
+      {(chartData.x_axis || chartData.y_axis) && (
+        <p className="mt-2 text-[10px] text-[#737373] text-center">
+          {chartData.x_axis && chartData.y_axis
+            ? `${chartData.y_axis} by ${chartData.x_axis}`
+            : chartData.y_axis || chartData.x_axis}
+        </p>
+      )}
+      {chartData.key_takeaway && (
+        <div className="mt-3 rounded-lg bg-[#f0fdf4] border border-[#bbf7d0] px-3 py-2">
+          <p className="text-xs text-[#166534] leading-relaxed">{chartData.key_takeaway}</p>
+        </div>
+      )}
+      {chartData.limitations && (
+        <p className="mt-2 text-[11px] text-[#737373] italic">{chartData.limitations}</p>
+      )}
     </div>
   )
 }
