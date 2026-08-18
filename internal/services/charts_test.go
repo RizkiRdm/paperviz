@@ -173,4 +173,3 @@ func TestReVisualizeOneChapterIndex(t *testing.T) {
 		})
 	}
 }
-

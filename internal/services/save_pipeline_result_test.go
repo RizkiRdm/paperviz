@@ -93,13 +93,13 @@ func TestSavePipelineResultUnlinkedChartHasNilChapterID(t *testing.T) {
 	}
 	docRepo := repository.NewDocumentRepo(db)
 	if err := docRepo.Insert(repository.Document{
-		ID:           docID,
-		CreatedAt:    1,
+		ID:             docID,
+		CreatedAt:      1,
 		LastAccessedAt: 1,
-		Status:       repository.StatusProcessing,
-		SourceType:   repository.SourceTypePDF,
-		ReadingLevel: repository.ReadingLevelSimplified,
-		OriginalText: "original",
+		Status:         repository.StatusProcessing,
+		SourceType:     repository.SourceTypePDF,
+		ReadingLevel:   repository.ReadingLevelSimplified,
+		OriginalText:   "original",
 	}); err != nil {
 		t.Fatalf("insert document: %v", err)
 	}
@@ -142,4 +142,3 @@ func TestSavePipelineResultUnlinkedChartHasNilChapterID(t *testing.T) {
 		t.Errorf("chart 1 ChapterID is nil, want non-nil")
 	}
 }
-

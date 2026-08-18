@@ -28,7 +28,7 @@ type DocumentListItem struct {
 	SummaryPreview   string
 	ChartCount       int
 	ExplanationCount int
-	Saved           bool
+	Saved            bool
 }
 
 // Chart mirrors the charts table.
