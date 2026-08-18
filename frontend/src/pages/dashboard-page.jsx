@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, FileText, Plus, Calendar, Star, Pencil, Trash2, X, Check } from "lucide-react"
+import { ArrowRight, FileText, Plus, Calendar, Star, Pencil, Trash2, X, Check, FolderPlus, Folder, ChevronRight, MoreHorizontal } from "lucide-react"
 
 const STATUS_STYLES = {
   complete: "bg-[#dcfce7] text-[#16a34a]",
@@ -27,6 +27,13 @@ export function DashboardPage() {
   const [editingId, setEditingId] = useState(null)
   const [editTitle, setEditTitle] = useState("")
   const [deleteConfirmId, setDeleteConfirmId] = useState(null)
+  const [collections, setCollections] = useState([])
+  const [activeCollection, setActiveCollection] = useState(null)
+  const [showNewCollection, setShowNewCollection] = useState(false)
+  const [newCollectionName, setNewCollectionName] = useState("")
+  const [editingCollectionId, setEditingCollectionId] = useState(null)
+  const [editCollectionName, setEditCollectionName] = useState("")
+  const [showAddToCollection, setShowAddToCollection] = useState(null)
 
   useEffect(() => {
     async function checkAuth() {
@@ -63,7 +70,41 @@ export function DashboardPage() {
       }
     }
     fetchDocs()
-  }, [authChecked])
+  }, [authChecked, activeCollection])
+
+  useEffect(() => {
+    if (!authChecked || activeCollection) return
+
+    async function fetchDocs() {
+      try {
+        const res = await fetch("/api/documents")
+        if (res.ok) {
+          const data = await res.json()
+          setDocs(data.documents || [])
+        }
+      } catch {
+        // silent — empty state shown
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchDocs()
+  }, [authChecked, activeCollection])
+
+  useEffect(() => {
+    if (!activeCollection) return
+
+    async function fetchCollectionDocs() {
+      try {
+        const res = await fetch(`/api/collections/${activeCollection}`)
+        if (res.ok) {
+          const data = await res.json()
+          setDocs(data.documents || [])
+        }
+      } catch {}
+    }
+    fetchCollectionDocs()
+  }, [activeCollection])
 
   async function handleToggleSaved(e, doc) {
     e.preventDefault()
@@ -110,6 +151,80 @@ export function DashboardPage() {
     } catch {}
   }
 
+  async function handleCreateCollection(e) {
+    e.preventDefault()
+    if (!newCollectionName.trim()) return
+    try {
+      const res = await fetch("/api/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newCollectionName.trim() }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setCollections([{ ...data, document_count: 0 }, ...collections])
+        setNewCollectionName("")
+        setShowNewCollection(false)
+      }
+    } catch {}
+  }
+
+  async function handleRenameCollection(e, colId) {
+    e.preventDefault()
+    if (!editCollectionName.trim()) return
+    try {
+      const res = await fetch(`/api/collections/${colId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editCollectionName.trim() }),
+      })
+      if (res.ok) {
+        setCollections(collections.map(c => c.id === colId ? { ...c, name: editCollectionName.trim() } : c))
+        setEditingCollectionId(null)
+        setEditCollectionName("")
+      }
+    } catch {}
+  }
+
+  async function handleDeleteCollection(e, colId) {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      const res = await fetch(`/api/collections/${colId}`, { method: "DELETE" })
+      if (res.ok) {
+        setCollections(collections.filter(c => c.id !== colId))
+        if (activeCollection === colId) setActiveCollection(null)
+      }
+    } catch {}
+  }
+
+  async function handleAddToCollection(e, colId, docId) {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      const res = await fetch(`/api/collections/${colId}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ document_id: docId }),
+      })
+      if (res.ok) {
+        setCollections(collections.map(c => c.id === colId ? { ...c, document_count: c.document_count + 1 } : c))
+        setShowAddToCollection(null)
+      }
+    } catch {}
+  }
+
+  async function handleRemoveFromCollection(e, colId, docId) {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      const res = await fetch(`/api/collections/${colId}/documents/${docId}`, { method: "DELETE" })
+      if (res.ok) {
+        setCollections(collections.map(c => c.id === colId ? { ...c, document_count: Math.max(0, c.document_count - 1) } : c))
+      }
+    } catch {}
+  }
+
   if (!authChecked) {
     return (
       <div className="min-h-screen bg-white bg-dotted-grid flex items-center justify-center">
@@ -141,6 +256,81 @@ export function DashboardPage() {
 
       <main className="mx-auto max-w-[900px] px-6 py-10">
         <h1 className="font-satoshi text-2xl font-medium text-[#0a0a0a] mb-6">Your Documents</h1>
+
+        {collections.length > 0 || showNewCollection ? (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-medium text-[#737373]">Collections</h2>
+              <button
+                onClick={() => setShowNewCollection(true)}
+                className="text-xs text-[#2563eb] hover:text-[#1e40af] flex items-center gap-1"
+              >
+                <FolderPlus className="h-3.5 w-3.5" /> New
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {showNewCollection && (
+                <form onSubmit={handleCreateCollection} className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={newCollectionName}
+                    onChange={(e) => setNewCollectionName(e.target.value)}
+                    placeholder="Collection name"
+                    autoFocus
+                    className="text-sm border border-[#2563eb] rounded-[6px] px-2.5 py-1.5 outline-none w-40"
+                  />
+                  <button type="submit" className="text-[#16a34a] hover:text-[#15803d] p-1">
+                    <Check className="h-4 w-4" />
+                  </button>
+                  <button type="button" onClick={() => { setShowNewCollection(false); setNewCollectionName("") }} className="text-[#737373] hover:text-[#171717] p-1">
+                    <X className="h-4 w-4" />
+                  </button>
+                </form>
+              )}
+              {collections.map(col => (
+                <div
+                  key={col.id}
+                  onClick={() => setActiveCollection(activeCollection === col.id ? null : col.id)}
+                  className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs cursor-pointer transition-colors ${
+                    activeCollection === col.id
+                      ? "bg-[#0a0a0a] text-white"
+                      : "bg-[#f5f5f5] text-[#737373] hover:bg-[#e5e5e5]"
+                  }`}
+                >
+                  <Folder className="h-3.5 w-3.5" />
+                  {editingCollectionId === col.id ? (
+                    <form onSubmit={(e) => handleRenameCollection(e, col.id)} className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={editCollectionName}
+                        onChange={(e) => setEditCollectionName(e.target.value)}
+                        onBlur={() => setEditingCollectionId(null)}
+                        autoFocus
+                        className="bg-transparent border-b border-current outline-none w-20 text-xs"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </form>
+                  ) : (
+                    <span onDoubleClick={(e) => {
+                      e.stopPropagation()
+                      setEditingCollectionId(col.id)
+                      setEditCollectionName(col.name)
+                    }}>
+                      {col.name}
+                    </span>
+                  )}
+                  <span className="opacity-60">{col.document_count}</span>
+                  <button
+                    onClick={(e) => handleDeleteCollection(e, col.id)}
+                    className="opacity-0 group-hover:opacity-100 ml-0.5 hover:text-red-500"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {docs.length > 0 && (
           <div className="flex items-center gap-1 mb-4">
@@ -314,6 +504,36 @@ export function DashboardPage() {
                           <Trash2 className="h-4 w-4" />
                         </button>
                       )}
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setShowAddToCollection(showAddToCollection === doc.id ? null : doc.id)
+                          }}
+                          className="text-[#a3a3a3] hover:text-[#2563eb]"
+                        >
+                          <FolderPlus className="h-4 w-4" />
+                        </button>
+                        {showAddToCollection === doc.id && (
+                          <div className="absolute right-0 top-8 z-10 bg-white border border-[#e5e5e5] rounded-[8px] shadow-lg py-1 w-48">
+                            {collections.length === 0 ? (
+                              <div className="px-3 py-2 text-xs text-[#737373]">No collections yet</div>
+                            ) : (
+                              collections.map(col => (
+                                <button
+                                  key={col.id}
+                                  onClick={(e) => handleAddToCollection(e, col.id, doc.id)}
+                                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#f5f5f5] flex items-center gap-2"
+                                >
+                                  <Folder className="h-3.5 w-3.5 text-[#737373]" />
+                                  {col.name}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
