@@ -128,7 +128,7 @@ func (r *DocumentRepo) ListByUser(userID string, limit, offset int) ([]Document,
 // ListSummariesByUser returns lightweight history rows for a user's documents.
 func (r *DocumentRepo) ListSummariesByUser(userID string, limit, offset int) ([]DocumentListItem, error) {
 	rows, err := r.db.Query(
-		`SELECT d.id, d.title, d.created_at, d.status,
+		`SELECT d.id, d.title, d.created_at, d.status, d.saved,
 		        substr(coalesce(d.simplified_text, ''), 1, 240) AS summary_preview,
 		        (SELECT COUNT(*) FROM charts c WHERE c.document_id = d.id) AS chart_count,
 		        (SELECT COUNT(*) FROM charts c WHERE c.document_id = d.id AND c.annotation IS NOT NULL AND c.annotation != '') AS explanation_count
@@ -143,7 +143,7 @@ func (r *DocumentRepo) ListSummariesByUser(userID string, limit, offset int) ([]
 	var items []DocumentListItem
 	for rows.Next() {
 		var it DocumentListItem
-		if err := rows.Scan(&it.ID, &it.Title, &it.CreatedAt, &it.Status, &it.SummaryPreview, &it.ChartCount, &it.ExplanationCount); err != nil {
+		if err := rows.Scan(&it.ID, &it.Title, &it.CreatedAt, &it.Status, &it.Saved, &it.SummaryPreview, &it.ChartCount, &it.ExplanationCount); err != nil {
 			return nil, fmt.Errorf("scan document summary: %w", err)
 		}
 		items = append(items, it)
@@ -152,4 +152,36 @@ func (r *DocumentRepo) ListSummariesByUser(userID string, limit, offset int) ([]
 		return nil, fmt.Errorf("iterate document summaries: %w", err)
 	}
 	return items, nil
+}
+
+// ToggleSaved sets the saved flag on a document.
+func (r *DocumentRepo) ToggleSaved(id string, saved bool) error {
+	savedInt := 0
+	if saved {
+		savedInt = 1
+	}
+	_, err := r.db.Exec(`UPDATE documents SET saved = ? WHERE id = ?`, savedInt, id)
+	if err != nil {
+		return fmt.Errorf("toggle saved: %w", err)
+	}
+	return nil
+}
+
+// UpdateTitle sets a custom title on a document.
+func (r *DocumentRepo) UpdateTitle(id string, title string) error {
+	_, err := r.db.Exec(`UPDATE documents SET title = ? WHERE id = ?`, title, id)
+	if err != nil {
+		return fmt.Errorf("update title: %w", err)
+	}
+	return nil
+}
+
+// DeleteDocument hard-deletes a document. Related rows (charts, claim_diffs,
+// chapters, evidence) cascade via FK constraints.
+func (r *DocumentRepo) DeleteDocument(id string) error {
+	_, err := r.db.Exec(`DELETE FROM documents WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete document: %w", err)
+	}
+	return nil
 }
