@@ -185,3 +185,27 @@ func (r *DocumentRepo) DeleteDocument(id string) error {
 	}
 	return nil
 }
+
+// CountByUser returns the total number of documents for a user.
+func (r *DocumentRepo) CountByUser(userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM documents WHERE user_id = ?`, userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count documents: %w", err)
+	}
+	return count, nil
+}
+
+// CountSavedByUser returns the number of saved documents for a user.
+func (r *DocumentRepo) CountSavedByUser(userID string) (int, error) {
+	var count int
+	err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM documents WHERE user_id = ? AND saved = 1`, userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count saved documents: %w", err)
+	}
+	return count, nil
+}

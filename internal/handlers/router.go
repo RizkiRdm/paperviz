@@ -43,6 +43,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth).Post("/", docHandler.Create)
 		r.Get("/{id}", docHandler.Get)
 		r.Get("/{id}/charts/{chartId}/image", docHandler.GetChartImage)
+		r.With(authMiddleware.RequireAuth).Get("/stats", docHandler.Stats)
 		r.With(authMiddleware.RequireAuth).Get("/", docHandler.List)
 		r.With(authMiddleware.RequireAuth).Put("/{id}/save", docHandler.ToggleSaved)
 		r.With(authMiddleware.RequireAuth).Patch("/{id}", docHandler.UpdateTitle)

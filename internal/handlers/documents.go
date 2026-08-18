@@ -74,6 +74,12 @@ type documentSummary struct {
 	ExplanationCount int    `json:"explanation_count"`
 }
 
+type documentStatsResponse struct {
+	Total       int `json:"total"`
+	Saved       int `json:"saved"`
+	Collections int `json:"collections"`
+}
+
 type toggleSavedRequest struct {
 	Saved bool `json:"saved"`
 }
@@ -403,6 +409,45 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 		Total:     len(summaries),
 		Limit:     limit,
 		Offset:    offset,
+	})
+}
+
+// Stats handles GET /api/documents/stats
+func (h *DocumentHandler) Stats(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	docRepo := repository.NewDocumentRepo(h.db)
+
+	total, err := docRepo.CountByUser(userID)
+	if err != nil {
+		slog.Error("count documents failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	saved, err := docRepo.CountSavedByUser(userID)
+	if err != nil {
+		slog.Error("count saved failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	colRepo := repository.NewCollectionRepo(h.db)
+	collections, err := colRepo.ListByUser(userID)
+	if err != nil {
+		slog.Error("count collections failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, documentStatsResponse{
+		Total:       total,
+		Saved:       saved,
+		Collections: len(collections),
 	})
 }
 
