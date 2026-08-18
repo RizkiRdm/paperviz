@@ -76,6 +76,22 @@ type Evidence struct {
 	SourceReference string
 }
 
+// Collection mirrors the collections table.
+type Collection struct {
+	ID        string
+	UserID    string
+	Name      string
+	CreatedAt int64
+}
+
+// CollectionListItem is a lightweight row for the collections list.
+type CollectionListItem struct {
+	ID            string
+	Name          string
+	CreatedAt     int64
+	DocumentCount int
+}
+
 // Status enum values, per ARCHITECTURE.md Section 3 CHECK constraint.
 const (
 	StatusProcessing         = "processing"
