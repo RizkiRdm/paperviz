@@ -2,6 +2,20 @@
 
 Historical entries are append-only. Deprecate decisions instead of deleting them.
 
+## 2026-08-18 — Title source: first line of extracted text
+
+- **Context:** Paper History (Chunk 2.1) needs titles for documents, but documents table has no title column. PDF filenames are often generic ("download.pdf"). PDF metadata title requires extra pdfcpu metadata extraction.
+- **Decision:** deriveTitle() extracts the first non-empty line of extracted text, trimmed, capped at 200 chars. Fallback: "Untitled paper". Backfills existing docs via `substr(original_text, 1, 200)` in migration 006.
+- **Alternatives considered:** PDF filename (unreliable); PDF metadata title (extra extraction call); AI-generated title (cost/latency); no title (poor UX).
+- **Consequences:** Simple, zero-cost heuristic. Works for both PDF and pasted text. First line may contain journal header noise for some papers — acceptable MVP trade-off; can upgrade to metadata title later.
+
+## 2026-08-18 — ListSummariesByUser: correlated subqueries over JOIN
+
+- **Context:** Paper History list needs chart count, explanation count, and summary preview per document. Options: JOIN with GROUP BY, N+1 per-doc queries, or correlated subqueries.
+- **Decision:** Correlated subqueries in a single SELECT. Three subqueries: COUNT(charts), COUNT(charts WHERE annotation), substr(simplified_text). No GROUP BY, no JOIN, no new read-model table.
+- **Alternatives considered:** LEFT JOIN + GROUP BY (more complex, risk of row multiplication); N+1 repo calls (slow, code duplication); separate read-optimized table (premature denormalization per ARCHITECTURE.md Section 3).
+- **Consequences:** Single query, no GROUP BY complexity, cheap at dev scale (≤100 docs). Subqueries are O(n) but charts.document_id is indexed. Can upgrade to materialized view if volume warrants later.
+
 ## 2026-08-06 — Auth system: Option A (schema_migrations table)
 
 - **Context:** Need to run multiple SQL migrations in order. Current `db.go` had hardcoded migration logic.

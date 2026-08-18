@@ -2,13 +2,13 @@
 
 ## Current
 
-- **Phase 1 (Trust & Core Value):** FULLY COMPLETE — Chunks 0.2, 1.1, 1.2, 1.3, 1.4 done.
-- **Next:** Chunk 2.1 (Paper History) — list previously analyzed papers.
+- **Phase 2 (Activation & Retention):** Chunk 2.1 (Paper History) DONE — next: Chunk 2.2 (Saved Papers).
 - **Blockers:** Live Gemini regression tests still require a valid API key.
 
 ## Changelog
 
-- **2026-08-18:** Chunk 1.4 (Research-Oriented Summary) — structured prompt outputs 8 `## `-delimited sections (Research Question, Method, Main Findings, Evidence, Limitations, Key Figures, Key Tables, Conclusion). Frontend parses sections into distinct cards (flat mode). No schema change. 69/69 tests pass. Phase 1 fully complete. Committed `767c496`.
+- **2026-08-18:** Chunk 2.1 (Paper History) — migration 006 adds title column (backfilled from extracted text first line via deriveTitle). ListSummariesByUser with correlated subqueries for chart/explanation counts. Dashboard rows redesigned (title, date, status, summary preview, figure/explanation counts). Dashboard nav links on upload + result page headers. New test files: documents_test.go, deriveTitle tests in intake_test.go. 81/81 tests pass. Committed `604c087`.
+- **2026-08-18:** Chunk 1.4 (Research-Oriented Summary) — structured prompt outputs 8 `## `-delimited sections. Frontend parses sections into distinct cards (flat mode). No schema change. 69/69 tests pass. Phase 1 fully complete. Committed `767c496`.
 - **2026-08-15:** Chunk 1.3 (Figure Explanation Quality) — enriched chapterChartPrompt with x_axis, y_axis, key_takeaway, limitations, confidence; extended chapterChartJSON struct (omitempty); frontend displays axis labels, key takeaway card, limitations note, confidence badge; fixed pre-existing chartData.type→chart_data.chart_type bug; fixed Rules of Hooks crash in result-page.jsx (useState after conditional returns). 67/67 tests pass. Committed `b1e329e`.
 - **2026-08-15:** Chunk 1.1 tail — evidence populated in `savePipelineResult` (image-origin charts, full page text, `Figure on page N` ref), exposed as `evidence[]` in GET, repo + services tests. 67/67 tests pass.
 - **2026-08-15:** Chunk 1.2 (Original vs Explained Figure) — `GET /api/documents/:id/charts/:chartId/image` (MIME-sniffed, document-scoped), `image_url` in GET chart response, ChartCard 2-zone Original Figure vs PaperViz AI Interpretation with provenance badges. 62/62 tests pass. Committed `feb2d71`.

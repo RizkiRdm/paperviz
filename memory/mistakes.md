@@ -1,5 +1,20 @@
 # Lessons and Mistakes
 
+## 2026-08-18 — Test migration maps must be updated with every new migration
+
+- **Problem:** After adding migration 006, all existing tests failed: "table documents has no column named title". Three separate test files each hardcode a migration map for their in-memory test DB.
+- **Root cause:** openTestDB (charts_test.go), intake_test.go, and save_pipeline_result_test.go each have their own `map[int]string` of migrations. Adding a migration without updating ALL test helpers breaks every test that inserts into documents.
+- **Fix:** Added migration 6 to all three test helpers. intake_test.go was also missing migration 5 (pre-existing gap from Chunk 1.1).
+- **Prevention:** When adding a migration, grep for `001_init.sql` across all test files — every migration map must be updated. Consider a shared test helper in the future.
+
+## 2026-08-17 — Radix primitives: three integration traps
+
+- **Problem:** Share dialog never opened with Radix Dialog; tooltip never appeared on VerificationBadge; charts rendered twice in flat mode.
+- **Root cause 1 (dialog):** Conditional-mount (`{showShare && <ShareDialog/>}`) + no `DialogTrigger` → uncontrolled Radix Root mounts in its default closed state forever. Fix: pass controlled `open` prop.
+- **Root cause 2 (tooltip):** `TooltipTrigger asChild` clones the child and forwards ref + pointer handlers. `VerificationBadge({ onClick })` destructured only `onClick`, silently dropping Radix's props → tooltip dead. Fix: spread `...props` onto the button. Any component wrapped in asChild must forward refs + spread unknown props.
+- **Root cause 3 (duplicate render):** Pre-existing bug from chapters feature — in flat mode (`hasChapters` false) `chapterCharts` fell back to ALL charts, rendering them in both the tabpanel section and the flat section. Only visible when a doc has image-origin charts but 1 chapter. Fix: guard tabpanel charts section with `hasChapters`.
+- **Prevention:** Radix asChild children must spread props. Controlled vs uncontrolled Radix Root depends on mount pattern — conditional mount needs explicit `open`. Re-check render-site conditions when adding a mode toggle (chapter tabs).
+
 ## 2026-08-15 — Rules of Hooks violation caused React crash on status transition
 
 - **Problem:** "Something went wrong. Please refresh the page." error on result page when document transitions from `processing` to `complete`.
