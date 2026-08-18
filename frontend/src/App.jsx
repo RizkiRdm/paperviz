@@ -8,10 +8,12 @@ import { SignupPage } from "@/pages/signup-page"
 import { DashboardPage } from "@/pages/dashboard-page"
 import { NotFoundPage } from "@/pages/not-found-page"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 export default function App() {
   return (
     <ErrorBoundary>
+      <TooltipProvider delayDuration={200}>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<UploadPage />} />
@@ -22,6 +24,7 @@ export default function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>
+      </TooltipProvider>
     </ErrorBoundary>
   )
 }

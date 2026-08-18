@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 const CHART_COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0a0a0a", "#737373"]
 
@@ -142,17 +143,31 @@ export default function DataChart({ chartData, title }) {
         <h3 className="text-sm font-semibold text-[#0a0a0a]">{chartData.title || title}</h3>
         <div className="flex items-center gap-2">
           {chartData.confidence && chartData.confidence !== "high" && (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-              chartData.confidence === "low"
-                ? "bg-[#fef3c7] text-[#92400e]"
-                : "bg-[#f5f5f5] text-[#737373]"
-            }`}>
-              {chartData.confidence === "low" ? "Low Confidence" : "Interpreted"}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  chartData.confidence === "low"
+                    ? "bg-[#fef3c7] text-[#92400e]"
+                    : "bg-[#f5f5f5] text-[#737373]"
+                }`}>
+                  {chartData.confidence === "low" ? "Low Confidence" : "Interpreted"}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {chartData.confidence === "low"
+                  ? "Low confidence — this figure may not be reliably interpretable from the original."
+                  : "Interpreted from the original figure"}
+              </TooltipContent>
+            </Tooltip>
           )}
-          <span className="rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
-            PaperViz AI Interpretation
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
+                PaperViz AI Interpretation
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>AI-generated interpretation of the original figure</TooltipContent>
+          </Tooltip>
         </div>
       </div>
       <div className="h-60 w-full pt-2">

@@ -38,7 +38,7 @@ Rules:
 When schema changes (new column/table):
 1. `kill` server process
 2. `rm paperviz.db paperviz.db-wal paperviz.db-shm paperviz.db-journal` (all present)
-3. `go run ./cmd/server` — fresh DB, fresh schema, fresh WAL
+3. `make dev` — fresh DB, fresh schema, fresh WAL
 4. Data ephemeral (7-day expiry). No migration runner yet.
 
 ## Security & Hardening (Round 2 — applied July 2026)
@@ -72,3 +72,6 @@ When schema changes (new column/table):
 - Pipeline integration test REQUIRED covering all 4 Acceptance Scenarios and 4 Failure Scenarios listed in ARCHITECTURE.md Section 6.
 - MUST run `go test ./...` before considering any task in PLAN.md complete.
 - Claim-diff verification MUST be tested against the Phase 0 corrupted-passage case (PLAN.md) to confirm it actually catches injected errors — a verification system that never fails its own test is not proven. 
+
+## Git Rules
+- every task do MUST commit and push to remote repository.

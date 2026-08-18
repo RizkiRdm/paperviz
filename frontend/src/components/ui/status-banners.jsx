@@ -1,11 +1,12 @@
 // ponytail: status indicators styled per DESIGN.md (Soft Mint badge, Tangerine warning, Red error)
 import { ShieldCheck, AlertTriangle, AlertCircle } from "lucide-react"
 
-export function VerificationBadge({ onClick }) {
+export function VerificationBadge({ onClick, ...props }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      {...props}
       className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-medium text-[#16a34a] border border-[#bbf7d0] hover:bg-[#d1fae5] transition-colors cursor-pointer"
     >
       <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />

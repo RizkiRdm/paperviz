@@ -131,3 +131,82 @@ func TestDocumentRepoListSummariesByUser(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+func TestToggleSaved(t *testing.T) {
+	db := openTestDB(t)
+	repo := NewDocumentRepo(db)
+
+	doc := Document{
+		ID: "test-doc-1", CreatedAt: 1000, LastAccessedAt: 1000,
+		Status: StatusComplete, SourceType: SourceTypePDF,
+		ReadingLevel: ReadingLevelSimplified, Title: "Test",
+		OriginalText: "original",
+	}
+	if err := repo.Insert(doc); err != nil {
+		t.Fatal(err)
+	}
+
+	// Toggle on
+	if err := repo.ToggleSaved("test-doc-1", true); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := repo.Get("test-doc-1")
+	if !d.Saved {
+		t.Error("expected saved=true after toggle")
+	}
+
+	// Toggle off
+	if err := repo.ToggleSaved("test-doc-1", false); err != nil {
+		t.Fatal(err)
+	}
+	d, _ = repo.Get("test-doc-1")
+	if d.Saved {
+		t.Error("expected saved=false after toggle")
+	}
+}
+
+func TestUpdateTitle(t *testing.T) {
+	db := openTestDB(t)
+	repo := NewDocumentRepo(db)
+
+	doc := Document{
+		ID: "test-doc-2", CreatedAt: 1000, LastAccessedAt: 1000,
+		Status: StatusComplete, SourceType: SourceTypePDF,
+		ReadingLevel: ReadingLevelSimplified, Title: "Original",
+		OriginalText: "original",
+	}
+	if err := repo.Insert(doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.UpdateTitle("test-doc-2", "New Title"); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := repo.Get("test-doc-2")
+	if d.Title != "New Title" {
+		t.Errorf("expected title='New Title', got %q", d.Title)
+	}
+}
+
+func TestDeleteDocument(t *testing.T) {
+	db := openTestDB(t)
+	repo := NewDocumentRepo(db)
+
+	doc := Document{
+		ID: "test-doc-3", CreatedAt: 1000, LastAccessedAt: 1000,
+		Status: StatusComplete, SourceType: SourceTypePDF,
+		ReadingLevel: ReadingLevelSimplified, Title: "Delete Me",
+		OriginalText: "original",
+	}
+	if err := repo.Insert(doc); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.DeleteDocument("test-doc-3"); err != nil {
+		t.Fatal(err)
+	}
+	_, err := repo.Get("test-doc-3")
+	if err != ErrNotFound {
+		t.Errorf("expected ErrNotFound after delete, got %v", err)
+	}
+}

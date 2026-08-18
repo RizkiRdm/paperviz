@@ -1,10 +1,57 @@
 // ponytail: chart card redesign per DESIGN.md (hairline border, white canvas surface)
-import { lazy, Suspense } from "react"
-import { Image as ImageIcon } from "lucide-react"
+import { lazy, Suspense, useState } from "react"
+import { Image as ImageIcon, BookMarked, ChevronDown } from "lucide-react"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 const LazyDataChart = lazy(() => import("./data-chart"))
 
-export function ChartCard({ chart, chapterTitle }) {
+// Evidence provenance strip — ties the AI interpretation back to the original
+// source page (Rule 4: explanations must carry provenance). Only rendered for
+// charts that have evidence rows (image-origin charts).
+function EvidenceBlock({ evidence }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-5 border-t border-[#e5e5e5] pt-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0a0a0a]">
+          <BookMarked className="h-3.5 w-3.5 text-[#2563eb]" aria-hidden="true" />
+          Source
+        </span>
+        {evidence.source_reference && (
+          <span className="inline-flex items-center rounded-full border border-[#e5e5e5] bg-white px-2.5 py-0.5 text-[11px] font-medium text-[#737373]">
+            {evidence.source_reference}
+          </span>
+        )}
+        {evidence.section && (
+          <span className="inline-flex items-center rounded-full border border-[#e5e5e5] bg-white px-2.5 py-0.5 text-[11px] font-medium text-[#737373]">
+            {evidence.section}
+          </span>
+        )}
+        {!evidence.source_reference && evidence.page > 0 && (
+          <span className="inline-flex items-center rounded-full border border-[#e5e5e5] bg-white px-2.5 py-0.5 text-[11px] font-medium text-[#737373]">
+            Page {evidence.page}
+          </span>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-[#2563eb] hover:text-[#1e40af] transition-colors cursor-pointer"
+      >
+        {open ? "Hide source text" : "View source text"}
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+      </button>
+      {open && (
+        <p className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-[8px] border border-[#e5e5e5] bg-[#f5f5f5] p-3 text-[11px] leading-relaxed text-[#525252]">
+          {evidence.source_text}
+        </p>
+      )}
+    </div>
+  )
+}
+
+export function ChartCard({ chart, chapterTitle, evidence = [] }) {
   const pageNumber = chart.page_number || 0
   const isDataExtracted = chart.source_method === "data_extracted"
   const isImageFallback = chart.source_method === "image_fallback"
@@ -46,9 +93,14 @@ export function ChartCard({ chart, chapterTitle }) {
         </div>
 
         <div>
-          <span className="inline-flex items-center rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
-            PaperViz AI Interpretation
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex items-center rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
+                PaperViz AI Interpretation
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>AI-generated interpretation of the original figure</TooltipContent>
+          </Tooltip>
           <div className="mt-3">
             {isDataExtracted && (
               <Suspense
@@ -64,6 +116,8 @@ export function ChartCard({ chart, chapterTitle }) {
           </div>
         </div>
       </div>
+
+      {evidence.length > 0 && <EvidenceBlock evidence={evidence[0]} />}
     </div>
   )
 }

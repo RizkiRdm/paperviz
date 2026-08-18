@@ -16,6 +16,7 @@ func TestValidateAndInsert(t *testing.T) {
 		4: "004_chapter_charts.sql",
 		5: "005_evidence.sql",
 		6: "006_document_title.sql",
+		7: "007_saved_papers.sql",
 	} {
 		sqlStr, err := repository.ReadMigration(filepath.Join("..", "..", "migrations", file))
 		if err != nil {
