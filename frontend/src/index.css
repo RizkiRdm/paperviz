@@ -1,5 +1,6 @@
 /* ponytail: direct DESIGN.md token translation into Tailwind v4 @theme */
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   /* Colors */

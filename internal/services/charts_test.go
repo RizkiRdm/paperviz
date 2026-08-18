@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -132,3 +133,44 @@ func TestChartValuesInStruct(t *testing.T) {
 		t.Errorf("title = %q, want test", elem.Title)
 	}
 }
+
+func TestReVisualizeOneChapterIndex(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		pageContext string
+		imageBytes  []byte
+		wantMethod  string
+	}{
+		{
+			name:        "omitted path (no page context, no image)",
+			pageContext: "",
+			imageBytes:  nil,
+			wantMethod:  chartSourceOmitted,
+		},
+		{
+			name:        "omitted path (with image but nil client fails annotation)",
+			pageContext: "",
+			imageBytes:  []byte("fake-image"),
+			wantMethod:  chartSourceOmitted,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ec := ExtractedChart{
+				PageNumber: 1,
+				ImageBytes: tt.imageBytes,
+			}
+			chart := reVisualizeOne(ctx, nil, ec, tt.pageContext, 0)
+			if chart.ChapterIndex != -1 {
+				t.Errorf("ChapterIndex = %d, want -1", chart.ChapterIndex)
+			}
+			if chart.SourceMethod != tt.wantMethod {
+				t.Errorf("SourceMethod = %q, want %q", chart.SourceMethod, tt.wantMethod)
+			}
+		})
+	}
+}
+

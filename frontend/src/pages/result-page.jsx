@@ -8,6 +8,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { useDocumentPoll } from "@/hooks/use-document-poll"
 import { ArrowLeft, Copy, Check, RefreshCw, BarChart2, Link2 } from "lucide-react"
 import { NotFoundPage } from "@/pages/not-found-page"
+import ReactMarkdown from "react-markdown"
 
 const COPY_FEEDBACK_MS = 2000
 
@@ -327,101 +328,145 @@ const STAGE_LABELS = {
           </p>
         )}
 
-        {/* Chapter tabs — horizontal scrollable, only when 2+ chapters */}
-        {hasChapters && (
-          <div
-            role="tablist"
-            aria-label="Paper sections"
-            className="mb-6 flex gap-1 overflow-x-auto pb-2 scrollbar-hide"
-          >
-            {doc.chapters.map((ch, i) => (
-              <button
-                key={ch.id || i}
-                role="tab"
-                id={`tab-${i}`}
-                aria-selected={activeChapter === i}
-                aria-controls={`panel-${i}`}
-                tabIndex={activeChapter === i ? 0 : -1}
-                onClick={() => setActiveChapter(i)}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowRight") setActiveChapter(Math.min(i + 1, doc.chapters.length - 1))
-                  if (e.key === "ArrowLeft") setActiveChapter(Math.max(i - 1, 0))
-                }}
-                className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
-                  activeChapter === i
-                    ? "bg-[#0a0a0a] text-white"
-                    : "text-[#737373] hover:text-[#171717] hover:bg-[#f5f5f5]"
-                }`}
-              >
-                {ch.title}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Chapter content panel */}
-        <div
-          role="tabpanel"
-          id={`panel-${activeChapter}`}
-          aria-labelledby={`tab-${activeChapter}`}
-          tabIndex={0}
-        >
-          {/* Chapter summary — only in tabbed mode */}
-          {activeChapterData && (
-            <p className="mb-4 text-sm text-[#737373] italic">{activeChapterData.summary}</p>
+        {/* Main layout container — flex row with sidebar on desktop when chapters exist */}
+        <div className={hasChapters ? "md:flex md:gap-8 md:items-start" : ""}>
+          {/* Mobile chapter tabs — horizontal scrollable strip */}
+          {hasChapters && (
+            <div
+              role="tablist"
+              aria-label="Paper sections"
+              className="md:hidden mb-6 flex gap-1 overflow-x-auto pb-2 scrollbar-hide"
+            >
+              {doc.chapters.map((ch, i) => (
+                <button
+                  key={ch.id || i}
+                  role="tab"
+                  id={`tab-mobile-${i}`}
+                  aria-selected={activeChapter === i}
+                  aria-controls={`panel-${i}`}
+                  tabIndex={activeChapter === i ? 0 : -1}
+                  onClick={() => setActiveChapter(i)}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowRight" || e.key === "ArrowDown") setActiveChapter(Math.min(i + 1, doc.chapters.length - 1))
+                    if (e.key === "ArrowLeft" || e.key === "ArrowUp") setActiveChapter(Math.max(i - 1, 0))
+                  }}
+                  title={ch.title}
+                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium transition-colors whitespace-nowrap max-w-[200px] truncate ${
+                    activeChapter === i
+                      ? "bg-[#0a0a0a] text-white"
+                      : "text-[#737373] hover:text-[#171717] hover:bg-[#f5f5f5]"
+                  }`}
+                >
+                  {ch.title}
+                </button>
+              ))}
+            </div>
           )}
 
-          {showOriginal || hasChapters ? (
-            <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
-              <div className="prose prose-neutral max-w-none text-[#171717] text-base leading-relaxed whitespace-pre-wrap font-inter">
-                {showOriginal ? displayedText : chapterContent}
+          {/* Desktop chapter sidebar — vertical list */}
+          {hasChapters && (
+            <aside className="hidden md:block md:w-64 md:shrink-0 sticky top-20">
+              <div
+                role="tablist"
+                aria-orientation="vertical"
+                aria-label="Paper sections"
+                className="flex flex-col gap-1 rounded-[16px] border border-[#e5e5e5] bg-white p-3 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]"
+              >
+                <h2 className="px-3 py-1.5 font-satoshi text-xs font-semibold text-[#737373] uppercase tracking-wider">
+                  Chapters
+                </h2>
+                {doc.chapters.map((ch, i) => (
+                  <button
+                    key={ch.id || i}
+                    role="tab"
+                    id={`tab-desktop-${i}`}
+                    aria-selected={activeChapter === i}
+                    aria-controls={`panel-${i}`}
+                    tabIndex={activeChapter === i ? 0 : -1}
+                    onClick={() => setActiveChapter(i)}
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowDown" || e.key === "ArrowRight") setActiveChapter(Math.min(i + 1, doc.chapters.length - 1))
+                      if (e.key === "ArrowUp" || e.key === "ArrowLeft") setActiveChapter(Math.max(i - 1, 0))
+                    }}
+                    title={ch.title}
+                    className={`w-full text-left rounded-lg px-3 py-2 text-xs font-medium transition-colors truncate ${
+                      activeChapter === i
+                        ? "bg-[#0a0a0a] text-white"
+                        : "text-[#737373] hover:text-[#171717] hover:bg-[#f5f5f5]"
+                    }`}
+                  >
+                    {ch.title}
+                  </button>
+                ))}
               </div>
-            </article>
-          ) : (() => {
-            const sections = parseResearchSections(displayedText)
-            if (!sections) {
-              return (
-                <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
-                  <div className="prose prose-neutral max-w-none text-[#171717] text-base leading-relaxed whitespace-pre-wrap font-inter">
-                    {displayedText}
-                  </div>
-                </article>
-              )
-            }
-            return (
-              <div className="flex flex-col gap-4">
-                {sections.map((section) => (
-                  <article key={section.title} className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
-                    <h3 className="font-satoshi text-base font-medium text-[#0a0a0a] mb-3">
-                      {section.title}
-                    </h3>
-                    <div className="text-sm text-[#404040] leading-relaxed whitespace-pre-wrap font-inter">
-                      {section.content}
+            </aside>
+          )}
+
+          {/* Chapter content panel */}
+          <div
+            role="tabpanel"
+            id={`panel-${activeChapter}`}
+            aria-labelledby={hasChapters ? `tab-desktop-${activeChapter}` : undefined}
+            tabIndex={0}
+            className="flex-1 min-w-0"
+          >
+            {/* Chapter summary — only in tabbed mode */}
+            {activeChapterData && (
+              <p className="mb-4 text-sm text-[#737373] italic">{activeChapterData.summary}</p>
+            )}
+
+            {showOriginal || hasChapters ? (
+              <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
+                <div className="prose prose-neutral max-w-none break-words text-[#171717] text-base leading-relaxed font-inter">
+                  <ReactMarkdown>{showOriginal ? displayedText : chapterContent}</ReactMarkdown>
+                </div>
+              </article>
+            ) : (() => {
+              const sections = parseResearchSections(displayedText)
+              if (!sections) {
+                return (
+                  <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
+                    <div className="prose prose-neutral max-w-none break-words text-[#171717] text-base leading-relaxed font-inter">
+                      <ReactMarkdown>{displayedText}</ReactMarkdown>
                     </div>
                   </article>
-                ))}
-              </div>
-            )
-          })()}
+                )
+              }
+              return (
+                <div className="flex flex-col gap-4">
+                  {sections.map((section) => (
+                    <article key={section.title} className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
+                      <h3 className="font-satoshi text-base font-medium text-[#0a0a0a] mb-3">
+                        {section.title}
+                      </h3>
+                      <div className="prose prose-neutral max-w-none break-words text-sm text-[#404040] leading-relaxed font-inter">
+                        <ReactMarkdown>{section.content}</ReactMarkdown>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )
+            })()}
 
-          {/* Charts for this chapter — only in tabbed mode; flat mode renders
-              them once below (guards against double render when a doc has
-              image-origin charts but a single chapter) */}
-          {hasChapters && chapterCharts.length > 0 && (
-            <section className="mt-8">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart2 className="h-4 w-4 text-[#2563eb]" />
-                <h2 className="font-satoshi text-lg font-medium text-[#0a0a0a]">
-                  {activeChapterData ? `Charts — ${activeChapterData.title}` : "Charts & Visualizations"}
-                </h2>
-              </div>
-              <div className="flex flex-col gap-4">
-                {chapterCharts.map((chart) => (
-                  <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} evidence={evidenceFor(chart.id)} />
-                ))}
-              </div>
-            </section>
-          )}
+            {/* Charts for this chapter — only in tabbed mode; flat mode renders
+                them once below (guards against double render when a doc has
+                image-origin charts but a single chapter) */}
+            {hasChapters && chapterCharts.length > 0 && (
+              <section className="mt-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <BarChart2 className="h-4 w-4 text-[#2563eb]" />
+                  <h2 className="font-satoshi text-lg font-medium text-[#0a0a0a]">
+                    {activeChapterData ? `Charts — ${activeChapterData.title}` : "Charts & Visualizations"}
+                  </h2>
+                </div>
+                <div className="flex flex-col gap-4">
+                  {chapterCharts.map((chart) => (
+                    <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} evidence={evidenceFor(chart.id)} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
         </div>
 
         {/* Empty states — only when no chapters */}
