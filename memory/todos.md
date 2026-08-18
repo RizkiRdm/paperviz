@@ -10,7 +10,7 @@
 
 ## Medium
 
-- Chunk 2.4: Return Workflow — design reason for users to come back.
+- Chunk 3.1: Multi-Paper Comparison Model — design comparison data model.
 - Add processing progress indicator or elapsed time (P3 from critique).
 - Run full five-paper manual flow before MVP release.
 
@@ -21,6 +21,7 @@
 
 ## Completed
 
+- Chunk 2.4 Return Workflow — stats endpoint, dashboard welcome hero, post-analysis "What's Next" panel (2026-08-18).
 - Chunk 2.3 Research Collections — migration 008, CollectionRepo, handlers, dashboard UI (collection pills, add-to-collection) (2026-08-18).
 - Chunk 2.2 Saved Papers — migration 007, ToggleSaved/UpdateTitle/DeleteDocument, handlers, dashboard UI (star/edit/delete/filter) (2026-08-18).
 - Chunk 2.1 Paper History — title column, deriveTitle, ListSummariesByUser, dashboard redesign, nav links (2026-08-18).
