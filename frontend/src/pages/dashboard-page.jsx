@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, FileText, Plus } from "lucide-react"
+import { ArrowRight, FileText, Plus, Calendar } from "lucide-react"
 
 const STATUS_STYLES = {
   complete: "bg-[#dcfce7] text-[#16a34a]",
@@ -114,17 +114,50 @@ export function DashboardPage() {
               <Link
                 key={doc.id}
                 to={`/${doc.id}`}
-                className={`flex items-center justify-between px-5 py-3.5 hover:bg-[#f5f5f5] transition-colors ${
+                className={`block px-5 py-4 hover:bg-[#f5f5f5] transition-colors ${
                   i < docs.length - 1 ? "border-b border-[#e5e5e5]" : ""
                 }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <FileText className="h-4 w-4 text-[#737373] shrink-0" />
-                  <span className="text-sm text-[#171717] truncate font-mono">{doc.id}</span>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2.5 mb-0.5">
+                      <FileText className="h-4 w-4 text-[#737373] shrink-0 mt-0.5" />
+                      <span className="text-sm font-medium text-[#171717] truncate">
+                        {doc.title || "Untitled paper"}
+                      </span>
+                    </div>
+                    {doc.summary_preview ? (
+                      <p className="text-xs text-[#737373] line-clamp-2 ml-6.5 mt-0.5">
+                        {doc.summary_preview}
+                      </p>
+                    ) : null}
+                    <div className="flex items-center gap-2 ml-6.5 mt-1.5">
+                      <span className="flex items-center gap-1 text-[11px] text-[#a3a3a3]">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(doc.created_at * 1000).toLocaleDateString(undefined, {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                      {doc.chart_count > 0 ? (
+                        <span className="text-[11px] text-[#a3a3a3]">
+                          {doc.chart_count} figure{doc.chart_count !== 1 ? "s" : ""}{" "}
+                          {doc.explanation_count > 0
+                            ? `\u00b7 ${doc.explanation_count} explanation${doc.explanation_count !== 1 ? "s" : ""}`
+                            : null}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium shrink-0 mt-0.5 ${
+                      STATUS_STYLES[doc.status] || "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {STATUS_LABELS[doc.status] || doc.status}
+                  </span>
                 </div>
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium shrink-0 ml-4 ${STATUS_STYLES[doc.status] || "bg-gray-100 text-gray-600"}`}>
-                  {STATUS_LABELS[doc.status] || doc.status}
-                </span>
               </Link>
             ))}
           </div>

@@ -65,9 +65,13 @@ type listDocumentResponse struct {
 }
 
 type documentSummary struct {
-	ID        string `json:"id"`
-	Status    string `json:"status"`
-	CreatedAt int64  `json:"created_at"`
+	ID               string `json:"id"`
+	Title            string `json:"title"`
+	Status           string `json:"status"`
+	CreatedAt        int64  `json:"created_at"`
+	SummaryPreview   string `json:"summary_preview"`
+	ChartCount       int    `json:"chart_count"`
+	ExplanationCount int    `json:"explanation_count"`
 }
 
 // Create handles POST /api/documents. It is intentionally synchronous up
@@ -211,6 +215,7 @@ type evidenceResponse struct {
 // contract exactly.
 type getDocumentResponse struct {
 	ID                      string             `json:"id"`
+	Title                   string             `json:"title"`
 	Status                  string             `json:"status"`
 	ReadingLevel            string             `json:"reading_level"`
 	SimplifiedText          *string            `json:"simplified_text"`
@@ -329,6 +334,7 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, getDocumentResponse{
 		ID:                      doc.ID,
+		Title:                   doc.Title,
 		Status:                  doc.Status,
 		ReadingLevel:            doc.ReadingLevel,
 		SimplifiedText:          doc.SimplifiedText,
@@ -364,7 +370,7 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	docRepo := repository.NewDocumentRepo(h.db)
-	docs, err := docRepo.ListByUser(userID, limit, offset)
+	docs, err := docRepo.ListSummariesByUser(userID, limit, offset)
 	if err != nil {
 		slog.Error("list documents failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -374,9 +380,13 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 	summaries := make([]documentSummary, 0, len(docs))
 	for _, d := range docs {
 		summaries = append(summaries, documentSummary{
-			ID:        d.ID,
-			Status:    d.Status,
-			CreatedAt: d.CreatedAt,
+			ID:               d.ID,
+			Title:            d.Title,
+			Status:           d.Status,
+			CreatedAt:        d.CreatedAt,
+			SummaryPreview:   d.SummaryPreview,
+			ChartCount:       d.ChartCount,
+			ExplanationCount: d.ExplanationCount,
 		})
 	}
 

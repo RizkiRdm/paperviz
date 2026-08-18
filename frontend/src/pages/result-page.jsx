@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { VerificationBadge, WarningBanner, ErrorBanner, ClaimComparisonPanel } from "@/components/ui/status-banners"
 import { ChartCard } from "@/components/chart-card"
@@ -235,6 +235,10 @@ const STAGE_LABELS = {
             >
               <ArrowLeft className="h-4 w-4" /> New Document
             </button>
+            <span className="h-4 w-px bg-[#e5e5e5]" />
+            <Link to="/dashboard" className="text-xs text-[#737373] hover:text-[#0a0a0a] transition-colors">
+              Dashboard
+            </Link>
             <span className="h-4 w-px bg-[#e5e5e5]" />
             <span className="font-mono text-xs font-semibold text-[#0a0a0a]">PaperViz</span>
           </div>

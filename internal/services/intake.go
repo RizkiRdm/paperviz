@@ -56,6 +56,7 @@ func ValidateAndInsert(db *sql.DB, readingLevel string, hasFile bool, pdfBytes [
 		Status:         repository.StatusProcessing,
 		SourceType:     sourceType,
 		ReadingLevel:   readingLevel,
+		Title:          deriveTitle(originalText),
 		OriginalText:   originalText,
 		UserID:         userID,
 	}
@@ -218,4 +219,17 @@ func savePipelineResult(db *sql.DB, documentID string, output PipelineOutput) er
 	}
 
 	return tx.Commit()
+}
+
+func deriveTitle(text string) string {
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			if len(line) > 200 {
+				return line[:200]
+			}
+			return line
+		}
+	}
+	return "Untitled paper"
 }

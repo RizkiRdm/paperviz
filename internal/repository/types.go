@@ -8,12 +8,25 @@ type Document struct {
 	Status                  string // processing | complete | failed | verification_failed
 	SourceType              string // pdf | pasted_text
 	ReadingLevel            string // simplified | eli5
+	Title                   string // paper title derived from first line of text
 	OriginalText            string
 	SimplifiedText          *string
 	ErrorMessage            *string
 	ChartExtractionDegraded bool
 	ProcessingStage         *string
 	UserID                  *string // nullable — anonymous docs have NULL user_id
+}
+
+// DocumentListItem is a lightweight row for the paper-history list.
+// Carries preview + counts instead of full text so the list stays cheap.
+type DocumentListItem struct {
+	ID               string
+	Title            string
+	CreatedAt        int64
+	Status           string
+	SummaryPreview   string
+	ChartCount       int
+	ExplanationCount int
 }
 
 // Chart mirrors the charts table.

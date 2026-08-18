@@ -1,6 +1,6 @@
 // ponytail: upload page redesign with Satoshi display headline, pill feature tags & hairline card surface
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import { UploadDropzone } from "@/components/upload-dropzone"
 import { ReadingLevelSelector } from "@/components/ui/reading-level-selector"
 import { Button } from "@/components/ui/button"
@@ -59,7 +59,11 @@ export function UploadPage() {
             </div>
             <span className="font-mono text-sm font-semibold tracking-tight text-[#0a0a0a]">PaperViz</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <Link to="/dashboard" className="text-xs text-[#737373] hover:text-[#0a0a0a] transition-colors">
+              Dashboard
+            </Link>
+            <span className="h-3.5 w-px bg-[#e5e5e5]" />
             <span className="inline-flex items-center gap-1 rounded-full border border-[#e5e5e5] bg-[#f5f5f5] px-3 py-1 text-xs text-[#737373]">
               Ephemeral 7-Day Storage
             </span>
