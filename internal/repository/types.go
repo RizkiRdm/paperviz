@@ -15,6 +15,7 @@ type Document struct {
 	ChartExtractionDegraded bool
 	ProcessingStage         *string
 	UserID                  *string // nullable — anonymous docs have NULL user_id
+	Saved                   bool
 }
 
 // DocumentListItem is a lightweight row for the paper-history list.
@@ -27,6 +28,7 @@ type DocumentListItem struct {
 	SummaryPreview   string
 	ChartCount       int
 	ExplanationCount int
+	Saved           bool
 }
 
 // Chart mirrors the charts table.
