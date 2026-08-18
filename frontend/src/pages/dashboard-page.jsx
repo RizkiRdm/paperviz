@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, FileText, Plus, Calendar, Star, Pencil, Trash2, X, Check, FolderPlus, Folder, ChevronRight, MoreHorizontal } from "lucide-react"
+import { ArrowRight, BarChart3, FileText, Plus, Calendar, Star, Pencil, Trash2, X, Check, FolderPlus, Folder, ChevronRight, MoreHorizontal } from "lucide-react"
 
 const STATUS_STYLES = {
   complete: "bg-[#dcfce7] text-[#16a34a]",
@@ -23,6 +23,7 @@ export function DashboardPage() {
   const [docs, setDocs] = useState([])
   const [loading, setLoading] = useState(true)
   const [authChecked, setAuthChecked] = useState(false)
+  const [stats, setStats] = useState({ total: 0, saved: 0, collections: 0 })
   const [filter, setFilter] = useState("all") // "all" | "saved"
   const [editingId, setEditingId] = useState(null)
   const [editTitle, setEditTitle] = useState("")
@@ -52,6 +53,21 @@ export function DashboardPage() {
     }
     checkAuth()
   }, [navigate])
+
+  useEffect(() => {
+    if (!authChecked) return
+
+    async function fetchStats() {
+      try {
+        const res = await fetch("/api/documents/stats")
+        if (res.ok) {
+          const data = await res.json()
+          setStats(data)
+        }
+      } catch {}
+    }
+    fetchStats()
+  }, [authChecked])
 
   useEffect(() => {
     if (!authChecked) return
@@ -255,7 +271,27 @@ export function DashboardPage() {
       </header>
 
       <main className="mx-auto max-w-[900px] px-6 py-10">
-        <h1 className="font-satoshi text-2xl font-medium text-[#0a0a0a] mb-6">Your Documents</h1>
+        <div className="mb-8">
+          <h1 className="font-satoshi text-2xl font-medium text-[#0a0a0a] mb-2">
+            Welcome back{user?.email ? `, ${user.email.split("@")[0]}` : ""}
+          </h1>
+          <p className="text-sm text-[#737373] mb-4">
+            {stats.total === 0
+              ? "Start by uploading your first paper."
+              : `You have ${stats.total} paper${stats.total !== 1 ? "s" : ""}${
+                  stats.saved > 0 ? `, ${stats.saved} saved` : ""
+                }${
+                  stats.collections > 0 ? `, ${stats.collections} collection${stats.collections !== 1 ? "s" : ""}` : ""
+                }.`}
+          </p>
+          {stats.total > 0 && (
+            <Link to="/">
+              <Button className="gap-1.5">
+                <Plus className="h-4 w-4" /> Upload New Paper
+              </Button>
+            </Link>
+          )}
+        </div>
 
         {collections.length > 0 || showNewCollection ? (
           <div className="mb-8">
@@ -369,10 +405,12 @@ export function DashboardPage() {
             </h2>
             {filter !== "saved" && (
               <>
-                <p className="mt-1 text-xs text-[#737373]">Upload your first PDF to get started.</p>
+                <p className="mt-1 text-xs text-[#737373] max-w-[280px] mx-auto">
+                  Upload a PDF or paste text to get a simplified summary with re-visualized charts.
+                </p>
                 <Link to="/">
                   <Button className="mt-6 gap-1.5">
-                    Upload your first PDF <ArrowRight className="h-4 w-4" />
+                    Upload your first paper <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
               </>
@@ -395,7 +433,7 @@ export function DashboardPage() {
               return filteredDocs.map((doc, i) => (
                 <div
                   key={doc.id}
-                  className={`relative px-5 py-4 hover:bg-[#f5f5f5] transition-colors ${
+                  className={`relative px-5 py-4 hover:bg-[#fafafa] transition-colors ${
                     i < filteredDocs.length - 1 ? "border-b border-[#e5e5e5]" : ""
                   }`}
                 >
