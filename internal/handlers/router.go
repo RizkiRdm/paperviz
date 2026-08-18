@@ -57,6 +57,17 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.Get("/me", authHandler.Me)
 	})
 
+	collectionHandler := NewCollectionHandler(db)
+	r.Route("/api/collections", func(r chi.Router) {
+		r.With(authMiddleware.RequireAuth).Post("/", collectionHandler.Create)
+		r.With(authMiddleware.RequireAuth).Get("/", collectionHandler.List)
+		r.With(authMiddleware.RequireAuth).Get("/{id}", collectionHandler.Get)
+		r.With(authMiddleware.RequireAuth).Patch("/{id}", collectionHandler.Rename)
+		r.With(authMiddleware.RequireAuth).Delete("/{id}", collectionHandler.Delete)
+		r.With(authMiddleware.RequireAuth).Post("/{id}/documents", collectionHandler.AddDocument)
+		r.With(authMiddleware.RequireAuth).Delete("/{id}/documents/{docId}", collectionHandler.RemoveDocument)
+	})
+
 	// Serve the built SPA for everything else. Any unmatched path falls
 	// back to index.html so client-side routing (if the frontend adds any)
 	// still works on a hard refresh.
