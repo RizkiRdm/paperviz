@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -208,5 +209,67 @@ func TestDeleteDocument(t *testing.T) {
 	_, err := repo.Get("test-doc-3")
 	if err != ErrNotFound {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
+	}
+}
+
+func TestCountByUser(t *testing.T) {
+	db := openTestDB(t)
+	repo := NewDocumentRepo(db)
+
+	userRepo := NewUserRepo(db)
+	if err := userRepo.Insert(User{ID: "user-1", Email: "count@test.com", PasswordHash: "hash", CreatedAt: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 3; i++ {
+		doc := Document{
+			ID: fmt.Sprintf("doc-%d", i), CreatedAt: 1000, LastAccessedAt: 1000,
+			Status: StatusComplete, SourceType: SourceTypePDF,
+			ReadingLevel: ReadingLevelSimplified, Title: fmt.Sprintf("Doc %d", i),
+			OriginalText: "original", UserID: strPtr("user-1"),
+		}
+		if err := repo.Insert(doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	count, err := repo.CountByUser("user-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 3 {
+		t.Errorf("expected 3 documents, got %d", count)
+	}
+}
+
+func TestCountSavedByUser(t *testing.T) {
+	db := openTestDB(t)
+	repo := NewDocumentRepo(db)
+
+	userRepo := NewUserRepo(db)
+	if err := userRepo.Insert(User{ID: "user-1", Email: "saved@test.com", PasswordHash: "hash", CreatedAt: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 3; i++ {
+		doc := Document{
+			ID: fmt.Sprintf("doc-%d", i), CreatedAt: 1000, LastAccessedAt: 1000,
+			Status: StatusComplete, SourceType: SourceTypePDF,
+			ReadingLevel: ReadingLevelSimplified, Title: fmt.Sprintf("Doc %d", i),
+			OriginalText: "original", UserID: strPtr("user-1"),
+		}
+		if err := repo.Insert(doc); err != nil {
+			t.Fatal(err)
+		}
+	}
+	repo.ToggleSaved("doc-0", true)
+	repo.ToggleSaved("doc-1", true)
+
+	count, err := repo.CountSavedByUser("user-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Errorf("expected 2 saved documents, got %d", count)
 	}
 }

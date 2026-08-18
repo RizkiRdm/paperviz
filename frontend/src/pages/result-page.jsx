@@ -6,7 +6,7 @@ import { ChartCard } from "@/components/chart-card"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useDocumentPoll } from "@/hooks/use-document-poll"
-import { ArrowLeft, Copy, Check, RefreshCw, BarChart2, Link2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, Copy, Check, RefreshCw, BarChart2, Link2, FolderPlus, LayoutDashboard } from "lucide-react"
 import { NotFoundPage } from "@/pages/not-found-page"
 import ReactMarkdown from "react-markdown"
 
@@ -110,6 +110,8 @@ export function ResultPage() {
   const [textCopied, setTextCopied] = useState(false)
   const [textCopyError, setTextCopyError] = useState(false)
   const [activeChapter, setActiveChapter] = useState(-1)
+  const [collections, setCollections] = useState([])
+  const [showAddToCollection, setShowAddToCollection] = useState(false)
   const copyTimerRef = useRef(null)
 
   useEffect(() => () => clearTimeout(copyTimerRef.current), [])
@@ -119,6 +121,19 @@ export function ResultPage() {
     const hasChapters = doc?.chapters && doc.chapters.length > 1
     if (hasChapters && activeChapter === -1) setActiveChapter(0)
   }, [doc, activeChapter])
+
+  useEffect(() => {
+    async function fetchCollections() {
+      try {
+        const res = await fetch("/api/collections")
+        if (res.ok) {
+          const data = await res.json()
+          setCollections(data.collections || [])
+        }
+      } catch {}
+    }
+    fetchCollections()
+  }, [])
 
   async function handleCopyText() {
     const text = showOriginal ? doc.original_text : doc.simplified_text
@@ -224,6 +239,19 @@ const STAGE_LABELS = {
   const chapterCharts = hasChapters
     ? (doc.charts || []).filter(c => c.chapter_id === activeChapterData?.id)
     : (doc.charts || [])
+
+  async function handleAddToCollection(colId) {
+    try {
+      const res = await fetch(`/api/collections/${colId}/documents`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ document_id: documentId }),
+      })
+      if (res.ok) {
+        setShowAddToCollection(false)
+      }
+    } catch {}
+  }
 
   return (
     <div className="min-h-screen bg-white text-[#171717] bg-dotted-grid">
@@ -498,6 +526,51 @@ const STAGE_LABELS = {
               </div>
             )}
           </>
+        )}
+
+        {doc.status === "complete" && (
+          <div className="mt-12 rounded-[12px] border border-[#e5e5e5] bg-[#fafafa] p-6">
+            <h3 className="text-sm font-medium text-[#0a0a0a] mb-3">What's next?</h3>
+            <div className="flex flex-wrap gap-3">
+              <div className="relative">
+                <button
+                  onClick={() => setShowAddToCollection(!showAddToCollection)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#737373] bg-white border border-[#e5e5e5] rounded-full hover:bg-[#f5f5f5] transition-colors"
+                >
+                  <FolderPlus className="h-3.5 w-3.5" /> Add to Collection
+                </button>
+                {showAddToCollection && (
+                  <div className="absolute left-0 top-full mt-1 z-10 bg-white border border-[#e5e5e5] rounded-[8px] shadow-lg py-1 w-48">
+                    {collections.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-[#737373]">No collections yet</div>
+                    ) : (
+                      collections.map(col => (
+                        <button
+                          key={col.id}
+                          onClick={() => handleAddToCollection(col.id)}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-[#f5f5f5] flex items-center gap-2"
+                        >
+                          {col.name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <Link
+                to="/"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#0a0a0a] rounded-full hover:bg-[#262626] transition-colors"
+              >
+                Upload Another <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+              <Link
+                to="/dashboard"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#737373] bg-white border border-[#e5e5e5] rounded-full hover:bg-[#f5f5f5] transition-colors"
+              >
+                <LayoutDashboard className="h-3.5 w-3.5" /> View All Papers
+              </Link>
+            </div>
+          </div>
         )}
       </main>
 
