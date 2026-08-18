@@ -25,6 +25,8 @@ func TestLoadMigrationsRegistersChapterCharts(t *testing.T) {
 		4: {"ALTER TABLE charts ADD COLUMN chapter_id"},
 		5: {"CREATE TABLE evidence"},
 		6: {"ADD COLUMN title"},
+		7: {"ADD COLUMN saved"},
+		8: {"CREATE TABLE collections", "CREATE TABLE document_collections"},
 	}
 
 	if len(migrations) != len(want) {

@@ -6,7 +6,6 @@
 
 ## High
 
-- Chunk 2.2: Saved Papers — save, rename, delete, reopen documents from dashboard.
 - Add contextual help tooltips for VerificationBadge and ClaimComparisonPanel (P2 from critique).
 
 ## Medium
@@ -23,6 +22,7 @@
 
 ## Completed
 
+- Chunk 2.2 Saved Papers — migration 007, ToggleSaved/UpdateTitle/DeleteDocument, handlers, dashboard UI (star/edit/delete/filter) (2026-08-18).
 - Chunk 2.1 Paper History — title column, deriveTitle, ListSummariesByUser, dashboard redesign, nav links (2026-08-18).
 - Chunk 1.4 Research-Oriented Summary — structured sections, frontend cards (2026-08-18).
 - Chunk 1.3 Figure Explanation Quality — enriched prompts, frontend display, chart_type bugfix (2026-08-15).
