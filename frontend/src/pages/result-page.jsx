@@ -3,11 +3,28 @@ import { useParams, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { VerificationBadge, WarningBanner, ErrorBanner, ClaimComparisonPanel } from "@/components/ui/status-banners"
 import { ChartCard } from "@/components/chart-card"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useDocumentPoll } from "@/hooks/use-document-poll"
-import { ArrowLeft, Copy, Check, Sparkles, RefreshCw, BarChart2, Link2, X } from "lucide-react"
+import { ArrowLeft, Copy, Check, RefreshCw, BarChart2, Link2 } from "lucide-react"
 import { NotFoundPage } from "@/pages/not-found-page"
 
 const COPY_FEEDBACK_MS = 2000
+
+// Parse structured research summary sections from simplified text.
+// Sections are delimited by "## " headers (Research Question, Method, etc.).
+// Returns null if no sections found — caller falls back to raw text display.
+function parseResearchSections(text) {
+  if (!text) return null
+  const parts = text.split(/^## /m).filter(Boolean)
+  if (parts.length < 2) return null
+  return parts.map((part) => {
+    const lines = part.split("\n")
+    const title = lines[0].trim()
+    const content = lines.slice(1).join("\n").trim()
+    return { title, content }
+  })
+}
 
 const READING_LEVEL_LABELS = {
   simplified: "Simplified",
@@ -20,7 +37,9 @@ const ERROR_MESSAGES = {
   extraction_failed: "We couldn't read this PDF. Please check that it has a text layer and try again.",
 }
 
-// Share dialog modal — DESIGN.md Elevated Feature Card (16px radius, subtle-2 shadow)
+// Share dialog — Radix Dialog provides Esc dismiss, focus trap, and modal
+// semantics. Styled per DESIGN.md Elevated Feature Card (16px radius,
+// hairline border, subtle-2 ring).
 function ShareDialog({ url, onClose }) {
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState(false)
@@ -31,14 +50,6 @@ function ShareDialog({ url, onClose }) {
     inputRef.current?.focus()
     return () => clearTimeout(timerRef.current)
   }, [])
-
-  useEffect(() => {
-    function handleKeyDown(e) {
-      if (e.key === "Escape") onClose()
-    }
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [onClose])
 
   async function handleCopy() {
     try {
@@ -55,17 +66,17 @@ function ShareDialog({ url, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
-      <div className="w-full max-w-md rounded-[16px] border border-[#e5e5e5] bg-white p-6 shadow-[rgba(0,0,0,0.1)_0px_0px_0px_4px]">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Link2 className="h-4 w-4 text-[#2563eb]" />
-            <h3 className="text-sm font-semibold text-[#0a0a0a]">Share this summary</h3>
-          </div>
-          <button onClick={onClose} className="rounded-full p-1 text-[#737373] hover:text-[#0a0a0a] transition-colors">
-            <X className="h-4 w-4" />
-          </button>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent>
+        <div className="flex items-center gap-2 mb-4">
+          <Link2 className="h-4 w-4 text-[#2563eb]" />
+          <DialogTitle className="text-sm font-semibold text-[#0a0a0a]">
+            Share this summary
+          </DialogTitle>
         </div>
+        <DialogDescription className="mb-3 text-[11px] text-[#737373]">
+          Anyone with the link can view it for 7 days of inactivity.
+        </DialogDescription>
         <div className="flex gap-2">
           <input
             ref={inputRef}
@@ -82,9 +93,8 @@ function ShareDialog({ url, onClose }) {
         {copyError && (
           <p className="mt-2 text-[11px] text-[#ea580c]">Couldn't copy automatically. Select the link and press Ctrl+C / Cmd+C.</p>
         )}
-        <p className="mt-2 text-[11px] text-[#737373]">Link expires after 7 days of inactivity.</p>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -97,6 +107,7 @@ export function ResultPage() {
   const [showShare, setShowShare] = useState(false)
   const [showClaims, setShowClaims] = useState(false)
   const [textCopied, setTextCopied] = useState(false)
+  const [textCopyError, setTextCopyError] = useState(false)
   const [activeChapter, setActiveChapter] = useState(-1)
   const copyTimerRef = useRef(null)
 
@@ -113,10 +124,12 @@ export function ResultPage() {
     try {
       await navigator.clipboard.writeText(text)
       setTextCopied(true)
+      setTextCopyError(false)
       clearTimeout(copyTimerRef.current)
       copyTimerRef.current = setTimeout(() => setTextCopied(false), COPY_FEEDBACK_MS)
     } catch {
       setTextCopied(false)
+      setTextCopyError(true)
     }
   }
 
@@ -206,6 +219,7 @@ const STAGE_LABELS = {
 
   const activeChapterData = hasChapters ? doc.chapters[activeChapter] : null
   const chapterContent = activeChapterData?.content || displayedText
+  const evidenceFor = (chartId) => (doc.evidence || []).filter((e) => e.figure_id === chartId)
   const chapterCharts = hasChapters
     ? (doc.charts || []).filter(c => c.chapter_id === activeChapterData?.id)
     : (doc.charts || [])
@@ -226,11 +240,21 @@ const STAGE_LABELS = {
           </div>
           <div className="flex items-center gap-3">
             {doc.status === "complete" && (
-              <VerificationBadge onClick={() => setShowClaims(v => !v)} />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <VerificationBadge onClick={() => setShowClaims(v => !v)} />
+                </TooltipTrigger>
+                <TooltipContent>Claims checked against the original text. Click to compare.</TooltipContent>
+              </Tooltip>
             )}
-            <Button variant="secondary" onClick={() => setShowShare(true)} className="h-9 px-3 text-xs gap-1.5 font-medium">
-              <Link2 className="h-3.5 w-3.5 text-[#737373]" /> Share
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="secondary" onClick={() => setShowShare(true)} className="h-9 px-3 text-xs gap-1.5 font-medium">
+                  <Link2 className="h-3.5 w-3.5 text-[#737373]" /> Share
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Share via a link that expires after 7 days of inactivity.</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </header>
@@ -258,14 +282,19 @@ const STAGE_LABELS = {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={handleCopyText}
-              className="h-8 px-2.5 text-xs gap-1.5 font-medium"
-            >
-              {textCopied ? <Check className="h-3.5 w-3.5 text-[#16a34a]" /> : <Copy className="h-3.5 w-3.5 text-[#737373]" />}
-              {textCopied ? "Copied" : "Copy Text"}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  onClick={handleCopyText}
+                  className="h-8 px-2.5 text-xs gap-1.5 font-medium"
+                >
+                  {textCopied ? <Check className="h-3.5 w-3.5 text-[#16a34a]" /> : <Copy className="h-3.5 w-3.5 text-[#737373]" />}
+                  {textCopied ? "Copied" : "Copy Text"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Copy the {showOriginal ? "original" : "simplified"} text</TooltipContent>
+            </Tooltip>
 
             <div className="inline-flex gap-1 rounded-full border border-[#e5e5e5] bg-white p-1 shadow-2xs">
               <button
@@ -287,6 +316,12 @@ const STAGE_LABELS = {
             </div>
           </div>
         </div>
+
+        {textCopyError && (
+          <p className="mb-4 -mt-2 text-[11px] text-[#ea580c]">
+            Couldn't copy automatically. Select the text and press Ctrl+C / Cmd+C.
+          </p>
+        )}
 
         {/* Chapter tabs — horizontal scrollable, only when 2+ chapters */}
         {hasChapters && (
@@ -332,14 +367,43 @@ const STAGE_LABELS = {
             <p className="mb-4 text-sm text-[#737373] italic">{activeChapterData.summary}</p>
           )}
 
-          <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
-            <div className="prose prose-neutral max-w-none text-[#171717] text-base leading-relaxed whitespace-pre-wrap font-inter">
-              {showOriginal ? displayedText : chapterContent}
-            </div>
-          </article>
+          {showOriginal || hasChapters ? (
+            <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
+              <div className="prose prose-neutral max-w-none text-[#171717] text-base leading-relaxed whitespace-pre-wrap font-inter">
+                {showOriginal ? displayedText : chapterContent}
+              </div>
+            </article>
+          ) : (() => {
+            const sections = parseResearchSections(displayedText)
+            if (!sections) {
+              return (
+                <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
+                  <div className="prose prose-neutral max-w-none text-[#171717] text-base leading-relaxed whitespace-pre-wrap font-inter">
+                    {displayedText}
+                  </div>
+                </article>
+              )
+            }
+            return (
+              <div className="flex flex-col gap-4">
+                {sections.map((section) => (
+                  <article key={section.title} className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
+                    <h3 className="font-satoshi text-base font-medium text-[#0a0a0a] mb-3">
+                      {section.title}
+                    </h3>
+                    <div className="text-sm text-[#404040] leading-relaxed whitespace-pre-wrap font-inter">
+                      {section.content}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )
+          })()}
 
-          {/* Charts for this chapter */}
-          {chapterCharts.length > 0 && (
+          {/* Charts for this chapter — only in tabbed mode; flat mode renders
+              them once below (guards against double render when a doc has
+              image-origin charts but a single chapter) */}
+          {hasChapters && chapterCharts.length > 0 && (
             <section className="mt-8">
               <div className="flex items-center gap-2 mb-4">
                 <BarChart2 className="h-4 w-4 text-[#2563eb]" />
@@ -349,7 +413,7 @@ const STAGE_LABELS = {
               </div>
               <div className="flex flex-col gap-4">
                 {chapterCharts.map((chart) => (
-                  <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} />
+                  <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} evidence={evidenceFor(chart.id)} />
                 ))}
               </div>
             </section>
@@ -369,7 +433,7 @@ const STAGE_LABELS = {
                 </div>
                 <div className="flex flex-col gap-4">
                   {doc.charts.map((chart) => (
-                    <ChartCard key={chart.id} chart={chart} />
+                    <ChartCard key={chart.id} chart={chart} evidence={evidenceFor(chart.id)} />
                   ))}
                 </div>
               </section>

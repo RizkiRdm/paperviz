@@ -2,20 +2,13 @@
 
 ## Objective
 
-Chunk 1.1 (Evidence Provenance) — frontend evidence display alongside figure explanations. Backend complete (model + pipeline population + GET exposure + tests). Frontend display pending.
+Chunk 1.4 (Research-Oriented Summary) — complete. Phase 1 (Trust & Core Value) now fully complete. Next: Phase 2 (Activation & Retention), starting with Chunk 2.1 (Paper History).
 
 ## Requirements
 
-- **Chunk 1.1 backend (DONE):**
-  - Migration 005: `evidence` table (`id`, `paper_id` FK cascade, `page`, `figure_id`, `table_id`, `section`, `source_text`, `source_reference`)
-  - `repository.Evidence` type in `types.go`
-  - `repository/evidence.go`: `EvidenceRepo` `Insert` + `ListByPaper`
-  - Pipeline population: `savePipelineResult` writes one evidence row per image-origin chart (`Services.Chart.SourceText`, set in `reVisualizeOne` from page text) — `paper_id`, `page`, `figure_id`=chart id, `source_text`=full page text, `source_reference`="Figure on page N"
-  - Exposed in `GET /api/documents/:id` as `evidence` array
-  - Table-driven repo tests (`evidence_test.go`): Insert+List success, empty list, FK-violation error; services test verifies persistence path
+- **Chunk 1.4 (DONE):** Structured research summary — Gemini prompt now outputs `## `-delimited sections (Research Question, Method, Main Findings, Evidence, Limitations, Key Figures, Key Tables, Conclusion). Frontend parses sections and renders each as a distinct card. Flat mode only; chapter mode unaffected. No schema change.
 
-- **Chunk 1.1 (PENDING):**
-  - Frontend evidence display alongside figure explanations (provenance: page, section, source ref)
+- **Chunk 1.1 (DONE):** Evidence provenance — migration 005, `evidence` table, `EvidenceRepo`, pipeline population, GET exposure, frontend Source chips + collapsible source text.
 
 - **Chunk 1.2 (DONE):** Original vs Explained Figure — `/api/documents/:id/charts/:chartId/image` endpoint + 2-zone UI + chart-level provenance.
 
@@ -26,31 +19,23 @@ Chunk 1.1 (Evidence Provenance) — frontend evidence display alongside figure e
 ## Constraints
 
 - Follow `handlers → services → repository/external` layering
-- No DB reset needed (chunk 1.1 tail added no schema change)
+- No DB reset needed
 - Existing functionality must remain intact
 
 ## Relevant Files
 
-- `migrations/005_evidence.sql` — evidence table
-- `internal/repository/types.go` — Evidence struct
-- `internal/repository/evidence.go` — EvidenceRepo
-- `internal/repository/evidence_test.go` — repo tests
-- `internal/services/types.go` — Chart.SourceText
-- `internal/services/charts.go` — SourceText set from page context, enriched chapterChartPrompt
-- `internal/services/intake.go` — `savePipelineResult` evidence insert
-- `internal/services/save_pipeline_result_test.go` — persistence test
-- `internal/handlers/documents.go` — `evidence` in GET
-- `frontend/src/pages/result-page.jsx` — where evidence will display (pending)
-- `frontend/src/components/data-chart.jsx` — chart explanation display
+- `internal/services/simplification.go` — structured research prompt
+- `internal/services/simplification_test.go` — prompt format tests
+- `frontend/src/pages/result-page.jsx` — section parsing + card rendering
 
 ## Progress
 
-- Chunk 1.3 complete: enriched prompts + frontend display + chart_type bugfix. 67 Go tests pass, build + gofmt clean.
-- Chunk 1.1 backend tail complete: pipeline population + GET exposure + repo/services tests. 67 Go tests pass.
+- Chunk 1.4 complete: structured research summary (backend prompt + frontend section cards). 69 Go tests pass, frontend builds clean, gofmt clean.
+- Chunk 1.3 complete: enriched prompts + frontend display + chart_type bugfix.
+- Chunk 1.1 complete (backend + frontend): evidence provenance fully displayed.
 - Chunk 1.2 complete: original-figure serving endpoint + clear original-vs-interpretation UI + tests.
 - Chunk 0.2 audit deliverable: `docs/product/current-user-flow.md`.
 
 ## Next Action
 
-1. Render `evidence` from GET response in result page (provenance under each figure explanation)
-2. Then start Chunk 1.4 (Research-Oriented Summary)
+1. Start Chunk 2.1 (Paper History) — list previously analyzed papers: title, date, status, summary, figures, explanations.

@@ -148,6 +148,7 @@ func reVisualizeOne(ctx context.Context, client *external.GeminiClient, ec Extra
 		PageNumber:   ec.PageNumber,
 		DisplayOrder: displayOrder,
 		SourceText:   pageContext,
+		ChapterIndex: -1, // explicit: image-extracted charts are not chapter-linked
 	}
 
 	// Primary path: try to extract structured chart data from the page text.
