@@ -74,6 +74,14 @@ type documentSummary struct {
 	ExplanationCount int    `json:"explanation_count"`
 }
 
+type toggleSavedRequest struct {
+	Saved bool `json:"saved"`
+}
+
+type updateTitleRequest struct {
+	Title string `json:"title"`
+}
+
 // Create handles POST /api/documents. It is intentionally synchronous up
 // through extraction — a bad upload (wrong MIME, no text layer, oversized)
 // must be rejected before we ever spend a Gemini call on it (ARCHITECTURE.md
@@ -396,6 +404,62 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 		Limit:     limit,
 		Offset:    offset,
 	})
+}
+
+// ToggleSaved handles PUT /api/documents/:id/save
+func (h *DocumentHandler) ToggleSaved(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	var req toggleSavedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	if err := services.ToggleDocumentSaved(h.db, id, req.Saved); err != nil {
+		slog.Error("toggle saved failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]bool{"saved": req.Saved})
+}
+
+// UpdateTitle handles PATCH /api/documents/:id
+func (h *DocumentHandler) UpdateTitle(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	var req updateTitleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	if req.Title == "" {
+		writeError(w, http.StatusBadRequest, "title_required")
+		return
+	}
+
+	if err := services.RenameDocument(h.db, id, req.Title); err != nil {
+		slog.Error("update title failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"title": req.Title})
+}
+
+// Delete handles DELETE /api/documents/:id
+func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	if err := services.DeleteDocument(h.db, id); err != nil {
+		slog.Error("delete document failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 // GetChartImage serves the original chart image bytes for a document's
