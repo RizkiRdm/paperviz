@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, BarChart3, FileText, Plus, Calendar, Star, Pencil, Trash2, X, Check, FolderPlus, Folder, ChevronRight, MoreHorizontal } from "lucide-react"
+import { ArrowRight, BarChart3, FileText, Plus, Calendar, Star, Pencil, Trash2, X, Check, FolderPlus, Folder, ChevronRight, MoreHorizontal, GitCompare } from "lucide-react"
 
 const STATUS_STYLES = {
   complete: "bg-[#dcfce7] text-[#16a34a]",
@@ -35,6 +35,7 @@ export function DashboardPage() {
   const [editingCollectionId, setEditingCollectionId] = useState(null)
   const [editCollectionName, setEditCollectionName] = useState("")
   const [showAddToCollection, setShowAddToCollection] = useState(null)
+  const [selectedPapers, setSelectedPapers] = useState([])
 
   useEffect(() => {
     async function checkAuth() {
@@ -390,6 +391,17 @@ export function DashboardPage() {
             >
               Saved
             </button>
+            {selectedPapers.length >= 2 && (
+              <Link
+                to={`/compare?ids=${selectedPapers.join(",")}`}
+                className="ml-auto"
+              >
+                <Button variant="secondary" className="h-8 px-3 text-xs gap-1.5">
+                  <GitCompare className="h-3.5 w-3.5" />
+                  Compare {selectedPapers.length} papers
+                </Button>
+              </Link>
+            )}
           </div>
         )}
 
@@ -440,6 +452,18 @@ export function DashboardPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2.5 mb-0.5">
+                        <input
+                          type="checkbox"
+                          checked={selectedPapers.includes(doc.id)}
+                          onChange={() => {
+                            setSelectedPapers(prev =>
+                              prev.includes(doc.id)
+                                ? prev.filter(id => id !== doc.id)
+                                : [...prev, doc.id]
+                            )
+                          }}
+                          className="h-4 w-4 rounded border-[#e5e5e5] text-[#2563eb] focus:ring-[#2563eb]"
+                        />
                         <button
                           onClick={(e) => handleToggleSaved(e, doc)}
                           className="shrink-0 mt-0.5"

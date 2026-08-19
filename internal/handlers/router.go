@@ -48,6 +48,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.With(authMiddleware.RequireAuth).Put("/{id}/save", docHandler.ToggleSaved)
 		r.With(authMiddleware.RequireAuth).Patch("/{id}", docHandler.UpdateTitle)
 		r.With(authMiddleware.RequireAuth).Delete("/{id}", docHandler.Delete)
+		r.Post("/compare", docHandler.Compare)
 	})
 
 	authHandler := NewAuthHandler(db)

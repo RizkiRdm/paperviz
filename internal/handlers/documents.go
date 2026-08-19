@@ -546,3 +546,66 @@ func (h *DocumentHandler) GetChartImage(w http.ResponseWriter, r *http.Request) 
 		slog.Error("write chart image failed", "chart_id", chartID, "error", err)
 	}
 }
+
+type compareRequest struct {
+	DocumentIDs []string `json:"document_ids"`
+}
+
+type compareResponse struct {
+	Papers       []services.PaperSummary       `json:"papers"`
+	Dimensions   []services.ComparisonDimension `json:"dimensions"`
+	Agreement    []string                       `json:"agreement"`
+	Disagreement []string                       `json:"disagreement"`
+}
+
+// Compare handles POST /api/documents/compare.
+func (h *DocumentHandler) Compare(w http.ResponseWriter, r *http.Request) {
+	var req compareRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	if len(req.DocumentIDs) < 2 || len(req.DocumentIDs) > 10 {
+		writeError(w, http.StatusBadRequest, "document_ids_must_be_2_to_10")
+		return
+	}
+
+	docRepo := repository.NewDocumentRepo(h.db)
+	var papers []services.PaperSummary
+
+	for _, docID := range req.DocumentIDs {
+		doc, err := docRepo.Get(docID)
+		if errors.Is(err, repository.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "document_not_found")
+			return
+		}
+		if err != nil {
+			slog.Error("get document for comparison failed", "error", err)
+			writeError(w, http.StatusInternalServerError, "internal_error")
+			return
+		}
+
+		summary, err := services.ExtractPaperSummary(r.Context(), h.gemini, doc.ID, doc.Title, doc.OriginalText)
+		if err != nil {
+			slog.Error("extract paper summary failed", "document_id", docID, "error", err)
+			writeError(w, http.StatusInternalServerError, "extraction_failed")
+			return
+		}
+		papers = append(papers, summary)
+	}
+
+	comparison, err := services.ComparePapers(r.Context(), h.gemini, papers)
+	if err != nil {
+		slog.Error("compare papers failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "comparison_failed")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, compareResponse{
+		Papers:       comparison.Papers,
+		Dimensions:   comparison.Dimensions,
+		Agreement:    comparison.Agreement,
+		Disagreement: comparison.Disagreement,
+	})
+}

@@ -68,3 +68,34 @@ type PipelineOutput struct {
 	ChartExtractionDegraded bool
 	Chapters                []Chapter
 }
+
+// PaperSummary holds the extracted structured fields for one paper,
+// used as input to the multi-paper comparison service.
+type PaperSummary struct {
+	DocumentID      string
+	Title           string
+	ResearchQuestion string
+	Methodology     string
+	Dataset         string
+	SampleSize      string
+	Findings        []string
+	Limitations     []string
+	Figures         []string
+	Evidence        []string
+	Conclusions     string
+}
+
+// ComparisonDimension represents a single dimension of comparison across papers.
+type ComparisonDimension struct {
+	Dimension string            // e.g. "research_question", "methodology", "findings"
+	Values    map[string]string // document_id -> value for that paper
+	Notes     string            // optional synthesis/observation
+}
+
+// PaperComparison holds the full structured comparison across multiple papers.
+type PaperComparison struct {
+	Papers       []PaperSummary          // individual paper summaries
+	Dimensions   []ComparisonDimension   // side-by-side comparison dimensions
+	Agreement    []string                // areas where papers agree
+	Disagreement []string                // areas where papers disagree
+}
