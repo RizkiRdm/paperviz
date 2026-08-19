@@ -10,7 +10,7 @@
 
 ## Medium
 
-- Chunk 3.2: Paper Comparison UI — implement Paper A vs Paper B comparison view.
+- Chunk 3.3: Evidence Comparison — structured claim → per-paper evidence view.
 - Add processing progress indicator or elapsed time (P3 from critique).
 - Run full five-paper manual flow before MVP release.
 
@@ -21,6 +21,7 @@
 
 ## Completed
 
+- Chunk 3.2 Paper Comparison UI — dashboard selection, redesigned comparison page, source links, DESIGN.md tokens (2026-08-19).
 - Chunk 3.1 Multi-Paper Comparison Model — data model, comparison service, HTTP handler, frontend page, 6 tests (2026-08-19).
 - Chunk 2.4 Return Workflow — stats endpoint, dashboard welcome hero, post-analysis "What's Next" panel (2026-08-18).
 - Chunk 2.3 Research Collections — migration 008, CollectionRepo, handlers, dashboard UI (collection pills, add-to-collection) (2026-08-18).

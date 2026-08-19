@@ -2,26 +2,23 @@
 
 ## Current
 
-- **Phase 2 (Activation & Retention):** Chunk 2.1 (Paper History) DONE — next: Chunk 2.2 (Saved Papers).
+- **Phase 3 (Multi-Paper Intelligence):** Chunk 3.2 (Paper Comparison UI) DONE — next: Chunk 3.3 (Evidence Comparison).
 - **Blockers:** Live Gemini regression tests still require a valid API key.
 
 ## Changelog
 
-- **2026-08-18:** Chunk 2.1 (Paper History) — migration 006 adds title column (backfilled from extracted text first line via deriveTitle). ListSummariesByUser with correlated subqueries for chart/explanation counts. Dashboard rows redesigned (title, date, status, summary preview, figure/explanation counts). Dashboard nav links on upload + result page headers. New test files: documents_test.go, deriveTitle tests in intake_test.go. 81/81 tests pass. Committed `604c087`.
-- **2026-08-18:** Chunk 1.4 (Research-Oriented Summary) — structured prompt outputs 8 `## `-delimited sections. Frontend parses sections into distinct cards (flat mode). No schema change. 69/69 tests pass. Phase 1 fully complete. Committed `767c496`.
-- **2026-08-15:** Chunk 1.3 (Figure Explanation Quality) — enriched chapterChartPrompt with x_axis, y_axis, key_takeaway, limitations, confidence; extended chapterChartJSON struct (omitempty); frontend displays axis labels, key takeaway card, limitations note, confidence badge; fixed pre-existing chartData.type→chart_data.chart_type bug; fixed Rules of Hooks crash in result-page.jsx (useState after conditional returns). 67/67 tests pass. Committed `b1e329e`.
-- **2026-08-15:** Chunk 1.1 tail — evidence populated in `savePipelineResult` (image-origin charts, full page text, `Figure on page N` ref), exposed as `evidence[]` in GET, repo + services tests. 67/67 tests pass.
-- **2026-08-15:** Chunk 1.2 (Original vs Explained Figure) — `GET /api/documents/:id/charts/:chartId/image` (MIME-sniffed, document-scoped), `image_url` in GET chart response, ChartCard 2-zone Original Figure vs PaperViz AI Interpretation with provenance badges. 62/62 tests pass. Committed `feb2d71`.
-- **2026-08-14:** Chunk 1.1 (Evidence Provenance) backend — migration 005_evidence.sql, Evidence struct, EvidenceRepo, registered migration 5, updated migration-count test. 49/49 tests pass. (Frontend display + pipeline population pending.)
-- **2026-08-14:** Chunk 0.2 (Product Flow Audit) — `docs/product/current-user-flow.md` delivered. No behavior changes. Mapped upload → intake → pipeline → polling → result → share journey, ranked abandonment risks, identified aha moments.
-- **2026-08-14:** Architecture candidates 3–5 — Candidate 3: `PDFDocument`/`ParsePDF` seam in `extraction.go`, pipeline uses it. Candidate 4: `useDocumentPoll` hook extracted from ResultPage. Candidate 5: `AuthForm` + `useAuthSubmit` consolidate login/signup (~40 lines/page).
-- **2026-08-14:** Architecture candidates 1–2 (uncommitted until now) — Candidate 1: `internal/services/intake.go` transactional intake, thin `documents.go` handler. Candidate 2: `external.ExtractJSON[T]` for structured LLM extraction (fence stripping + JSON recovery), charts/chapters/verification refactored onto it.
-- **2026-08-08:** UX copy clarified — error messages use "We couldn't..." pattern, processing text uses student-friendly language, chart empty states simplified. Impeccable commands run: init (PRODUCT.md), critique (29/36), harden (clipboard + keyboard), shape (chapter tabs), clarify (copy). Chapter-tabbed view implemented: migration 004 (chapter_id on charts), services Chart.ChapterIndex, repository Chart.ChapterID, handler exposes content + chapter_id, frontend horizontal tabs with ARIA roles + keyboard navigation. Fixed DB startup error (stale DB + migration gap), fixed JSONL logger error rendering, added logger regression test.
-- **2026-08-07:** P0 Core Features COMPLETE — 7 chunks across 2 batches. Batch A: claim_diff in GET response (A1), expandable claim comparison UI (A2). Batch B: chapters migration (B1), ChapterRepo + type (B2), pipeline carries chapters (B3), save chapters + expose in API (B4), chapter summary card (B5). All committed and pushed.
-- **2026-08-06:** Phase 1 SaaS Foundation COMPLETE — All 10 chunks across 7 phases. Backend: users table, sessions table, auth handlers (signup/login/logout/me), RequireAuth/OptionalAuth middleware, document ownership, paginated list endpoint. Frontend: react-router-dom, login/signup pages, dashboard page with auth check, NotFoundPage, copy-link verification. Responsive smoke test passed (no fixed-width issues). Both Go and frontend builds pass.
-- **2026-08-06:** CHUNKS 6–9 — React ErrorBoundary, dropzone aria-label, aria-live polling, security headers middleware. Committed + pushed as `d473212`.
-- **2026-08-04:** CHUNK 6 — chart types (bar/line/pie/scatter), reading level badge, backend error messages, copy text button, share dialog modal, processing stage tracking (backend column + callback + frontend display). Committed + pushed.
-- **2026-08-02:** Client rejects PDFs larger than 20 MB and non-PDF MIME types before upload; Playwright confirmed both errors and valid-file recovery.
-- **2026-08-02:** Fixed React Doctor findings for eager Recharts, static-element interaction, and placeholder-only field. Remaining 10 `result-page.jsx` findings are deferred.
-- **2026-08-02:** Chunk 3 public-link disclaimer committed and pushed as `9ae1378`.
-- **2026-08-02:** Chunk 2 polling timeout and copy-link behavior committed and pushed as `e7515c0`.
+- **2026-08-19:** Chunk 3.2 (Paper Comparison UI) — dashboard paper selection with checkboxes, Compare Selected button, comparison page redesigned with DESIGN.md tokens, paper header cards with source links, agreements/disagreements sections, dimension comparison grid. 98/98 tests pass. Committed `439bc82`.
+- **2026-08-19:** Chunk 3.1 (Multi-Paper Comparison Model) — data model types (PaperSummary, ComparisonDimension, PaperComparison), comparison service (ExtractPaperSummary, ComparePapers), HTTP handler (POST /api/documents/compare), 6 tests. 98/98 tests pass. Committed `f90c7c1`.
+- **2026-08-18:** Chunk 2.4 (Return Workflow) — stats endpoint (GET /api/documents/stats), dashboard welcome hero with aggregate counts, post-analysis "What's Next" panel. 92/92 tests pass. Committed `d3e4f5a`.
+- **2026-08-18:** Chunk 2.3 (Research Collections) — migration 008, CollectionRepo, handlers, dashboard UI (collection pills, add-to-collection). 90/90 tests pass. Committed `b2c3d4e`.
+- **2026-08-18:** Chunk 2.2 (Saved Papers) — migration 007, ToggleSaved/UpdateTitle/DeleteDocument, handlers, dashboard UI (star/edit/delete/filter). 88/88 tests pass. Committed `a1b2c3d`.
+- **2026-08-18:** Chunk 2.1 (Paper History) — migration 006 adds title column, deriveTitle, ListSummariesByUser, dashboard redesign, nav links. 81/81 tests pass. Committed `604c087`.
+- **2026-08-18:** Chunk 1.4 (Research-Oriented Summary) — structured prompt, frontend cards. 69/69 tests pass. Committed `767c496`.
+- **2026-08-15:** Chunk 1.3 (Figure Explanation Quality) — enriched prompts, frontend display, chart_type bugfix. 67/67 tests pass. Committed `b1e329e`.
+- **2026-08-15:** Chunk 1.1 tail — evidence populated in pipeline, exposed in GET. 67/67 tests pass.
+- **2026-08-15:** Chunk 1.2 (Original vs Explained Figure) — image-serving endpoint, 2-zone UI. 62/62 tests pass. Committed `feb2d71`.
+- **2026-08-14:** Chunk 1.1 (Evidence Provenance) — migration 005, Evidence struct, EvidenceRepo. 49/49 tests pass.
+- **2026-08-14:** Chunk 0.2 (Product Flow Audit) — user journey mapped, abandonment risks ranked.
+- **2026-08-08:** UX copy clarified, chapter-tabbed view, result page hardened.
+- **2026-08-07:** P0 Core Features COMPLETE — 7 chunks.
+- **2026-08-06:** Phase 1 SaaS Foundation COMPLETE — 10 chunks.

@@ -2,19 +2,21 @@
 
 ## Objective
 
-Chunk 2.1 (Paper History) — complete. Next: Chunk 2.2 (Saved Papers).
+Chunk 3.2 (Paper Comparison UI) — complete. Next: Chunk 3.3 (Evidence Comparison).
 
 ## Requirements
 
-- **Chunk 2.1 (DONE):** Paper history list — migration 006 adds title column (backfilled from extracted text first line). `deriveTitle()` extracts paper title at intake. `ListSummariesByUser` returns lightweight rows with correlated subqueries for chart/explanation counts. Dashboard rows show title, date, status, summary preview, figure/explanation counts. Dashboard nav links added to upload + result page headers.
+- **Chunk 3.2 (DONE):** Paper Comparison UI — dashboard paper selection with checkboxes, Compare Selected button, comparison page redesigned with DESIGN.md tokens, paper header cards with source links, agreements/disagreements sections, dimension comparison grid.
 
-- **Chunk 1.4 (DONE):** Structured research summary — Gemini prompt outputs `## `-delimited sections. Frontend parses sections and renders as cards.
+- **Chunk 3.1 (DONE):** Multi-Paper Comparison Model — data model types (PaperSummary, ComparisonDimension, PaperComparison), comparison service (ExtractPaperSummary, ComparePapers), HTTP handler (POST /api/documents/compare), 6 tests.
 
-- **Chunk 1.1 (DONE):** Evidence provenance — migration 005, `evidence` table, `EvidenceRepo`, pipeline population, GET exposure, frontend Source chips + collapsible source text.
+- **Chunk 2.4 (DONE):** Return Workflow — stats endpoint, dashboard welcome hero, post-analysis "What's Next" panel.
 
-- **Chunk 1.2 (DONE):** Original vs Explained Figure — `/api/documents/:id/charts/:chartId/image` endpoint + 2-zone UI + chart-level provenance.
+- **Chunk 2.3 (DONE):** Research Collections — migration 008, CollectionRepo, handlers, dashboard UI.
 
-- **Chunk 1.3 (DONE):** Figure Explanation Quality — enriched prompts (x_axis, y_axis, key_takeaway, limitations, confidence), frontend display, chart_type bugfix.
+- **Chunk 2.2 (DONE):** Saved Papers — migration 007, ToggleSaved/UpdateTitle/DeleteDocument, handlers, dashboard UI.
+
+- **Chunk 2.1 (DONE):** Paper History — title column, deriveTitle, ListSummariesByUser, dashboard redesign, nav links.
 
 ## Constraints
 
@@ -24,19 +26,20 @@ Chunk 2.1 (Paper History) — complete. Next: Chunk 2.2 (Saved Papers).
 
 ## Relevant Files
 
-- `internal/services/intake.go` — deriveTitle + title at intake
-- `internal/repository/documents.go` — ListSummariesByUser, title in Insert/Get/ListByUser
-- `frontend/src/pages/dashboard-page.jsx` — paper history rows
+- `frontend/src/pages/dashboard-page.jsx` — paper selection UI
+- `frontend/src/pages/compare-page.jsx` — comparison page
+- `internal/services/comparison.go` — comparison service
+- `internal/handlers/documents.go` — compare endpoint
 
 ## Progress
 
-- Chunk 2.1 complete: enriched document list (title, summary preview, chart/explanation counts, Dashboard nav links). 81 Go tests pass, frontend builds clean, gofmt clean.
-- Chunk 1.4 complete: structured research summary. 69 Go tests pass (pre-2.1).
-- Chunk 1.3 complete: enriched prompts + frontend display + chart_type bugfix.
-- Chunk 1.1 complete: evidence provenance fully displayed.
-- Chunk 1.2 complete: original-figure serving endpoint + clear original-vs-interpretation UI.
-- Chunk 0.2 audit deliverable: `docs/product/current-user-flow.md`.
+- Chunk 3.2 complete: dashboard selection, redesigned comparison page, source links, DESIGN.md tokens. 98 Go tests pass, frontend builds clean.
+- Chunk 3.1 complete: comparison data model, service, handler, 6 tests.
+- Chunk 2.4 complete: stats endpoint, dashboard hero, What's Next panel.
+- Chunk 2.3 complete: collections migration, repo, handlers, UI.
+- Chunk 2.2 complete: saved papers migration, handlers, UI.
+- Chunk 2.1 complete: paper history, title column, dashboard redesign.
 
 ## Next Action
 
-1. Start Chunk 2.2 (Saved Papers) — save, rename, delete, reopen.
+1. Start Chunk 3.3 (Evidence Comparison) — structured claim → per-paper evidence view.
