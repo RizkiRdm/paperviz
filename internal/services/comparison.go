@@ -37,6 +37,22 @@ type paperExtractionResult struct {
 	Conclusions      string   `json:"conclusions"`
 }
 
+const evidenceComparisonPrompt = `Compare evidence claims across these academic papers. For each distinct claim found in any paper's evidence, determine which papers support it, contradict it, or have unclear stance.
+
+Papers:
+%s
+
+Return JSON array of claims. Each claim object:
+{
+  "claim": "specific factual claim about research findings",
+  "stances": {"doc_id_1": "supporting", "doc_id_2": "contradicting", "doc_id_3": "unclear"},
+  "source_refs": {"doc_id_1": "relevant evidence text from that paper"}
+}
+
+Claims should be specific (e.g., "Method X improves outcome Y by Z%%"), not vague themes.
+Only include claims that appear in at least 2 papers' evidence.
+JSON array shape: [{"claim":"...","stances":{...},"source_refs":{...}}]`
+
 const comparisonSynthesisPrompt = `Compare these academic papers. For each dimension, provide synthesis notes.
 
 Dimensions: %s
@@ -49,6 +65,12 @@ Paper summaries:
 type dimensionSynthesis struct {
 	Dimension string `json:"dimension"`
 	Notes     string `json:"notes"`
+}
+
+type evidenceClaimResult struct {
+	Claim      string            `json:"claim"`
+	Stances    map[string]string `json:"stances"`
+	SourceRefs map[string]string `json:"source_refs"`
 }
 
 // ExtractPaperSummary extracts structured fields from a single paper for multi-paper comparison.
@@ -97,11 +119,17 @@ func ComparePapers(ctx context.Context, client *external.GeminiClient, papers []
 
 	agreement, disagreement := identifyAgreementsAndDisagreements(papers)
 
+	evidenceClaims, err := CompareEvidence(ctx, client, papers)
+	if err != nil {
+		slog.Warn("evidence comparison failed, omitting evidence claims", "error", err)
+	}
+
 	return PaperComparison{
-		Papers:       papers,
-		Dimensions:   dimensions,
-		Agreement:    agreement,
-		Disagreement: disagreement,
+		Papers:         papers,
+		Dimensions:     dimensions,
+		Agreement:      agreement,
+		Disagreement:   disagreement,
+		EvidenceClaims: evidenceClaims,
 	}, nil
 }
 
@@ -184,6 +212,37 @@ func identifyAgreementsAndDisagreements(papers []PaperSummary) (agreement []stri
 	}
 
 	return agreement, disagreement
+}
+
+// CompareEvidence identifies cross-paper claims and per-paper stance.
+func CompareEvidence(ctx context.Context, client *external.GeminiClient, papers []PaperSummary) ([]EvidenceClaim, error) {
+	if len(papers) < 2 {
+		return nil, nil
+	}
+
+	var paperDescriptions []string
+	for _, p := range papers {
+		desc := fmt.Sprintf("Document '%s' (id: %s):\n  Evidence: %s",
+			p.Title, p.DocumentID, strings.Join(p.Evidence, "; "))
+		paperDescriptions = append(paperDescriptions, desc)
+	}
+
+	prompt := fmt.Sprintf(evidenceComparisonPrompt, strings.Join(paperDescriptions, "\n\n"))
+
+	parsed, err := external.ExtractJSON[[]evidenceClaimResult](ctx, client, prompt, 0)
+	if err != nil {
+		return nil, fmt.Errorf("compare evidence: %w", err)
+	}
+
+	var claims []EvidenceClaim
+	for _, r := range parsed {
+		claims = append(claims, EvidenceClaim{
+			Claim:      r.Claim,
+			Stances:    r.Stances,
+			SourceRefs: r.SourceRefs,
+		})
+	}
+	return claims, nil
 }
 
 func findCommonKeywords(text1, text2 string) []string {

@@ -552,10 +552,11 @@ type compareRequest struct {
 }
 
 type compareResponse struct {
-	Papers       []services.PaperSummary       `json:"papers"`
-	Dimensions   []services.ComparisonDimension `json:"dimensions"`
-	Agreement    []string                       `json:"agreement"`
-	Disagreement []string                       `json:"disagreement"`
+	Papers         []services.PaperSummary        `json:"papers"`
+	Dimensions     []services.ComparisonDimension `json:"dimensions"`
+	Agreement      []string                       `json:"agreement"`
+	Disagreement   []string                       `json:"disagreement"`
+	EvidenceClaims []services.EvidenceClaim       `json:"evidence_claims"`
 }
 
 // Compare handles POST /api/documents/compare.
@@ -603,9 +604,10 @@ func (h *DocumentHandler) Compare(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, compareResponse{
-		Papers:       comparison.Papers,
-		Dimensions:   comparison.Dimensions,
-		Agreement:    comparison.Agreement,
-		Disagreement: comparison.Disagreement,
+		Papers:         comparison.Papers,
+		Dimensions:     comparison.Dimensions,
+		Agreement:      comparison.Agreement,
+		Disagreement:   comparison.Disagreement,
+		EvidenceClaims: comparison.EvidenceClaims,
 	})
 }
