@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useSearchParams, Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, FileText, Calendar, ExternalLink } from "lucide-react"
+import { EvidenceComparisonPanel } from "@/components/evidence-comparison"
 
 const DIMENSION_LABELS = {
   research_question: "Research Question",
@@ -168,6 +169,11 @@ export function ComparePage() {
             </div>
           </section>
         )}
+
+        <EvidenceComparisonPanel
+          evidenceClaims={comparison.evidence_claims}
+          papers={comparison.papers}
+        />
 
         <section className="mb-10">
           <h2 className="text-sm font-medium text-[#0a0a0a] mb-4">Detailed Comparison</h2>
