@@ -72,17 +72,17 @@ type PipelineOutput struct {
 // PaperSummary holds the extracted structured fields for one paper,
 // used as input to the multi-paper comparison service.
 type PaperSummary struct {
-	DocumentID      string
-	Title           string
+	DocumentID       string
+	Title            string
 	ResearchQuestion string
-	Methodology     string
-	Dataset         string
-	SampleSize      string
-	Findings        []string
-	Limitations     []string
-	Figures         []string
-	Evidence        []string
-	Conclusions     string
+	Methodology      string
+	Dataset          string
+	SampleSize       string
+	Findings         []string
+	Limitations      []string
+	Figures          []string
+	Evidence         []string
+	Conclusions      string
 }
 
 // ComparisonDimension represents a single dimension of comparison across papers.
@@ -95,15 +95,15 @@ type ComparisonDimension struct {
 // EvidenceClaim represents a cross-paper claim with per-paper stance.
 type EvidenceClaim struct {
 	Claim      string            `json:"claim"`
-	Stances    map[string]string `json:"stances"`    // document_id → "supporting" | "contradicting" | "unclear"
+	Stances    map[string]string `json:"stances"`     // document_id → "supporting" | "contradicting" | "unclear"
 	SourceRefs map[string]string `json:"source_refs"` // document_id → evidence reference text
 }
 
 // PaperComparison holds the full structured comparison across multiple papers.
 type PaperComparison struct {
-	Papers         []PaperSummary          // individual paper summaries
-	Dimensions     []ComparisonDimension   // side-by-side comparison dimensions
-	Agreement      []string                // areas where papers agree
-	Disagreement   []string                // areas where papers disagree
-	EvidenceClaims []EvidenceClaim         // cross-paper claims with per-paper stance
+	Papers         []PaperSummary        // individual paper summaries
+	Dimensions     []ComparisonDimension // side-by-side comparison dimensions
+	Agreement      []string              // areas where papers agree
+	Disagreement   []string              // areas where papers disagree
+	EvidenceClaims []EvidenceClaim       // cross-paper claims with per-paper stance
 }

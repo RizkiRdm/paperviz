@@ -1,5 +1,11 @@
 # Lessons and Mistakes
 
+## 2026-08-24 — Public share page image serving needs no extra auth check
+
+- **Problem:**担心 GetChartImage endpoint lacks visibility check for share pages.
+- **Root cause:** Overthinking. Share page service (GetSharedFigure) already checks document visibility and only returns image URL for non-private docs. GetChartImage itself doesn't need visibility check — the URL is only exposed when appropriate.
+- **Prevention:** Don't add auth checks to endpoints that are already gated by the data layer. Trace the full request path before adding security controls.
+
 ## 2026-08-18 — Test migration maps must be updated with every new migration
 
 - **Problem:** After adding migration 006, all existing tests failed: "table documents has no column named title". Three separate test files each hardcode a migration map for their in-memory test DB.

@@ -43,11 +43,11 @@ func (r *DocumentRepo) Insert(d Document) error {
 // Get retrieves a document by ID. Returns ErrNotFound if no row matches.
 func (r *DocumentRepo) Get(id string) (*Document, error) {
 	row := r.db.QueryRow(
-		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, saved
+		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, saved, visibility
 		FROM documents WHERE id = ?`, id,
 	)
 	var d Document
-	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.Title, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID, &d.Saved)
+	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.Title, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID, &d.Saved, &d.Visibility)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -102,7 +102,7 @@ func (r *DocumentRepo) DeleteExpiredBefore(cutoff int64) (int64, error) {
 // ListByUser returns documents belonging to a user, ordered by most recent, paginated.
 func (r *DocumentRepo) ListByUser(userID string, limit, offset int) ([]Document, error) {
 	rows, err := r.db.Query(
-		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id
+		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, visibility
 		FROM documents WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
 		userID, limit, offset,
 	)
@@ -114,7 +114,7 @@ func (r *DocumentRepo) ListByUser(userID string, limit, offset int) ([]Document,
 	var docs []Document
 	for rows.Next() {
 		var d Document
-		if err := rows.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.Title, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID); err != nil {
+		if err := rows.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.Title, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID, &d.Visibility); err != nil {
 			return nil, fmt.Errorf("scan document: %w", err)
 		}
 		docs = append(docs, d)

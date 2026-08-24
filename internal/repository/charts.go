@@ -44,7 +44,7 @@ func (r *ChartRepo) Insert(c Chart) error {
 // ListByDocument returns all charts for a document, ordered for display.
 func (r *ChartRepo) ListByDocument(documentID string) ([]Chart, error) {
 	rows, err := r.db.Query(
-		`SELECT id, document_id, source_method, chart_data, image_blob, annotation, page_number, display_order, chapter_id
+		`SELECT id, document_id, source_method, chart_data, image_blob, annotation, page_number, display_order, chapter_id, share_token
 		FROM charts WHERE document_id = ? ORDER BY display_order ASC`, documentID,
 	)
 	if err != nil {
@@ -55,7 +55,7 @@ func (r *ChartRepo) ListByDocument(documentID string) ([]Chart, error) {
 	var charts []Chart
 	for rows.Next() {
 		var c Chart
-		if err := rows.Scan(&c.ID, &c.DocumentID, &c.SourceMethod, &c.ChartData, &c.ImageBlob, &c.Annotation, &c.PageNumber, &c.DisplayOrder, &c.ChapterID); err != nil {
+		if err := rows.Scan(&c.ID, &c.DocumentID, &c.SourceMethod, &c.ChartData, &c.ImageBlob, &c.Annotation, &c.PageNumber, &c.DisplayOrder, &c.ChapterID, &c.ShareToken); err != nil {
 			return nil, fmt.Errorf("scan chart: %w", err)
 		}
 		charts = append(charts, c)
@@ -71,11 +71,11 @@ func (r *ChartRepo) ListByDocument(documentID string) ([]Chart, error) {
 // Returns ErrNotFound if no row matches either the id or the document scope.
 func (r *ChartRepo) GetByDocumentAndID(documentID, chartID string) (*Chart, error) {
 	row := r.db.QueryRow(
-		`SELECT id, document_id, source_method, chart_data, image_blob, annotation, page_number, display_order, chapter_id
+		`SELECT id, document_id, source_method, chart_data, image_blob, annotation, page_number, display_order, chapter_id, share_token
 		FROM charts WHERE id = ? AND document_id = ?`, chartID, documentID,
 	)
 	var c Chart
-	err := row.Scan(&c.ID, &c.DocumentID, &c.SourceMethod, &c.ChartData, &c.ImageBlob, &c.Annotation, &c.PageNumber, &c.DisplayOrder, &c.ChapterID)
+	err := row.Scan(&c.ID, &c.DocumentID, &c.SourceMethod, &c.ChartData, &c.ImageBlob, &c.Annotation, &c.PageNumber, &c.DisplayOrder, &c.ChapterID, &c.ShareToken)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -83,4 +83,45 @@ func (r *ChartRepo) GetByDocumentAndID(documentID, chartID string) (*Chart, erro
 		return nil, fmt.Errorf("get chart by document: %w", err)
 	}
 	return &c, nil
+}
+
+// SetShareToken sets the share_token on a chart. Returns ErrNotFound if
+// the chart doesn't exist.
+func (r *ChartRepo) SetShareToken(chartID, token string) error {
+	res, err := r.db.Exec(`UPDATE charts SET share_token = ? WHERE id = ?`, token, chartID)
+	if err != nil {
+		return fmt.Errorf("set share token: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// GetByShareToken returns a chart by its share token. Returns ErrNotFound
+// if no chart has that token.
+func (r *ChartRepo) GetByShareToken(token string) (*Chart, error) {
+	row := r.db.QueryRow(
+		`SELECT id, document_id, source_method, chart_data, image_blob, annotation, page_number, display_order, chapter_id, share_token
+		FROM charts WHERE share_token = ?`, token,
+	)
+	var c Chart
+	err := row.Scan(&c.ID, &c.DocumentID, &c.SourceMethod, &c.ChartData, &c.ImageBlob, &c.Annotation, &c.PageNumber, &c.DisplayOrder, &c.ChapterID, &c.ShareToken)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get chart by share token: %w", err)
+	}
+	return &c, nil
+}
+
+// RevokeShareToken clears the share_token on a chart.
+func (r *ChartRepo) RevokeShareToken(chartID string) error {
+	_, err := r.db.Exec(`UPDATE charts SET share_token = NULL WHERE id = ?`, chartID)
+	if err != nil {
+		return fmt.Errorf("revoke share token: %w", err)
+	}
+	return nil
 }

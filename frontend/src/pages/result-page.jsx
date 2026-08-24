@@ -489,7 +489,7 @@ const STAGE_LABELS = {
                 </div>
                 <div className="flex flex-col gap-4">
                   {chapterCharts.map((chart) => (
-                    <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} evidence={evidenceFor(chart.id)} />
+                    <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} evidence={evidenceFor(chart.id)} documentId={documentId} />
                   ))}
                 </div>
               </section>
@@ -510,7 +510,7 @@ const STAGE_LABELS = {
                 </div>
                 <div className="flex flex-col gap-4">
                   {doc.charts.map((chart) => (
-                    <ChartCard key={chart.id} chart={chart} evidence={evidenceFor(chart.id)} />
+                    <ChartCard key={chart.id} chart={chart} evidence={evidenceFor(chart.id)} documentId={documentId} />
                   ))}
                 </div>
               </section>

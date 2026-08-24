@@ -38,6 +38,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 
 	docHandler := NewDocumentHandler(db, gemini)
 	authMiddleware := NewAuthMiddleware(db)
+	shareHandler := NewShareHandler(db)
 
 	r.Route("/api/documents", func(r chi.Router) {
 		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth).Post("/", docHandler.Create)
@@ -48,8 +49,12 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.With(authMiddleware.RequireAuth).Put("/{id}/save", docHandler.ToggleSaved)
 		r.With(authMiddleware.RequireAuth).Patch("/{id}", docHandler.UpdateTitle)
 		r.With(authMiddleware.RequireAuth).Delete("/{id}", docHandler.Delete)
+		r.With(authMiddleware.RequireAuth).Post("/{id}/charts/{chartId}/share", shareHandler.GenerateToken)
+		r.With(authMiddleware.RequireAuth).Delete("/{id}/charts/{chartId}/share", shareHandler.RevokeToken)
 		r.Post("/compare", docHandler.Compare)
 	})
+
+	r.Get("/share/fig/{shareToken}", shareHandler.GetSharedFigure)
 
 	authHandler := NewAuthHandler(db)
 	r.Route("/api/auth", func(r chi.Router) {

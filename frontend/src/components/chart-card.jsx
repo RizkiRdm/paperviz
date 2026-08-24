@@ -1,7 +1,8 @@
 // ponytail: chart card redesign per DESIGN.md (hairline border, white canvas surface)
-import { lazy, Suspense, useState } from "react"
-import { Image as ImageIcon, BookMarked, ChevronDown } from "lucide-react"
+import { lazy, Suspense, useState, useRef, useEffect } from "react"
+import { Image as ImageIcon, BookMarked, ChevronDown, Share2, Copy, Check } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 const LazyDataChart = lazy(() => import("./data-chart"))
 
@@ -51,11 +52,81 @@ function EvidenceBlock({ evidence }) {
   )
 }
 
-export function ChartCard({ chart, chapterTitle, evidence = [] }) {
+function ShareFigureDialog({ url, onClose }) {
+  const [copied, setCopied] = useState(false)
+  const inputRef = useRef(null)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    return () => clearTimeout(timerRef.current)
+  }, [])
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 2000)
+    } catch {
+      inputRef.current?.select()
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent>
+        <DialogTitle className="text-sm font-semibold text-[#0a0a0a]">
+          Share this figure
+        </DialogTitle>
+        <DialogDescription className="mb-3 text-[11px] text-[#737373]">
+          Anyone with this link can view this figure explanation for 7 days.
+        </DialogDescription>
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            readOnly
+            value={url}
+            className="flex-1 rounded-[8px] border border-[#e5e5e5] bg-[#f5f5f5] px-3 py-2 text-xs text-[#0a0a0a] font-mono"
+          />
+          <button
+            onClick={handleCopy}
+            className="inline-flex items-center gap-1.5 rounded-[8px] bg-[#0a0a0a] px-3 py-2 text-xs font-medium text-white hover:bg-[#262626] transition-colors cursor-pointer"
+          >
+            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
+  const [shareUrl, setShareUrl] = useState(null)
+  const [sharing, setSharing] = useState(false)
   const pageNumber = chart.page_number || 0
   const isDataExtracted = chart.source_method === "data_extracted"
   const isImageFallback = chart.source_method === "image_fallback"
   const isOmitted = chart.source_method === "omitted"
+
+  async function handleShare() {
+    if (sharing) return
+    setSharing(true)
+    try {
+      const res = await fetch(`/api/documents/${documentId}/charts/${chart.id}/share`, {
+        method: "POST",
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const fullUrl = window.location.origin + data.share_url
+        setShareUrl(fullUrl)
+      }
+    } catch {
+    } finally {
+      setSharing(false)
+    }
+  }
 
   return (
     <div className="rounded-[12px] border border-[#e5e5e5] bg-white p-5">
@@ -93,14 +164,26 @@ export function ChartCard({ chart, chapterTitle, evidence = [] }) {
         </div>
 
         <div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex items-center rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
-                PaperViz AI Interpretation
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>AI-generated interpretation of the original figure</TooltipContent>
-          </Tooltip>
+          <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
+                  PaperViz AI Interpretation
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>AI-generated interpretation of the original figure</TooltipContent>
+            </Tooltip>
+            {documentId && (
+              <button
+                onClick={handleShare}
+                disabled={sharing}
+                className="inline-flex items-center gap-1 rounded-full border border-[#e5e5e5] bg-white px-2 py-0.5 text-[11px] font-medium text-[#737373] hover:text-[#0a0a0a] hover:border-[#d4d4d4] transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <Share2 className="h-3 w-3" />
+                {sharing ? "Sharing…" : "Share"}
+              </button>
+            )}
+          </div>
           <div className="mt-3">
             {isDataExtracted && (
               <Suspense
@@ -118,6 +201,8 @@ export function ChartCard({ chart, chapterTitle, evidence = [] }) {
       </div>
 
       {evidence.length > 0 && <EvidenceBlock evidence={evidence[0]} />}
+
+      {shareUrl && <ShareFigureDialog url={shareUrl} onClose={() => setShareUrl(null)} />}
     </div>
   )
 }

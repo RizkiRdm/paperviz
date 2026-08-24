@@ -16,6 +16,7 @@ type Document struct {
 	ProcessingStage         *string
 	UserID                  *string // nullable — anonymous docs have NULL user_id
 	Saved                   bool
+	Visibility              string // public | unlisted | private
 }
 
 // DocumentListItem is a lightweight row for the paper-history list.
@@ -42,6 +43,7 @@ type Chart struct {
 	PageNumber   *int
 	DisplayOrder int
 	ChapterID    *string // nullable — links chart to a chapter
+	ShareToken   *string // nullable — lazy-generated for public share pages
 }
 
 // ClaimDiff mirrors the claim_diffs table.
