@@ -1,0 +1,118 @@
+{
+  "stage": "interview",
+  "title": "Shareable Figure Explanation — Chunk 4.1",
+  "goalSlug": "shareable-figure-explanation",
+  "questions": [
+    {
+      "id": "share-url-structure",
+      "prompt": "What URL structure for individual figure share pages?",
+      "description": "How should the public URL for a shared figure look?",
+      "answerMode": "single",
+      "recommendedAnswer": "/share/fig/{shareToken} — dedicated share route, separate from document routes",
+      "recommendedOptionIds": ["share-fig-token"],
+      "options": [
+        { "id": "share-fig-token", "label": "/share/fig/{shareToken}" },
+        { "id": "doc-chart", "label": "/{documentId}/chart/{chartId}" },
+        { "id": "share-chart", "label": "/share/{documentId}/{chartId}" }
+      ],
+      "required": true
+    },
+    {
+      "id": "share-page-content",
+      "prompt": "What should the figure share page display?",
+      "description": "Select all that apply to the share page.",
+      "answerMode": "multi",
+      "recommendedAnswer": "Original figure image, PaperViz explanation/annotation, source paper title + page number, reading level used, CTA button to analyze own paper",
+      "recommendedOptionIds": ["original-img", "explanation", "source-attribution", "reading-level", "cta"],
+      "options": [
+        { "id": "original-img", "label": "Original figure image" },
+        { "id": "explanation", "label": "PaperViz explanation text" },
+        { "id": "chart-data", "label": "Chart data (JSON/Recharts render)" },
+        { "id": "source-attribution", "label": "Source paper title + page" },
+        { "id": "reading-level", "label": "Reading level used" },
+        { "id": "cta", "label": "CTA to analyze own paper" },
+        { "id": "uncertainty", "label": "Uncertainty/provenance badges" }
+      ],
+      "required": true
+    },
+    {
+      "id": "visibility",
+      "prompt": "What visibility options for shared figures?",
+      "description": "Should figures inherit document visibility or have independent controls?",
+      "answerMode": "single",
+      "recommendedAnswer": "Figures inherit document visibility for now — public, unlisted, or private. No per-figure visibility override in 4.1.",
+      "recommendedOptionIds": ["inherit-doc"],
+      "options": [
+        { "id": "inherit-doc", "label": "Inherit document visibility" },
+        { "id": "per-figure", "label": "Per-figure visibility toggle" }
+      ],
+      "required": true
+    },
+    {
+      "id": "expiration",
+      "prompt": "How should share link expiration work?",
+      "description": "Share links can expire based on inactivity or fixed TTL.",
+      "answerMode": "single",
+      "recommendedAnswer": "Reuse existing 7-day inactivity expiry for documents. Figures don't have separate expiry — document expiry kills all its figure shares.",
+      "recommendedOptionIds": ["reuse-doc-expiry"],
+      "options": [
+        { "id": "reuse-doc-expiry", "label": "Reuse 7-day doc expiry" },
+        { "id": "separate-expiry", "label": "Separate figure expiry" },
+        { "id": "no-expiry", "label": "No expiry for shares" }
+      ],
+      "required": true
+    },
+    {
+      "id": "share-generation",
+      "prompt": "How is a share link generated?",
+      "description": "When does the share token get created?",
+      "answerMode": "single",
+      "recommendedAnswer": "Lazy generation — share token created on first share action, stored in charts table. Token is a 16-char random ID (reuse repository.NewID).",
+      "recommendedOptionIds": ["lazy"],
+      "options": [
+        { "id": "lazy", "label": "Lazy — on first share" },
+        { "id": "eager", "label": "Eager — on document complete" }
+      ],
+      "required": true
+    },
+    {
+      "id": "revoke-share",
+      "prompt": "Should users be able to revoke a share link?",
+      "description": "Can the document owner disable sharing for a figure?",
+      "answerMode": "single",
+      "recommendedAnswer": "Yes — owner can toggle sharing on/off. Revoking clears the share_token. Simple and useful for privacy.",
+      "recommendedOptionIds": ["revoke-yes"],
+      "options": [
+        { "id": "revoke-yes", "label": "Yes, revoke via toggle" },
+        { "id": "revoke-no", "label": "No revoke in 4.1" }
+      ],
+      "required": true
+    },
+    {
+      "id": "existing-share-dialog",
+      "prompt": "The existing ShareDialog shares the document link. How should it change for figures?",
+      "description": "Current ShareDialog in result-page.jsx shares the full document. Should it be extended or replaced?",
+      "answerMode": "single",
+      "recommendedAnswer": "Add per-chart share button in ChartCard. ShareDialog opens with figure-specific URL when sharing a figure, document URL when sharing full doc.",
+      "recommendedOptionIds": ["per-chart-btn"],
+      "options": [
+        { "id": "per-chart-btn", "label": "Per-chart share button in ChartCard" },
+        { "id": "global-dialog", "label": "Extend existing ShareDialog" }
+      ],
+      "required": true
+    },
+    {
+      "id": "unlisted-vs-private",
+      "prompt": "What's the difference between 'unlisted' and 'private' for a document?",
+      "description": "These affect figure share visibility.",
+      "answerMode": "single",
+      "recommendedAnswer": "Unlisted = anyone with link can view (not in dashboard). Private = only owner can view (no share links work). Public = owner can view + share links work.",
+      "recommendedOptionIds": ["unlisted-link-only"],
+      "options": [
+        { "id": "unlisted-link-only", "label": "Unlisted = link-only access" },
+        { "id": "no-unlisted", "label": "No unlisted — only public/private" }
+      ],
+      "required": true
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "stage": "facts",
+  "title": "Shareable Figure Explanation — Facts",
+  "goalSlug": "shareable-figure-explanation",
+  "facts": [
+    {
+      "id": "fact-1",
+      "text": "Individual figures have a unique public URL at /share/fig/{shareToken}.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "fact-2",
+      "text": "The charts table gains a share_token TEXT column (nullable, unique, indexed) for lazy share link generation.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "fact-3",
+      "text": "Share tokens are generated lazily on first share action, using repository.NewID (16-char random).",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "fact-4",
+      "text": "GET /share/fig/{shareToken} serves a standalone page showing: original figure image, PaperViz explanation, source paper title, page number, reading level, and CTA to analyze own paper.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": false,
+      "automatedVerification": false
+    },
+    {
+      "id": "fact-5",
+      "text": "The original figure and PaperViz interpretation are visually distinguishable on the share page (e.g., labeled sections, distinct styling).",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "fact-6",
+      "text": "Figures inherit their parent document's visibility: public (share works), unlisted (share works, not in dashboard), private (share links return 404).",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "fact-7",
+      "text": "Document expiry (7-day inactivity) automatically invalidates all figure share links for that document.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "fact-8",
+      "text": "Document owner can revoke sharing by clearing the share_token. Revoked tokens return 404.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "fact-9",
+      "text": "Each ChartCard in the result page has a share button that opens a ShareDialog with the figure-specific share URL.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": false,
+      "automatedVerification": false
+    },
+    {
+      "id": "fact-10",
+      "text": "The existing document ShareDialog continues to share the document link. Figure sharing uses a separate per-chart share button.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": false,
+      "automatedVerification": false
+    },
+    {
+      "id": "fact-11",
+      "text": "The share page preserves provenance: source paper attribution and uncertainty information are shown alongside the explanation.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": false,
+      "automatedVerification": false
+    },
+    {
+      "id": "fact-12",
+      "text": "A new handler: POST /api/documents/{id}/charts/{chartId}/share generates or returns the share token. DELETE /api/documents/{id}/charts/{chartId}/share revokes it.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": true,
+      "automatedVerification": true
+    },
+    {
+      "id": "fact-13",
+      "text": "The frontend share page (ShareFigurePage) is a new route at /share/fig/:shareToken, rendered outside the auth-protected layout.",
+      "accepted": false,
+      "removed": false,
+      "recommendedAutomatedVerification": false,
+      "automatedVerification": false
+    }
+  ]
+}

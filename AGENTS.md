@@ -4,6 +4,7 @@
 - MUST NOT introduce an ORM, job queue, message broker, or microservice split — see ARCHITECTURE.md Non-goals.- MUST NOT persist uploaded PDF bytes to disk.
 - MUST NOT route LLM calls through any gateway other than direct Gemini API for MVP.
 - MUST run tests before marking any task complete.
+- MUST only inspect files directly related to task given. Do not scan the entier repository, Do not read file in `@.gitignore`. Do not inspect unrelated documents.
 
 ## Design System Rules
 For any task that modifies or generates UI, styling, layout, or components:
