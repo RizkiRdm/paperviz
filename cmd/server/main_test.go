@@ -19,15 +19,17 @@ func TestLoadMigrationsRegistersChapterCharts(t *testing.T) {
 	}
 
 	want := map[int][]string{
-		1: {"CREATE TABLE documents", "CREATE TABLE charts"},
-		2: {"CREATE TABLE IF NOT EXISTS users"},
-		3: {"CREATE TABLE chapters"},
-		4: {"ALTER TABLE charts ADD COLUMN chapter_id"},
-		5: {"CREATE TABLE evidence"},
-		6: {"ADD COLUMN title"},
-		7: {"ADD COLUMN saved"},
-		8: {"CREATE TABLE collections", "CREATE TABLE document_collections"},
-		9: {"share_token", "visibility"},
+		1:  {"CREATE TABLE documents", "CREATE TABLE charts"},
+		2:  {"CREATE TABLE IF NOT EXISTS users"},
+		3:  {"CREATE TABLE chapters"},
+		4:  {"ALTER TABLE charts ADD COLUMN chapter_id"},
+		5:  {"CREATE TABLE evidence"},
+		6:  {"ADD COLUMN title"},
+		7:  {"ADD COLUMN saved"},
+		8:  {"CREATE TABLE collections", "CREATE TABLE document_collections"},
+		9:  {"share_token", "visibility"},
+		10: {"share_token"},
+		11: {"share_visits", "share_conversions"},
 	}
 
 	if len(migrations) != len(want) {
