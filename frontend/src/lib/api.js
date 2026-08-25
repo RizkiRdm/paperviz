@@ -1,9 +1,8 @@
-// api.js — thin wrapper around the two backend endpoints from
+// api.js — thin wrapper around the backend endpoints from
 // ARCHITECTURE.md Section E ("Internal Contracts"). Deliberately not a
-// generic HTTP client abstraction: there are only two endpoints in this
-// whole app (POST /api/documents, GET /api/documents/:id), so two focused
-// functions are simpler to read and maintain than a configurable client
-// class would be here (YAGNI).
+// generic HTTP client abstraction: the endpoint surface stays small, so
+// focused functions are simpler to read and maintain than a configurable
+// client class would be here (YAGNI).
 //
 // Both functions throw an ApiError with the server's snake_case error code
 // attached, so callers can show a specific message per ARCHITECTURE.md's
@@ -77,6 +76,64 @@ export async function getDocument(id) {
       signal: controller.signal
     })
     clearTimeout(timeoutId)
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// generateDocumentShare creates (or refreshes) the document's share link
+// and resolves to { share_url } pointing at /share/doc/:token.
+export async function generateDocumentShare(documentId) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
+  try {
+    const response = await fetch(`/api/documents/${documentId}/share`, {
+      method: "POST",
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// revokeDocumentShare deletes the document's active share link; the 200
+// body is intentionally ignored.
+export async function revokeDocumentShare(documentId) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
+  try {
+    const response = await fetch(`/api/documents/${documentId}/share`, {
+      method: "DELETE",
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// updateDocumentVisibility switches who may open the document (private,
+// unlisted, or public) and resolves to { visibility }.
+export async function updateDocumentVisibility(documentId, visibility) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
+  try {
+    const response = await fetch(`/api/documents/${documentId}/visibility`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visibility }),
+      signal: controller.signal,
+    })
     if (!response.ok) {
       throw await parseErrorResponse(response)
     }

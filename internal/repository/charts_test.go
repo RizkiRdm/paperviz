@@ -11,15 +11,16 @@ func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	migrations := make(map[int]string)
 	for v, file := range map[int]string{
-		1: "001_init.sql",
-		2: "002_users.sql",
-		3: "003_chapters.sql",
-		4: "004_chapter_charts.sql",
-		5: "005_evidence.sql",
-		6: "006_document_title.sql",
-		7: "007_saved_papers.sql",
-		8: "008_research_collections.sql",
-		9: "009_share_tokens.sql",
+		1:  "001_init.sql",
+		2:  "002_users.sql",
+		3:  "003_chapters.sql",
+		4:  "004_chapter_charts.sql",
+		5:  "005_evidence.sql",
+		6:  "006_document_title.sql",
+		7:  "007_saved_papers.sql",
+		8:  "008_research_collections.sql",
+		9:  "009_share_tokens.sql",
+		10: "010_document_share.sql",
 	} {
 		sqlStr, err := ReadMigration(filepath.Join("..", "..", "migrations", file))
 		if err != nil {

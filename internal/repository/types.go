@@ -16,7 +16,8 @@ type Document struct {
 	ProcessingStage         *string
 	UserID                  *string // nullable — anonymous docs have NULL user_id
 	Saved                   bool
-	Visibility              string // public | unlisted | private
+	Visibility              string  // public | unlisted | private
+	ShareToken              *string // nullable — lazy-generated for paper share pages
 }
 
 // DocumentListItem is a lightweight row for the paper-history list.

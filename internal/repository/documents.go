@@ -43,11 +43,11 @@ func (r *DocumentRepo) Insert(d Document) error {
 // Get retrieves a document by ID. Returns ErrNotFound if no row matches.
 func (r *DocumentRepo) Get(id string) (*Document, error) {
 	row := r.db.QueryRow(
-		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, saved, visibility
+		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, saved, visibility, share_token
 		FROM documents WHERE id = ?`, id,
 	)
 	var d Document
-	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.Title, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID, &d.Saved, &d.Visibility)
+	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.Title, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID, &d.Saved, &d.Visibility, &d.ShareToken)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -208,4 +208,52 @@ func (r *DocumentRepo) CountSavedByUser(userID string) (int, error) {
 		return 0, fmt.Errorf("count saved documents: %w", err)
 	}
 	return count, nil
+}
+
+// SetShareToken sets the share_token on a document. Returns ErrNotFound if the document doesn't exist.
+func (r *DocumentRepo) SetShareToken(id, token string) error {
+	res, err := r.db.Exec(`UPDATE documents SET share_token = ? WHERE id = ?`, token, id)
+	if err != nil {
+		return fmt.Errorf("set share token: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// RevokeShareToken clears the share_token on a document.
+func (r *DocumentRepo) RevokeShareToken(id string) error {
+	_, err := r.db.Exec(`UPDATE documents SET share_token = NULL WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("revoke share token: %w", err)
+	}
+	return nil
+}
+
+// GetByShareToken returns a document by its share token. Returns ErrNotFound if no document has that token.
+func (r *DocumentRepo) GetByShareToken(token string) (*Document, error) {
+	row := r.db.QueryRow(
+		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, saved, visibility, share_token
+		FROM documents WHERE share_token = ?`, token,
+	)
+	var d Document
+	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.Title, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID, &d.Saved, &d.Visibility, &d.ShareToken)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get document by share token: %w", err)
+	}
+	return &d, nil
+}
+
+// UpdateVisibility sets the visibility column on a document.
+func (r *DocumentRepo) UpdateVisibility(id, visibility string) error {
+	_, err := r.db.Exec(`UPDATE documents SET visibility = ? WHERE id = ?`, visibility, id)
+	if err != nil {
+		return fmt.Errorf("update visibility: %w", err)
+	}
+	return nil
 }

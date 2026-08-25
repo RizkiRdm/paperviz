@@ -6,6 +6,7 @@ import { ChartCard } from "@/components/chart-card"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useDocumentPoll } from "@/hooks/use-document-poll"
+import { generateDocumentShare, updateDocumentVisibility } from "@/lib/api"
 import { ArrowLeft, ArrowRight, Copy, Check, RefreshCw, BarChart2, Link2, FolderPlus, LayoutDashboard } from "lucide-react"
 import { NotFoundPage } from "@/pages/not-found-page"
 import ReactMarkdown from "react-markdown"
@@ -106,6 +107,10 @@ export function ResultPage() {
   const { doc, error, notFound, timedOut, takingLong, retry } = useDocumentPoll(documentId)
   const [showOriginal, setShowOriginal] = useState(false)
   const [showShare, setShowShare] = useState(false)
+  const [shareUrl, setShareUrl] = useState(null)
+  const [shareError, setShareError] = useState(false)
+  const [visibility, setVisibility] = useState("private")
+  const [visibilityError, setVisibilityError] = useState(false)
   const [showClaims, setShowClaims] = useState(false)
   const [textCopied, setTextCopied] = useState(false)
   const [textCopyError, setTextCopyError] = useState(false)
@@ -146,6 +151,33 @@ export function ResultPage() {
     } catch {
       setTextCopied(false)
       setTextCopyError(true)
+    }
+  }
+
+  // handleShare mints a real share link via the API, then opens the
+  // dialog with the absolute URL; failures surface inline near the button.
+  async function handleShare() {
+    setShareError(false)
+    try {
+      const { share_url } = await generateDocumentShare(documentId)
+      setShareUrl(window.location.origin + share_url)
+      setShowShare(true)
+    } catch {
+      setShareError(true)
+    }
+  }
+
+  // handleVisibilityChange applies the new visibility optimistically and
+  // reverts to the previous value if the PATCH fails.
+  async function handleVisibilityChange(next) {
+    const previous = visibility
+    setVisibility(next)
+    setVisibilityError(false)
+    try {
+      await updateDocumentVisibility(documentId, next)
+    } catch {
+      setVisibility(previous)
+      setVisibilityError(true)
     }
   }
 
@@ -271,23 +303,46 @@ const STAGE_LABELS = {
             <span className="h-4 w-px bg-[#e5e5e5]" />
             <span className="font-mono text-xs font-semibold text-[#0a0a0a]">PaperViz</span>
           </div>
-          <div className="flex items-center gap-3">
-            {doc.status === "complete" && (
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-3">
+              {doc.status === "complete" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <VerificationBadge onClick={() => setShowClaims(v => !v)} />
+                  </TooltipTrigger>
+                  <TooltipContent>Claims checked against the original text. Click to compare.</TooltipContent>
+                </Tooltip>
+              )}
+              <select
+                value={visibility}
+                onChange={(e) => handleVisibilityChange(e.target.value)}
+                aria-label="Who can view this summary"
+                className="h-9 cursor-pointer rounded-[8px] border border-[#e5e5e5] bg-white px-2 text-xs font-medium text-[#171717] transition-colors hover:bg-[#f5f5f5] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 disabled:text-[#a3a3a3]"
+                disabled={doc.status !== "complete"}
+              >
+                <option value="private">Private</option>
+                <option value="unlisted">Unlisted</option>
+                <option value="public">Public</option>
+              </select>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <VerificationBadge onClick={() => setShowClaims(v => !v)} />
+                  <Button variant="secondary" onClick={handleShare} className="h-9 px-3 text-xs gap-1.5 font-medium">
+                    <Link2 className="h-3.5 w-3.5 text-[#737373]" /> Share
+                  </Button>
                 </TooltipTrigger>
-                <TooltipContent>Claims checked against the original text. Click to compare.</TooltipContent>
+                <TooltipContent>Share via a link that expires after 7 days of inactivity.</TooltipContent>
               </Tooltip>
+            </div>
+            {shareError && (
+              <p className="text-[11px] text-[#ea580c]" role="alert">
+                Couldn't create a share link. Please try again.
+              </p>
             )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="secondary" onClick={() => setShowShare(true)} className="h-9 px-3 text-xs gap-1.5 font-medium">
-                  <Link2 className="h-3.5 w-3.5 text-[#737373]" /> Share
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Share via a link that expires after 7 days of inactivity.</TooltipContent>
-            </Tooltip>
+            {visibilityError && (
+              <p className="text-[11px] text-[#ea580c]" role="alert">
+                Couldn't update visibility. Please try again.
+              </p>
+            )}
           </div>
         </div>
       </header>
@@ -574,7 +629,7 @@ const STAGE_LABELS = {
         )}
       </main>
 
-      {showShare && <ShareDialog url={window.location.href} onClose={() => setShowShare(false)} />}
+      {showShare && shareUrl && <ShareDialog url={shareUrl} onClose={() => setShowShare(false)} />}
     </div>
   )
 }

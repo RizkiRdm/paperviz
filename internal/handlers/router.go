@@ -51,10 +51,14 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.With(authMiddleware.RequireAuth).Delete("/{id}", docHandler.Delete)
 		r.With(authMiddleware.RequireAuth).Post("/{id}/charts/{chartId}/share", shareHandler.GenerateToken)
 		r.With(authMiddleware.RequireAuth).Delete("/{id}/charts/{chartId}/share", shareHandler.RevokeToken)
+		r.With(authMiddleware.RequireAuth).Post("/{id}/share", shareHandler.GenerateDocToken)
+		r.With(authMiddleware.RequireAuth).Delete("/{id}/share", shareHandler.RevokeDocToken)
+		r.With(authMiddleware.RequireAuth).Patch("/{id}/visibility", shareHandler.UpdateVisibility)
 		r.Post("/compare", docHandler.Compare)
 	})
 
 	r.Get("/share/fig/{shareToken}", shareHandler.GetSharedFigure)
+	r.Get("/share/doc/{shareToken}", shareHandler.GetSharedPaper)
 
 	authHandler := NewAuthHandler(db)
 	r.Route("/api/auth", func(r chi.Router) {

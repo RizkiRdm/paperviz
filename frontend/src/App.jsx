@@ -8,6 +8,7 @@ import { SignupPage } from "@/pages/signup-page"
 import { DashboardPage } from "@/pages/dashboard-page"
 import { ComparePage } from "@/pages/compare-page"
 import { ShareFigurePage } from "@/pages/share-figure-page"
+import { SharePaperPage } from "@/pages/share-paper-page"
 import { NotFoundPage } from "@/pages/not-found-page"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/share/fig/:shareToken" element={<ShareFigurePage />} />
+          <Route path="/share/doc/:shareToken" element={<SharePaperPage />} />
           <Route path="/:documentId" element={<ResultPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
