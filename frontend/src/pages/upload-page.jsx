@@ -1,11 +1,11 @@
 // ponytail: upload page redesign with Satoshi display headline, pill feature tags & hairline card surface
-import { useState } from "react"
-import { useNavigate, Link } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { useNavigate, useSearchParams, Link } from "react-router-dom"
 import { UploadDropzone } from "@/components/upload-dropzone"
 import { ReadingLevelSelector } from "@/components/ui/reading-level-selector"
 import { Button } from "@/components/ui/button"
 import { ErrorBanner } from "@/components/ui/status-banners"
-import { createDocument } from "@/lib/api"
+import { createDocument, trackReferral } from "@/lib/api"
 import { Sparkles, FileText, BarChart3, ArrowRight } from "lucide-react"
 
 const ERROR_MESSAGES = {
@@ -24,11 +24,21 @@ const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024
 
 export function UploadPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [file, setFile] = useState(null)
   const [text, setText] = useState("")
   const [readingLevel, setReadingLevel] = useState("simplified")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
+
+  // Capture ?ref= referral token on mount so attribution survives the
+  // post-upload redirect to the result page.
+  useEffect(() => {
+    const ref = searchParams.get("ref")
+    if (ref) {
+      localStorage.setItem("paperviz_ref", ref.trim())
+    }
+  }, [searchParams])
 
   async function handleSubmit() {
     setError(null)
@@ -41,6 +51,12 @@ export function UploadPage() {
     setIsSubmitting(true)
     try {
       const result = await createDocument({ file, text, readingLevel })
+      // Fire-and-forget: never awaited so navigation is not delayed.
+      const ref = localStorage.getItem("paperviz_ref")
+      if (ref) {
+        trackReferral(ref)
+        localStorage.removeItem("paperviz_ref")
+      }
       navigate(`/${result.document_id}`)
     } catch (err) {
       setError(ERROR_MESSAGES[err.code] || ERROR_MESSAGES.unknown_error)

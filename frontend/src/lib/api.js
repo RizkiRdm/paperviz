@@ -142,3 +142,18 @@ export async function updateDocumentVisibility(documentId, visibility) {
     clearTimeout(timeoutId)
   }
 }
+
+// trackReferral attributes an upload to a shared-link referral token.
+// Fire-and-forget by design: every failure is swallowed here so callers
+// never see an error and the upload flow is never blocked or delayed.
+export async function trackReferral(ref) {
+  try {
+    await fetch("/api/share-referrals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ref }),
+    })
+  } catch {
+    // intentionally ignored — referral tracking is best-effort
+  }
+}
