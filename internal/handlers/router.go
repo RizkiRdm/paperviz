@@ -3,12 +3,50 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
 	"paperviz/internal/external"
 )
+
+// noindexMiddleware sets X-Robots-Tag so crawlers never index or follow ephemeral share links.
+func noindexMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+		next.ServeHTTP(w, r)
+	})
+}
+
+// spaNotFound dispatches unmatched paths per plan chunk 5.1 §1.7: API prefix gets 404 JSON, existing static files are served, GET/HEAD fall back to the SPA shell, other methods get 404.
+func spaNotFound(staticDir string, fileServer http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
+		cleaned := filepath.Clean("/" + r.URL.Path)
+		if strings.Contains(r.URL.Path, "..") {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
+		full := filepath.Join(staticDir, cleaned)
+		if full == staticDir || strings.HasPrefix(full, staticDir+string(os.PathSeparator)) {
+			if info, err := os.Stat(full); err == nil && info.Mode().IsRegular() {
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+		}
+		if r.Method == http.MethodGet || r.Method == http.MethodHead {
+			http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
+			return
+		}
+		writeError(w, http.StatusNotFound, "not_found")
+	}
+}
 
 // NewRouter builds the full chi router: the two unversioned API endpoints
 // (ARCHITECTURE.md Section E) plus static file serving for the built React
@@ -57,8 +95,10 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.Post("/compare", docHandler.Compare)
 	})
 
-	r.Get("/share/fig/{shareToken}", shareHandler.GetSharedFigure)
-	r.Get("/share/doc/{shareToken}", shareHandler.GetSharedPaper)
+	r.With(noindexMiddleware).Get("/share/fig/{shareToken}", shareHandler.GetSharedFigure)
+	r.With(noindexMiddleware).Head("/share/fig/{shareToken}", shareHandler.GetSharedFigure)
+	r.With(noindexMiddleware).Get("/share/doc/{shareToken}", shareHandler.GetSharedPaper)
+	r.With(noindexMiddleware).Head("/share/doc/{shareToken}", shareHandler.GetSharedPaper)
 	r.Post("/share-referrals", shareHandler.TrackReferral)
 
 	authHandler := NewAuthHandler(db)
@@ -80,13 +120,9 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.With(authMiddleware.RequireAuth).Delete("/{id}/documents/{docId}", collectionHandler.RemoveDocument)
 	})
 
-	// Serve the built SPA for everything else. Any unmatched path falls
-	// back to index.html so client-side routing (if the frontend adds any)
-	// still works on a hard refresh.
+	// spaNotFound serves API 404 JSON, real static files, and the SPA fallback for deep links.
 	fileServer := http.FileServer(http.Dir(staticDir))
-	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
-		fileServer.ServeHTTP(w, req)
-	})
+	r.NotFound(spaNotFound(staticDir, fileServer))
 
 	return r
 }
