@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-25 — Chunk 4.2 merged: shareable paper explanation (document-level share links + visibility control)
+**Last updated:** 2026-08-25 — Chunk 4.3 merged: product-led referral loop (share→visit→conversion funnel counters + CTA ref links)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Chunk 4.3 — Product-Led Referral Loop (next chunk)
-- **Active task file:** none yet (create `goals/` package when starting 4.3)
+- **Working on:** Chunk 5.1 — SEO Architecture (next chunk)
+- **Active task file:** none yet
 - **Blocked on / pending decision:** none
-- **Next action if resuming a new session:** review 4.3 scope in roadmap; add share→visit→analysis conversion tracking before building loop UI
+- **Next action if resuming a new session:** review 5.1 scope in roadmap; candidate routes listed there — design info architecture only, no filler pages
 
 ---
 
@@ -45,6 +45,7 @@ something that should stay frozen.)*
 - Phases 1–3 (Trust & Core Value, Activation & Retention, Multi-Paper Intelligence) — done, omitted from active roadmap
 - Chunk 4.1 Shareable Figure Explanation — done 2026-08-24, known limitation: no interactive Recharts on share page (image + text only)
 - Chunk 4.2 Shareable Paper Explanation — done 2026-08-25 (`POST/DELETE /api/documents/{id}/share`, `PATCH /api/documents/{id}/visibility`, public `GET /share/doc/{token}`, `/share/doc/:shareToken` page)
+- Chunk 4.3 Product-Led Referral Loop — done 2026-08-25 (`share_visits`/`share_conversions` counters on documents+charts, visit++ on public share GETs, `POST /api/share-referrals` conversion beacon, CTA links carry `?ref=`, upload page persists ref via `localStorage.paperviz_ref`)
 
 ---
 
@@ -75,6 +76,9 @@ something you already rejected for a clear reason.)*
 | 2026-08-25 | Revoke downgrades unlisted→private, never public→private | Revoking a link shouldn't silently change explicit public choice |
 | 2026-08-25 | Switching to private clears share_token | Private must kill existing links |
 | 2026-08-25 | Shared paper payload excludes original_text/user_id/tokens | Copyright risk on public URLs |
+| 2026-08-25 | Funnel = atomic counters, no events table | Rule 2 minimal; per-token counts answer share→visit→analysis without time series |
+| 2026-08-25 | Conversion attribution via localStorage beacon | No-auth product; server-side cookie infra unjustified for MVP signal |
+| 2026-08-25 | Visit counted only after visibility check passes | Private/expired tokens must not inflate funnel |
 
 ---
 
@@ -87,5 +91,7 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Document share repo methods: `internal/repository/documents.go`
 - Public share pages: `frontend/src/pages/share-figure-page.jsx`, `frontend/src/pages/share-paper-page.jsx`
 - Share API client fns: `frontend/src/lib/api.js`
-- Migrations: `migrations/009_share_tokens.sql`, `migrations/010_document_share.sql`
+- Referral counters: repo methods in `internal/repository/documents.go` + `charts.go`, service in `internal/services/share.go` (`TrackReferralConversion`), route `POST /api/share-referrals`
+- Ref attribution: `frontend/src/pages/upload-page.jsx` (localStorage capture + beacon), CTA links on both share pages
+- Migrations: `migrations/009_share_tokens.sql`, `migrations/010_document_share.sql`, `migrations/011_share_referrals.sql`
 - Task/chunk docs: `docs/`
