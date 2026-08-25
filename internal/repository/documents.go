@@ -249,6 +249,32 @@ func (r *DocumentRepo) GetByShareToken(token string) (*Document, error) {
 	return &d, nil
 }
 
+// IncrementShareVisits atomically bumps share_visits for a document share token. Returns ErrNotFound if no row matches.
+func (r *DocumentRepo) IncrementShareVisits(shareToken string) error {
+	res, err := r.db.Exec(`UPDATE documents SET share_visits = share_visits + 1 WHERE share_token = ?`, shareToken)
+	if err != nil {
+		return fmt.Errorf("increment share visits: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// IncrementShareConversions atomically bumps share_conversions for a document share token. Returns ErrNotFound if no row matches.
+func (r *DocumentRepo) IncrementShareConversions(shareToken string) error {
+	res, err := r.db.Exec(`UPDATE documents SET share_conversions = share_conversions + 1 WHERE share_token = ?`, shareToken)
+	if err != nil {
+		return fmt.Errorf("increment share conversions: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // UpdateVisibility sets the visibility column on a document.
 func (r *DocumentRepo) UpdateVisibility(id, visibility string) error {
 	_, err := r.db.Exec(`UPDATE documents SET visibility = ? WHERE id = ?`, visibility, id)

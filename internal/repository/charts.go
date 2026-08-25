@@ -125,3 +125,29 @@ func (r *ChartRepo) RevokeShareToken(chartID string) error {
 	}
 	return nil
 }
+
+// IncrementShareVisits atomically bumps share_visits for a chart share token. Returns ErrNotFound if no row matches.
+func (r *ChartRepo) IncrementShareVisits(shareToken string) error {
+	res, err := r.db.Exec(`UPDATE charts SET share_visits = share_visits + 1 WHERE share_token = ?`, shareToken)
+	if err != nil {
+		return fmt.Errorf("increment chart share visits: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// IncrementShareConversions atomically bumps share_conversions for a chart share token. Returns ErrNotFound if no row matches.
+func (r *ChartRepo) IncrementShareConversions(shareToken string) error {
+	res, err := r.db.Exec(`UPDATE charts SET share_conversions = share_conversions + 1 WHERE share_token = ?`, shareToken)
+	if err != nil {
+		return fmt.Errorf("increment chart share conversions: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
