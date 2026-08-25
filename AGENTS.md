@@ -58,6 +58,7 @@ When schema changes (new column/table):
 ---
 
 ## Coding Conventions 
+- MUST use One line comment in every function made.
 - MUST follow standard Go formatting (`gofmt`) 
 — non-negotiable, run before every commit.
 - MUST use explicit error returns (`if err != nil`) 
