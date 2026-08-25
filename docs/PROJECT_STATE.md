@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-25 — Chunk 4.3 merged: product-led referral loop (share→visit→conversion funnel counters + CTA ref links)
+**Last updated:** 2026-08-25 — Chunk 5.1 merged: SEO architecture (URL taxonomy locked, true SPA fallback + API 404 contract in router dispatcher, noindex on share URLs)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Chunk 5.1 — SEO Architecture (next chunk)
+- **Working on:** Chunk 5.2 — Product Pages (next chunk)
 - **Active task file:** none yet
 - **Blocked on / pending decision:** none
-- **Next action if resuming a new session:** review 5.1 scope in roadmap; candidate routes listed there — design info architecture only, no filler pages
+- **Next action if resuming a new session:** read `docs/seo-architecture.md` first — 5.2 builds the three KEEP landing pages (research-paper-summarizer, figure-explanation, compare-research-papers); ADR needed: static-in-dist vs Go templates; prerequisites listed in its §8/non-goals
 
 ---
 
@@ -46,6 +46,7 @@ something that should stay frozen.)*
 - Chunk 4.1 Shareable Figure Explanation — done 2026-08-24, known limitation: no interactive Recharts on share page (image + text only)
 - Chunk 4.2 Shareable Paper Explanation — done 2026-08-25 (`POST/DELETE /api/documents/{id}/share`, `PATCH /api/documents/{id}/visibility`, public `GET /share/doc/{token}`, `/share/doc/:shareToken` page)
 - Chunk 4.3 Product-Led Referral Loop — done 2026-08-25 (`share_visits`/`share_conversions` counters on documents+charts, visit++ on public share GETs, `POST /api/share-referrals` conversion beacon, CTA links carry `?ref=`, upload page persists ref via `localStorage.paperviz_ref`)
+- Chunk 5.1 SEO Architecture — done 2026-08-25 (`docs/seo-architecture.md` = IA source of truth; router NotFound is now a real dispatcher: `/api/*`→404 JSON, static files served, GET/HEAD→SPA fallback; `X-Robots-Tag: noindex, nofollow` on share GET/HEAD)
 
 ---
 
@@ -79,6 +80,10 @@ something you already rejected for a clear reason.)*
 | 2026-08-25 | Funnel = atomic counters, no events table | Rule 2 minimal; per-token counts answer share→visit→analysis without time series |
 | 2026-08-25 | Conversion attribution via localStorage beacon | No-auth product; server-side cookie infra unjustified for MVP signal |
 | 2026-08-25 | Visit counted only after visibility check passes | Private/expired tokens must not inflate funnel |
+| 2026-08-25 | Prune `/scientific-figure-analysis` + `/research-paper-analysis` routes | One page per intent; near-duplicate keywords cannibalize |
+| 2026-08-25 | Crawlable pages must be server-delivered full HTML | Zero-JS AI crawlers + social scrapers; WRS render lag |
+| 2026-08-25 | Share URLs: X-Robots-Tag header, never robots.txt Disallow | Disallow hides noindex from crawler; header works on CSR pages |
+| 2026-08-25 | `/explain/` reserved, noindex until all 5 quality gates pass | Scaled-content-abuse policy has no volume threshold |
 
 ---
 
@@ -93,5 +98,6 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Share API client fns: `frontend/src/lib/api.js`
 - Referral counters: repo methods in `internal/repository/documents.go` + `charts.go`, service in `internal/services/share.go` (`TrackReferralConversion`), route `POST /api/share-referrals`
 - Ref attribution: `frontend/src/pages/upload-page.jsx` (localStorage capture + beacon), CTA links on both share pages
+- SEO IA + URL-space contract: `docs/seo-architecture.md`; router dispatcher `internal/handlers/router.go` (`spaNotFound`, `noindexMiddleware`)
 - Migrations: `migrations/009_share_tokens.sql`, `migrations/010_document_share.sql`, `migrations/011_share_referrals.sql`
 - Task/chunk docs: `docs/`
