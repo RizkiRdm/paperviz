@@ -59,6 +59,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 
 	r.Get("/share/fig/{shareToken}", shareHandler.GetSharedFigure)
 	r.Get("/share/doc/{shareToken}", shareHandler.GetSharedPaper)
+	r.Post("/share-referrals", shareHandler.TrackReferral)
 
 	authHandler := NewAuthHandler(db)
 	r.Route("/api/auth", func(r chi.Router) {

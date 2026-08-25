@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -202,4 +203,33 @@ func (h *ShareHandler) GetSharedPaper(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, paper)
+}
+
+// TrackReferral records a share→analysis conversion for a public referral token.
+func (h *ShareHandler) TrackReferral(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Ref string `json:"ref"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	ref := strings.TrimSpace(req.Ref)
+	if ref == "" {
+		writeError(w, http.StatusBadRequest, "invalid_ref")
+		return
+	}
+
+	if err := services.TrackReferralConversion(r.Context(), h.db, ref); err != nil {
+		switch err.Error() {
+		case "not found":
+			writeError(w, http.StatusNotFound, "not_found")
+		default:
+			slog.Error("track referral failed", "error", err)
+			writeError(w, http.StatusInternalServerError, "internal_error")
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

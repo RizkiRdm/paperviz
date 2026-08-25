@@ -347,3 +347,158 @@ func TestGetSharedPaper(t *testing.T) {
 		}
 	})
 }
+
+func TestTrackReferralConversion(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name    string
+		setup   func(t *testing.T) (*sql.DB, string)
+		wantErr string
+		check   func(t *testing.T, db *sql.DB, ref string)
+	}{
+		{
+			name: "document token conversion recorded",
+			setup: func(t *testing.T) (*sql.DB, string) {
+				db, docID, owner := insertShareFixture(t, "")
+				token, err := GenerateDocumentShareToken(ctx, db, docID, owner)
+				if err != nil {
+					t.Fatalf("generate: %v", err)
+				}
+				return db, token
+			},
+			check: func(t *testing.T, db *sql.DB, ref string) {
+				var n int
+				if err := db.QueryRow(`SELECT share_conversions FROM documents WHERE share_token = ?`, ref).Scan(&n); err != nil {
+					t.Fatalf("query conversions: %v", err)
+				}
+				if n != 1 {
+					t.Errorf("documents.share_conversions: got %d, want 1", n)
+				}
+			},
+		},
+		{
+			name: "chart token conversion recorded",
+			setup: func(t *testing.T) (*sql.DB, string) {
+				db, docID, owner := insertShareFixture(t, "")
+				insertShareChart(t, db, docID, "conv-chart", []byte{0x01})
+				token, err := GenerateShareToken(ctx, db, docID, "conv-chart", owner)
+				if err != nil {
+					t.Fatalf("generate: %v", err)
+				}
+				return db, token
+			},
+			check: func(t *testing.T, db *sql.DB, ref string) {
+				var n int
+				if err := db.QueryRow(`SELECT share_conversions FROM charts WHERE share_token = ?`, ref).Scan(&n); err != nil {
+					t.Fatalf("query conversions: %v", err)
+				}
+				if n != 1 {
+					t.Errorf("charts.share_conversions: got %d, want 1", n)
+				}
+			},
+		},
+		{
+			name: "unknown token is not found",
+			setup: func(t *testing.T) (*sql.DB, string) {
+				db, _, _ := insertShareFixture(t, "")
+				return db, "no-such-ref"
+			},
+			wantErr: "not found",
+		},
+		{
+			name: "empty ref is invalid",
+			setup: func(t *testing.T) (*sql.DB, string) {
+				db, _, _ := insertShareFixture(t, "")
+				return db, ""
+			},
+			wantErr: "invalid ref",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, ref := tt.setup(t)
+
+			err := TrackReferralConversion(ctx, db, ref)
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Fatalf("error: got %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("track referral: %v", err)
+			}
+
+			if tt.check != nil {
+				tt.check(t, db, ref)
+			}
+		})
+	}
+}
+
+func TestSharedViewBumpsVisitCounters(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("paper visit increments share_visits", func(t *testing.T) {
+		db, docID, owner := insertShareFixture(t, "")
+		token, err := GenerateDocumentShareToken(ctx, db, docID, owner)
+		if err != nil {
+			t.Fatalf("generate: %v", err)
+		}
+		if _, err := GetSharedPaper(ctx, db, token); err != nil {
+			t.Fatalf("get shared paper: %v", err)
+		}
+		var n int
+		if err := db.QueryRow(`SELECT share_visits FROM documents WHERE share_token = ?`, token).Scan(&n); err != nil {
+			t.Fatalf("query visits: %v", err)
+		}
+		if n != 1 {
+			t.Errorf("share_visits: got %d, want 1", n)
+		}
+	})
+
+	t.Run("figure visit increments share_visits", func(t *testing.T) {
+		db, docID, owner := insertShareFixture(t, "")
+		insertShareChart(t, db, docID, "visit-chart", []byte{0x01})
+		if err := repository.NewDocumentRepo(db).UpdateVisibility(docID, "unlisted"); err != nil {
+			t.Fatalf("unlist document: %v", err)
+		}
+		token, err := GenerateShareToken(ctx, db, docID, "visit-chart", owner)
+		if err != nil {
+			t.Fatalf("generate: %v", err)
+		}
+		if _, err := GetSharedFigure(ctx, db, token); err != nil {
+			t.Fatalf("get shared figure: %v", err)
+		}
+		var n int
+		if err := db.QueryRow(`SELECT share_visits FROM charts WHERE share_token = ?`, token).Scan(&n); err != nil {
+			t.Fatalf("query visits: %v", err)
+		}
+		if n != 1 {
+			t.Errorf("share_visits: got %d, want 1", n)
+		}
+	})
+
+	t.Run("private document is never counted", func(t *testing.T) {
+		db, docID, owner := insertShareFixture(t, "")
+		token, err := GenerateDocumentShareToken(ctx, db, docID, owner)
+		if err != nil {
+			t.Fatalf("generate: %v", err)
+		}
+		if err := repository.NewDocumentRepo(db).UpdateVisibility(docID, "private"); err != nil {
+			t.Fatalf("force private: %v", err)
+		}
+		if _, err := GetSharedPaper(ctx, db, token); err == nil || err.Error() != "not found" {
+			t.Fatalf("error: got %v, want not found", err)
+		}
+		var n int
+		if err := db.QueryRow(`SELECT share_visits FROM documents WHERE share_token = ?`, token).Scan(&n); err != nil {
+			t.Fatalf("query visits: %v", err)
+		}
+		if n != 0 {
+			t.Errorf("share_visits on private view: got %d, want 0", n)
+		}
+	})
+}

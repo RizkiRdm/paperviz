@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"paperviz/internal/repository"
 )
@@ -97,6 +98,10 @@ func GetSharedFigure(ctx context.Context, db *sql.DB, token string) (*SharedFigu
 
 	if doc.Visibility == "private" {
 		return nil, fmt.Errorf("not found")
+	}
+
+	if err := chartRepo.IncrementShareVisits(token); err != nil {
+		slog.Warn("increment share visits failed", "error", err)
 	}
 
 	fig := &SharedFigure{
@@ -252,6 +257,10 @@ func GetSharedPaper(ctx context.Context, db *sql.DB, token string) (*SharedPaper
 		return nil, fmt.Errorf("not found")
 	}
 
+	if err := docRepo.IncrementShareVisits(token); err != nil {
+		slog.Warn("increment share visits failed", "error", err)
+	}
+
 	paper := &SharedPaper{
 		DocumentID:     doc.ID,
 		Title:          doc.Title,
@@ -279,4 +288,30 @@ func GetSharedPaper(ctx context.Context, db *sql.DB, token string) (*SharedPaper
 	}
 
 	return paper, nil
+}
+
+// TrackReferralConversion records a share→visit conversion against whichever
+// entity (document or chart) owns the referral token.
+func TrackReferralConversion(ctx context.Context, db *sql.DB, ref string) error {
+	if ref == "" {
+		return fmt.Errorf("invalid ref")
+	}
+
+	docRepo := repository.NewDocumentRepo(db)
+	err := docRepo.IncrementShareConversions(ref)
+	if errors.Is(err, repository.ErrNotFound) {
+		chartRepo := repository.NewChartRepo(db)
+		cerr := chartRepo.IncrementShareConversions(ref)
+		if errors.Is(cerr, repository.ErrNotFound) {
+			return fmt.Errorf("not found")
+		}
+		if cerr != nil {
+			return fmt.Errorf("increment chart conversions: %w", cerr)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("increment document conversions: %w", err)
+	}
+	return nil
 }
