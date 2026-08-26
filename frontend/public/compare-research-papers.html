@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compare Research Papers — PaperViz</title>
+  <meta name="description" content="Compare multiple research papers side by side. Identify agreements, disagreements, and methodological differences automatically." />
+  <link rel="canonical" href="https://paperviz.com/compare-research-papers" />
+  <meta name="robots" content="index, follow" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Compare Research Papers — PaperViz" />
+  <meta property="og:description" content="Compare multiple research papers side by side. Identify agreements, disagreements, and methodological differences automatically." />
+  <meta property="og:url" content="https://paperviz.com/compare-research-papers" />
+  <meta property="og:site_name" content="PaperViz" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "PaperViz",
+    "url": "https://paperviz.com",
+    "description": "Compare multiple research papers side by side with automated agreement and disagreement detection.",
+    "applicationCategory": "EducationalApplication",
+    "operatingSystem": "Web",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "PaperViz",
+    "url": "https://paperviz.com"
+  }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --c-canvas: #ffffff; --c-paper: #f5f5f5; --c-ash: #e5e5e5;
+      --c-ink: #0a0a0a; --c-charcoal: #171717; --c-fog: #737373;
+      --c-blue: #2563eb; --c-mint: #dcfce7; --c-green: #16a34a;
+      --c-orange: #ea580c; --c-violet: #7c3aed;
+      --f-satoshi: 'Satoshi', ui-sans-serif, system-ui, sans-serif;
+      --f-inter: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      --f-mono: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--f-inter); color: var(--c-charcoal); background: var(--c-canvas); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    .hdr { border-bottom: 1px solid var(--c-ash); background: rgba(255,255,255,0.8); backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 10; }
+    .hdr-in { max-width: 1200px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+    .logo-mk { width: 28px; height: 28px; background: var(--c-ink); color: #fff; font-family: var(--f-mono); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; border-radius: 6px; }
+    .logo-tx { font-family: var(--f-mono); font-size: 14px; font-weight: 600; color: var(--c-ink); letter-spacing: -0.02em; }
+    .nav { display: flex; align-items: center; gap: 16px; }
+    .nav a { font-size: 12px; color: var(--c-fog); text-decoration: none; transition: color 0.15s; }
+    .nav a:hover { color: var(--c-ink); }
+    .nav-sep { width: 1px; height: 14px; background: var(--c-ash); }
+    .hero { max-width: 720px; margin: 0 auto; text-align: center; padding: 80px 24px 48px; }
+    .pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 24px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--c-ash); background: #fff; padding: 4px 14px; border-radius: 9999px; font-size: 12px; font-weight: 500; color: var(--c-charcoal); }
+    .hero h1 { font-family: var(--f-satoshi); font-size: 48px; font-weight: 500; line-height: 1.0; color: var(--c-ink); letter-spacing: -0.02em; }
+    .hero>p { margin-top: 16px; font-size: 16px; color: var(--c-fog); max-width: 560px; margin-left: auto; margin-right: auto; }
+    .sec { max-width: 720px; margin: 0 auto; padding: 0 24px 64px; }
+    .sec-lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--c-blue); margin-bottom: 12px; }
+    .sec h2 { font-family: var(--f-satoshi); font-size: 24px; font-weight: 500; color: var(--c-ink); margin-bottom: 16px; line-height: 1.33; }
+    .sec p { font-size: 16px; line-height: 1.5; margin-bottom: 16px; }
+    .sec ul { list-style: none; }
+    .sec li { font-size: 16px; line-height: 1.5; padding: 8px 0; border-bottom: 1px solid var(--c-ash); }
+    .sec li:last-child { border-bottom: none; }
+    .wf { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 24px; }
+    @media (min-width: 640px) { .wf { grid-template-columns: repeat(3, 1fr); } }
+    .wf-s { border: 1px solid var(--c-ash); border-radius: 12px; padding: 24px; background: #fff; }
+    .wf-n { font-family: var(--f-mono); font-size: 11px; font-weight: 500; color: var(--c-blue); margin-bottom: 8px; }
+    .wf-s h3 { font-size: 14px; font-weight: 600; color: var(--c-ink); margin-bottom: 8px; }
+    .wf-s p { font-size: 14px; color: var(--c-fog); line-height: 1.43; margin-bottom: 0; }
+    .ex { border: 1px solid var(--c-ash); border-radius: 16px; padding: 32px; margin-top: 24px; }
+    .ex-lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--c-fog); margin-bottom: 12px; }
+    .ex h3 { font-size: 16px; font-weight: 500; color: var(--c-ink); margin-bottom: 12px; }
+    .ex p { font-size: 14px; line-height: 1.43; margin-bottom: 0; }
+    .tag { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 10px; border-radius: 9999px; margin-right: 6px; margin-bottom: 6px; }
+    .tag-a { background: var(--c-mint); color: var(--c-green); }
+    .tag-d { background: #fff7ed; color: var(--c-orange); }
+    .lim { background: var(--c-paper); border-radius: 16px; padding: 32px; margin-top: 24px; }
+    .lim h3 { font-size: 14px; font-weight: 600; color: var(--c-ink); margin-bottom: 12px; }
+    .lim li { font-size: 14px; }
+    .cta { max-width: 720px; margin: 0 auto; padding: 0 24px 96px; text-align: center; }
+    .cta-c { border: 1px solid var(--c-ash); border-radius: 16px; padding: 48px 32px; background: #fff; }
+    .cta-c h2 { font-family: var(--f-satoshi); font-size: 24px; font-weight: 500; color: var(--c-ink); margin-bottom: 12px; }
+    .cta-c p { font-size: 16px; color: var(--c-fog); margin-bottom: 24px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--c-ink); color: #fff; font-size: 14px; font-weight: 500; padding: 10px 24px; border-radius: 8px; text-decoration: none; transition: background 0.15s; }
+    .btn:hover { background: var(--c-charcoal); }
+    .ftr { border-top: 1px solid var(--c-ash); padding: 24px; text-align: center; }
+    .ftr p { font-size: 12px; color: var(--c-fog); }
+    .ftr a { color: var(--c-fog); text-decoration: none; }
+    .ftr a:hover { color: var(--c-ink); }
+  </style>
+</head>
+<body>
+  <header class="hdr"><div class="hdr-in">
+    <a href="/" class="logo"><div class="logo-mk">PV</div><span class="logo-tx">PaperViz</span></a>
+    <nav class="nav">
+      <a href="/research-paper-summarizer">Summarizer</a>
+      <a href="/figure-explanation">Figures</a>
+      <a href="/compare-research-papers">Compare</a>
+      <span class="nav-sep"></span>
+      <a href="/dashboard">Dashboard</a>
+    </nav>
+  </div></header>
+
+  <section class="hero">
+    <div class="pills">
+      <span class="pill"><span style="color:var(--c-orange)">&#128221;</span> Side-by-Side</span>
+      <span class="pill"><span style="color:var(--c-green)">&#10003;</span> Agreement Detection</span>
+      <span class="pill"><span style="color:var(--c-violet)">&#128269;</span> Conflict Spotting</span>
+    </div>
+    <h1>Compare papers<br>in seconds.</h1>
+    <p>Upload two papers. PaperViz identifies where they agree, disagree, and differ in methodology — automatically.</p>
+  </section>
+
+  <section class="sec">
+    <p class="sec-lbl">The problem</p>
+    <h2>Manual comparison is slow and error-prone</h2>
+    <p>Comparing research papers means reading both fully, then mentally mapping findings, methods, and conclusions. For literature reviews, meta-analyses, or just trying to understand a debate, this is the bottleneck.</p>
+    <ul>
+      <li>Reading two papers takes 4–8 hours for non-specialists</li>
+      <li>Easy to miss subtle disagreements buried in discussion sections</li>
+      <li>Methodological differences often explain conflicting results — but are hard to spot</li>
+      <li>Literature reviews require comparing dozens of papers, not just two</li>
+    </ul>
+  </section>
+
+  <section class="sec">
+    <p class="sec-lbl">The solution</p>
+    <h2>Automated comparison with evidence</h2>
+    <p>PaperViz analyzes both papers and produces a structured comparison. You see agreements, disagreements, and methodological differences — each linked to the source text.</p>
+    <ul>
+      <li>Side-by-side comparison across research question, method, findings, and conclusions</li>
+      <li>Automatic detection of agreements and disagreements</li>
+      <li>Methodology comparison highlighted separately</li>
+      <li>Each comparison point linked to the original paper for verification</li>
+    </ul>
+  </section>
+
+  <section class="sec">
+    <p class="sec-lbl">How it works</p>
+    <h2>Upload, compare, understand</h2>
+    <div class="wf">
+      <div class="wf-s"><div class="wf-n">01</div><h3>Upload two papers</h3><p>Drop two PDFs or paste text from two sources. Each paper is analyzed independently first.</p></div>
+      <div class="wf-s"><div class="wf-n">02</div><h3>AI comparison</h3><p>PaperViz maps findings, methods, and conclusions across both papers. Agreements and conflicts are identified automatically.</p></div>
+      <div class="wf-s"><div class="wf-n">03</div><h3>Review results</h3><p>See a structured comparison with evidence links. Each point traces back to the specific text in each paper.</p></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <p class="sec-lbl">Example</p>
+    <h2>What you get</h2>
+    <div class="ex" style="background:var(--c-paper)">
+      <p class="ex-lbl">Input</p>
+      <h3>Two papers on sleep and cognition: one finds strong effects, the other finds moderate effects</h3>
+    </div>
+    <div class="ex" style="margin-top:12px;background:#fff">
+      <p class="ex-lbl">PaperViz comparison</p>
+      <h3>Areas of Agreement</h3>
+      <p><span class="tag tag-a">Both agree</span> Sleep quality affects cognitive performance. Both studies found statistically significant effects of sleep deprivation on working memory and attention.</p>
+      <h3 style="margin-top:16px">Areas of Disagreement</h3>
+      <p><span class="tag tag-d">Conflict</span> Effect size differs. Paper A reports a large effect (Cohen's d = 0.82) while Paper B reports a moderate effect (d = 0.41). The difference may stem from Paper A using a sleep lab while Paper B used self-reported sleep quality.</p>
+    </div>
+  </section>
+
+  <section class="sec">
+    <p class="sec-lbl">Honest limitations</p>
+    <h2>What PaperViz can and can't do</h2>
+    <div class="lim">
+      <h3>Current limitations</h3>
+      <ul>
+        <li>Compares two papers at a time — multi-paper comparison coming later</li>
+        <li>Works with text-layer PDFs only — no scanned/image PDFs yet</li>
+        <li>Comparison is automated interpretation, not expert review</li>
+        <li>Papers with very different topics may produce weak comparisons</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="cta">
+    <div class="cta-c">
+      <h2>Try it with two papers</h2>
+      <p>Upload two PDFs and see where they agree and disagree.</p>
+      <a href="/" class="btn">Analyze papers <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </div>
+  </section>
+
+  <footer class="ftr"><p><a href="/">PaperViz</a> &middot; <a href="/research-paper-summarizer">Summarizer</a> &middot; <a href="/figure-explanation">Figures</a> &middot; <a href="/compare-research-papers">Compare</a></p></footer>
+</body>
+</html>

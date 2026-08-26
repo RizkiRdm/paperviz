@@ -24,6 +24,9 @@ export default function App() {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/compare" element={<ComparePage />} />
+          <Route path="/research-paper-summarizer" element={<SharePaperPage />} />
+          <Route path="/figure-explanation" element={<ShareFigurePage />} />
+          <Route path="/compare-research-papers" element={<ComparePage />} />
           <Route path="/share/fig/:shareToken" element={<ShareFigurePage />} />
           <Route path="/share/doc/:shareToken" element={<SharePaperPage />} />
           <Route path="/:documentId" element={<ResultPage />} />

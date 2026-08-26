@@ -1,0 +1,14 @@
+# PaperViz — robots.txt
+# Chunk 5.1 §4: Allow all public pages, block API and internal paths.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /share/
+Disallow: /dashboard
+Disallow: /login
+Disallow: /signup
+Disallow: /compare
+
+# Sitemap — to be added in Chunk 5.3 when programmatic SEO pages ship.
+# Sitemap: https://paperviz.com/sitemap.xml
