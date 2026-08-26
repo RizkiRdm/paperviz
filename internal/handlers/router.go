@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"paperviz/internal/external"
+	"paperviz/internal/services"
 )
 
 // noindexMiddleware sets X-Robots-Tag so crawlers never index or follow ephemeral share links.
@@ -81,9 +82,10 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	authMiddleware := NewAuthMiddleware(db)
 	shareHandler := NewShareHandler(db)
 	analyticsHandler := NewAnalyticsHandler(db)
+	usageHandler := NewUsageHandler(services.NewTierService(db))
 
 	r.Route("/api/documents", func(r chi.Router) {
-		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth).Post("/", docHandler.Create)
+		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/", docHandler.Create)
 		r.Get("/{id}", docHandler.Get)
 		r.Get("/{id}/charts/{chartId}/image", docHandler.GetChartImage)
 		r.With(authMiddleware.RequireAuth).Get("/stats", docHandler.Stats)
@@ -106,6 +108,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	r.Post("/share-referrals", shareHandler.TrackReferral)
 
 	r.With(authMiddleware.RequireAuth).Get("/analytics", analyticsHandler.GetSummary)
+	r.Get("/api/usage", usageHandler.GetUsage)
 
 	authHandler := NewAuthHandler(db)
 	r.Route("/api/auth", func(r chi.Router) {
