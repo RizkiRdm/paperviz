@@ -20,6 +20,8 @@ func TestValidateAndInsert(t *testing.T) {
 		8:  "008_research_collections.sql",
 		9:  "009_share_tokens.sql",
 		10: "010_document_share.sql",
+		11: "011_share_referrals.sql",
+		12: "012_usage_analytics.sql",
 	} {
 		sqlStr, err := repository.ReadMigration(filepath.Join("..", "..", "migrations", file))
 		if err != nil {

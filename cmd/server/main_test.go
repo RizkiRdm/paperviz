@@ -30,6 +30,7 @@ func TestLoadMigrationsRegistersChapterCharts(t *testing.T) {
 		9:  {"share_token", "visibility"},
 		10: {"share_token"},
 		11: {"share_visits", "share_conversions"},
+		12: {"processing_time_ms", "analytics_events"},
 	}
 
 	if len(migrations) != len(want) {

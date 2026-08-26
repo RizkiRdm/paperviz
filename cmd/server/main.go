@@ -42,6 +42,7 @@ func loadMigrations(migrationsDir string) (map[int]string, error) {
 		9:  "009_share_tokens.sql",
 		10: "010_document_share.sql",
 		11: "011_share_referrals.sql",
+		12: "012_usage_analytics.sql",
 	}
 
 	for version, file := range paths {

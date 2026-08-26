@@ -82,6 +82,8 @@ func RunPipelineAndPersist(db *sql.DB, gemini *external.GeminiClient, documentID
 	ctx, cancel := context.WithTimeout(context.Background(), backgroundPipelineTimeout)
 	defer cancel()
 
+	startTime := time.Now()
+
 	input.OnStage = func(stage string) {
 		docRepo := repository.NewDocumentRepo(db)
 		s := stage
@@ -95,6 +97,11 @@ func RunPipelineAndPersist(db *sql.DB, gemini *external.GeminiClient, documentID
 	if err := savePipelineResult(db, documentID, output); err != nil {
 		slog.Error("save pipeline result failed", "document_id", documentID, "error", err)
 	}
+
+	// Record elapsed processing time in ms for usage measurement (best-effort).
+	elapsed := int(time.Since(startTime).Milliseconds())
+	docRepo := repository.NewDocumentRepo(db)
+	_ = docRepo.SetProcessingTime(documentID, elapsed)
 }
 
 func savePipelineResult(db *sql.DB, documentID string, output PipelineOutput) error {

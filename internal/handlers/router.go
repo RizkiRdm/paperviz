@@ -80,6 +80,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	docHandler := NewDocumentHandler(db, gemini)
 	authMiddleware := NewAuthMiddleware(db)
 	shareHandler := NewShareHandler(db)
+	analyticsHandler := NewAnalyticsHandler(db)
 
 	r.Route("/api/documents", func(r chi.Router) {
 		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth).Post("/", docHandler.Create)
@@ -103,6 +104,8 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	r.With(noindexMiddleware).Get("/share/doc/{shareToken}", shareHandler.GetSharedPaper)
 	r.With(noindexMiddleware).Head("/share/doc/{shareToken}", shareHandler.GetSharedPaper)
 	r.Post("/share-referrals", shareHandler.TrackReferral)
+
+	r.With(authMiddleware.RequireAuth).Get("/analytics", analyticsHandler.GetSummary)
 
 	authHandler := NewAuthHandler(db)
 	r.Route("/api/auth", func(r chi.Router) {

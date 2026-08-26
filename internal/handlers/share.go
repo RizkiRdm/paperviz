@@ -7,9 +7,11 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"paperviz/internal/repository"
 	"paperviz/internal/services"
 )
 
@@ -229,6 +231,15 @@ func (h *ShareHandler) TrackReferral(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "internal_error")
 		}
 		return
+	}
+
+	// Track share-referral event for analytics (Chunk 6.1).
+	eventID, _ := repository.NewID()
+	if eventID != "" {
+		_, _ = h.db.Exec(
+			`INSERT INTO analytics_events (id, event_type, entity_id, metadata, created_at) VALUES (?, 'share_referral', ?, ?, ?)`,
+			eventID, ref, "", time.Now().Unix(),
+		)
 	}
 
 	w.WriteHeader(http.StatusNoContent)

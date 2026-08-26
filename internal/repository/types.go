@@ -18,6 +18,7 @@ type Document struct {
 	Saved                   bool
 	Visibility              string  // public | unlisted | private
 	ShareToken              *string // nullable — lazy-generated for paper share pages
+	ProcessingTimeMs        *int    // nullable — total pipeline processing time in milliseconds (Chunk 6.1)
 }
 
 // DocumentListItem is a lightweight row for the paper-history list.

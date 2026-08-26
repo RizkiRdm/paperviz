@@ -30,9 +30,9 @@ func NewDocumentRepo(db dbExecutor) *DocumentRepo {
 func (r *DocumentRepo) Insert(d Document) error {
 	_, err := r.db.Exec(
 		`INSERT INTO documents
-			(id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.CreatedAt, d.LastAccessedAt, d.Status, d.SourceType, d.ReadingLevel, d.Title, d.OriginalText, d.SimplifiedText, d.ErrorMessage, d.ChartExtractionDegraded, d.ProcessingStage, d.UserID,
+			(id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, processing_time_ms)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		d.ID, d.CreatedAt, d.LastAccessedAt, d.Status, d.SourceType, d.ReadingLevel, d.Title, d.OriginalText, d.SimplifiedText, d.ErrorMessage, d.ChartExtractionDegraded, d.ProcessingStage, d.UserID, nil,
 	)
 	if err != nil {
 		return fmt.Errorf("insert document: %w", err)
@@ -43,11 +43,11 @@ func (r *DocumentRepo) Insert(d Document) error {
 // Get retrieves a document by ID. Returns ErrNotFound if no row matches.
 func (r *DocumentRepo) Get(id string) (*Document, error) {
 	row := r.db.QueryRow(
-		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, saved, visibility, share_token
+		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, saved, visibility, share_token, processing_time_ms
 		FROM documents WHERE id = ?`, id,
 	)
 	var d Document
-	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.Title, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID, &d.Saved, &d.Visibility, &d.ShareToken)
+	err := row.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.Title, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID, &d.Saved, &d.Visibility, &d.ShareToken, &d.ProcessingTimeMs)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -280,6 +280,15 @@ func (r *DocumentRepo) UpdateVisibility(id, visibility string) error {
 	_, err := r.db.Exec(`UPDATE documents SET visibility = ? WHERE id = ?`, visibility, id)
 	if err != nil {
 		return fmt.Errorf("update visibility: %w", err)
+	}
+	return nil
+}
+
+// SetProcessingTime records the total pipeline processing time (ms) for a document.
+func (r *DocumentRepo) SetProcessingTime(id string, ms int) error {
+	_, err := r.db.Exec(`UPDATE documents SET processing_time_ms = ? WHERE id = ?`, ms, id)
+	if err != nil {
+		return fmt.Errorf("set processing time: %w", err)
 	}
 	return nil
 }

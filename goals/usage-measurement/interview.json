@@ -1,0 +1,85 @@
+{
+  "stage": "interview",
+  "title": "Chunk 6.1 — Usage Measurement",
+  "goalSlug": "usage-measurement",
+  "questions": [
+    {
+      "id": "metrics_scope",
+      "prompt": "Which metrics from the roadmap should this chunk implement?",
+      "description": "Roadmap lists: papers analyzed, figures analyzed, processing time, returning users, papers per user, share events, comparison events, success rate.",
+      "answerMode": "multi",
+      "recommendedAnswer": "All listed metrics. Aggregate from existing tables where possible, add processing_time_ms to documents, create analytics_events for comparison/share events.",
+      "options": [
+        { "id": "all", "label": "All metrics (Recommended)" },
+        { "id": "core-only", "label": "Core only (papers, figures, success rate)" },
+        { "id": "minimal", "label": "Minimal (papers + success rate only)" }
+      ],
+      "required": true
+    },
+    {
+      "id": "returning_users",
+      "prompt": "How to track 'returning users' without auth?",
+      "description": "PaperViz is no-auth for MVP. Returning users = unique user_id values (set on signup) + anonymous docs with NULL user_id.",
+      "answerMode": "single",
+      "recommendedAnswer": "Count unique user_ids from documents table. Anonymous docs (NULL user_id) counted separately. No IP tracking.",
+      "options": [
+        { "id": "user-id", "label": "Unique user_ids only (Recommended)" },
+        { "id": "ip-hash", "label": "IP hash for anonymous" },
+        { "id": "skip", "label": "Skip returning users for now" }
+      ],
+      "required": true
+    },
+    {
+      "id": "processing_time",
+      "prompt": "Where to capture processing_time_ms?",
+      "description": "Need to measure time from document creation to pipeline completion.",
+      "answerMode": "single",
+      "recommendedAnswer": "Add processing_time_ms column to documents table. Set on pipeline completion in intake.go.",
+      "options": [
+        { "id": "doc-column", "label": "Column on documents table (Recommended)" },
+        { "id": "events-table", "label": "Separate events table" },
+        { "id": "skip", "label": "Skip processing time" }
+      ],
+      "required": true
+    },
+    {
+      "id": "events_tracking",
+      "prompt": "Should comparison and share events go in a new analytics_events table?",
+      "description": "Documents/charts already have share_visits/share_conversions counters. Comparison has no tracking at all.",
+      "answerMode": "single",
+      "recommendedAnswer": "Yes, create analytics_events table for comparison events. Share events already tracked via counters on documents/charts — reuse those.",
+      "options": [
+        { "id": "events-table", "label": "analytics_events table (Recommended)" },
+        { "id": "reuse-counters", "label": "Reuse existing counters only" },
+        { "id": "both", "label": "Both: events table + keep counters" }
+      ],
+      "required": true
+    },
+    {
+      "id": "api_shape",
+      "prompt": "What API shape for the analytics endpoint?",
+      "description": "Need a dashboard endpoint to expose the metrics.",
+      "answerMode": "single",
+      "recommendedAnswer": "GET /api/analytics returns all metrics in one response. Auth required. Simple JSON object.",
+      "options": [
+        { "id": "single-endpoint", "label": "GET /api/analytics (Recommended)" },
+        { "id": "separate", "label": "Separate endpoints per metric" },
+        { "id": "extend-stats", "label": "Extend existing GET /api/documents/stats" }
+      ],
+      "required": true
+    },
+    {
+      "id": "scope_limit",
+      "prompt": "Any metrics you want to defer to a later chunk?",
+      "description": "Some metrics (workflow depth, cost per operation) might be better deferred until more features exist.",
+      "answerMode": "multi",
+      "recommendedAnswer": "Defer workflow depth and cost-per-operation. Focus on the core 8 metrics listed in the roadmap.",
+      "options": [
+        { "id": "defer-workflow", "label": "Defer workflow depth" },
+        { "id": "defer-cost", "label": "Defer cost per operation" },
+        { "id": "none", "label": "No deferrals" }
+      ],
+      "required": true
+    }
+  ]
+}

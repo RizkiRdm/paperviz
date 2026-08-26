@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -601,6 +602,15 @@ func (h *DocumentHandler) Compare(w http.ResponseWriter, r *http.Request) {
 		slog.Error("compare papers failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "comparison_failed")
 		return
+	}
+
+	// Track comparison event for analytics (Chunk 6.1).
+	eventID, _ := repository.NewID()
+	if eventID != "" {
+		_, _ = h.db.Exec(
+			`INSERT INTO analytics_events (id, event_type, entity_id, metadata, created_at) VALUES (?, 'comparison', ?, ?, ?)`,
+			eventID, strings.Join(req.DocumentIDs, ","), "", time.Now().Unix(),
+		)
 	}
 
 	writeJSON(w, http.StatusOK, compareResponse{
