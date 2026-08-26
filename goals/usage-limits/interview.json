@@ -1,0 +1,96 @@
+{
+  "stage": "interview",
+  "title": "Chunk 6.2 — Usage Limits Tiers",
+  "goalSlug": "usage-limits",
+  "questions": [
+    {
+      "id": "tier-names",
+      "prompt": "What should the tier names be?",
+      "description": "Roadmap says Free/Pro/Research. Confirm or change.",
+      "answerMode": "single",
+      "recommendedAnswer": "Free, Pro, Research",
+      "options": [
+        { "id": "fpr", "label": "Free / Pro / Research" },
+        { "id": "fsp", "label": "Free / Starter / Pro" },
+        { "id": "custom", "label": "Custom names" }
+      ],
+      "required": true
+    },
+    {
+      "id": "free-limits",
+      "prompt": "Free tier monthly limits?",
+      "description": "Papers per month, figures analyzed, comparisons allowed.",
+      "answerMode": "text",
+      "recommendedAnswer": "5 papers/month, basic figure extraction only, no comparison",
+      "required": true
+    },
+    {
+      "id": "pro-limits",
+      "prompt": "Pro tier monthly limits?",
+      "description": "More papers, advanced figure analysis, saved library, comparison.",
+      "answerMode": "text",
+      "recommendedAnswer": "50 papers/month, advanced figure analysis, saved library, 10 comparisons/month",
+      "required": true
+    },
+    {
+      "id": "research-limits",
+      "prompt": "Research tier monthly limits?",
+      "description": "High usage, advanced workflows, export.",
+      "answerMode": "text",
+      "recommendedAnswer": "500 papers/month, all features, unlimited comparisons, export",
+      "required": true
+    },
+    {
+      "id": "enforcement",
+      "prompt": "How to enforce limits?",
+      "description": "Block hard? Soft limit with warning? Grace period?",
+      "answerMode": "single",
+      "recommendedAnswer": "Hard block with clear upgrade CTA",
+      "options": [
+        { "id": "hard", "label": "Hard block (cannot proceed)" },
+        { "id": "soft", "label": "Soft limit (warning, can proceed)" },
+        { "id": "grace", "label": "Grace period then block" }
+      ],
+      "required": true
+    },
+    {
+      "id": "tracking",
+      "prompt": "How to track usage per user?",
+      "description": "No auth yet — how to identify users for limit tracking?",
+      "answerMode": "single",
+      "recommendedAnswer": "Fingerprint-based (browser fingerprint + IP) since no auth",
+      "options": [
+        { "id": "fingerprint", "label": "Browser fingerprint + IP" },
+        { "id": "local", "label": "localStorage counter" },
+        { "id": "account", "label": "Require account creation" }
+      ],
+      "required": true
+    },
+    {
+      "id": "upgrade-flow",
+      "prompt": "What happens when user hits limit?",
+      "description": "Show modal? Redirect? Inline message?",
+      "answerMode": "single",
+      "recommendedAnswer": "Inline message with upgrade CTA (no modal, no redirect)",
+      "options": [
+        { "id": "inline", "label": "Inline message + CTA" },
+        { "id": "modal", "label": "Modal overlay" },
+        { "id": "redirect", "label": "Redirect to pricing page" }
+      ],
+      "required": true
+    },
+    {
+      "id": "scope",
+      "prompt": "What's in scope for this chunk?",
+      "description": "Backend only? Frontend UI? Both?",
+      "answerMode": "multi",
+      "recommendedAnswer": "Backend tier logic + enforcement + frontend usage display + upgrade CTA",
+      "options": [
+        { "id": "backend", "label": "Backend tier logic + enforcement" },
+        { "id": "frontend", "label": "Frontend usage display + CTA" },
+        { "id": "admin", "label": "Admin dashboard for tier management" }
+      ],
+      "required": true
+    }
+  ]
+}
