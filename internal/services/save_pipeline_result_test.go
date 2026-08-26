@@ -24,6 +24,7 @@ func openTestServicesDB(t *testing.T) *sql.DB {
 		10: "010_document_share.sql",
 		11: "011_share_referrals.sql",
 		12: "012_usage_analytics.sql",
+		13: "013_usage_tiers.sql",
 	} {
 		sqlStr, err := repository.ReadMigration(filepath.Join("..", "..", "migrations", file))
 		if err != nil {
