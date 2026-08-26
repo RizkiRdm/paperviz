@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"paperviz/internal/repository"
+	"paperviz/internal/services"
 )
 
 type contextKey string
@@ -109,5 +111,41 @@ func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 
 		ctx := context.WithValue(r.Context(), userIDKey, session.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// usageLimitResponse is the wire format returned when monthly paper limit is reached.
+type usageLimitResponse struct {
+	Error      string `json:"error"`
+	Tier       string `json:"tier"`
+	PapersUsed int    `json:"papers_used"`
+	Limit      int    `json:"limit"`
+	UpgradeCTA string `json:"upgrade_cta"`
+}
+
+// UsageLimitMiddleware rejects document creation requests when the
+// fingerprint's monthly paper count exceeds the tier limit.
+func (m *AuthMiddleware) UsageLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fp := GetFingerprint(r)
+		canCreate, papersUsed, err := services.CheckUsage(m.db, fp)
+		if err != nil {
+			slog.Error("usage check failed", "error", err)
+			writeError(w, http.StatusInternalServerError, "internal_error")
+			return
+		}
+		if !canCreate {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			json.NewEncoder(w).Encode(usageLimitResponse{
+				Error:      "monthly limit reached",
+				Tier:       "free",
+				PapersUsed: papersUsed,
+				Limit:      services.LimitFree,
+				UpgradeCTA: "Upgrade to Pro for more papers",
+			})
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
