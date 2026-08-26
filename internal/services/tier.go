@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// Tier limits: max papers allowed per month for each tier level.
 const (
 	TierFree     = "free"
 	TierPro      = "pro"
@@ -17,10 +16,20 @@ const (
 	LimitResearch = 500
 )
 
+// TierService wraps tier and usage logic for handler injection.
+type TierService struct {
+	db *sql.DB
+}
+
+// NewTierService creates a TierService with the given database connection.
+func NewTierService(db *sql.DB) *TierService {
+	return &TierService{db: db}
+}
+
 // GetTier returns the current tier for a fingerprint, defaulting to "free".
-func GetTier(db *sql.DB, fingerprint string) (string, error) {
+func (s *TierService) GetTier(fingerprint string) (string, error) {
 	var tier string
-	err := db.QueryRow(`SELECT tier FROM user_tiers WHERE fingerprint = ?`, fingerprint).Scan(&tier)
+	err := s.db.QueryRow(`SELECT tier FROM user_tiers WHERE fingerprint = ?`, fingerprint).Scan(&tier)
 	if err == sql.ErrNoRows {
 		return TierFree, nil
 	}
@@ -31,8 +40,8 @@ func GetTier(db *sql.DB, fingerprint string) (string, error) {
 }
 
 // CheckUsage returns whether the user can create a paper and how many they've used.
-func CheckUsage(db *sql.DB, fingerprint string) (bool, int, error) {
-	tier, err := GetTier(db, fingerprint)
+func (s *TierService) CheckUsage(fingerprint string) (bool, int, error) {
+	tier, err := s.GetTier(fingerprint)
 	if err != nil {
 		return false, 0, fmt.Errorf("check usage: %w", err)
 	}
@@ -40,7 +49,7 @@ func CheckUsage(db *sql.DB, fingerprint string) (bool, int, error) {
 	limit := tierLimit(tier)
 
 	var papersUsed int
-	err = db.QueryRow(`SELECT papers_used FROM user_tiers WHERE fingerprint = ?`, fingerprint).Scan(&papersUsed)
+	err = s.db.QueryRow(`SELECT papers_used FROM user_tiers WHERE fingerprint = ?`, fingerprint).Scan(&papersUsed)
 	if err == sql.ErrNoRows {
 		return true, 0, nil
 	}
@@ -52,9 +61,9 @@ func CheckUsage(db *sql.DB, fingerprint string) (bool, int, error) {
 }
 
 // IncrementUsage bumps the papers_used count, creating the record if it doesn't exist.
-func IncrementUsage(db *sql.DB, fingerprint string) error {
+func (s *TierService) IncrementUsage(fingerprint string) error {
 	now := time.Now().Unix()
-	_, err := db.Exec(`
+	_, err := s.db.Exec(`
 		INSERT INTO user_tiers (fingerprint, papers_used, last_reset)
 		VALUES (?, 1, ?)
 		ON CONFLICT(fingerprint) DO UPDATE SET papers_used = papers_used + 1
@@ -63,6 +72,24 @@ func IncrementUsage(db *sql.DB, fingerprint string) error {
 		return fmt.Errorf("increment usage: %w", err)
 	}
 	return nil
+}
+
+// GetTier returns the current tier for a fingerprint (package-level, legacy).
+func GetTier(db *sql.DB, fingerprint string) (string, error) {
+	ts := &TierService{db: db}
+	return ts.GetTier(fingerprint)
+}
+
+// CheckUsage returns whether the user can create a paper (package-level, legacy).
+func CheckUsage(db *sql.DB, fingerprint string) (bool, int, error) {
+	ts := &TierService{db: db}
+	return ts.CheckUsage(fingerprint)
+}
+
+// IncrementUsage bumps the papers_used count (package-level, legacy).
+func IncrementUsage(db *sql.DB, fingerprint string) error {
+	ts := &TierService{db: db}
+	return ts.IncrementUsage(fingerprint)
 }
 
 // ResetMonthlyUsage resets all counts when the month has changed since last_reset.
@@ -89,7 +116,6 @@ func ResetMonthlyUsage(db *sql.DB) error {
 	return nil
 }
 
-// tierLimit returns the monthly paper limit for a given tier.
 func tierLimit(tier string) int {
 	switch tier {
 	case TierPro:
