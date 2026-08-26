@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-26 — Chunk 6.1 merged: Usage Measurement (`GET /api/analytics` endpoint, `analytics_events` table, `processing_time_ms` on documents, aggregate metrics: papers/figures/processing time/returning users/papers per user/share events/comparison events/success rate)
+**Last updated:** 2026-08-27 — Chunk 6.2 merged: Usage Limits (Free/Pro/Research tiers, `user_tiers` table, fingerprint-based tracking, `UsageLimitMiddleware`, `GET /api/usage`, frontend `UsageDisplay` + `UpgradeCta` components)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Chunk 6.2 — Usage Limits (next chunk)
-- **Active task file:** none yet
+- **Working on:** none — awaiting next task
+- **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming a new session:** design usage-based tiers (Free/Pro/Research) with limits on papers/month, figure analysis, comparison, export. Do not hard-code pricing yet.
+- **Next action if resuming a new session:** ready for new work
 
 ---
 
@@ -49,6 +49,7 @@ something that should stay frozen.)*
 - Chunk 5.1 SEO Architecture — done 2026-08-25 (`docs/seo-architecture.md` = IA source of truth; router NotFound is now a real dispatcher: `/api/*`→404 JSON, static files served, GET/HEAD→SPA fallback; `X-Robots-Tag: noindex, nofollow` on share GET/HEAD)
 - Chunk 5.2 Product Pages — done 2026-08-26 (3 static HTML landing pages in `frontend/public/`: research-paper-summarizer, figure-explanation, compare-research-papers; `robots.txt`; React Router routes for SPA fallback; inline styles matching DESIGN.md; structured data + OG tags)
 - Chunk 5.3 Programmatic SEO foundation — done 2026-08-26 (`frontend/seo/explain-pages.json` publish registry, `/explain/:slug` route + `ExplainPage`, crawlable `frontend/public/explain/sleep-quality-executive-function.html`, `/sitemap.xml`, `robots.txt` Sitemap line, default `X-Robots-Tag: noindex, nofollow` on `/explain/*`)
+- Chunk 6.2 Usage Limits — done 2026-08-27 (Free/Pro/Research tiers, `user_tiers` table, fingerprint-based tracking, `UsageLimitMiddleware` on POST /api/documents, `GET /api/usage` endpoint, frontend `UsageDisplay` + `UpgradeCta` components)
 
 ---
 
@@ -88,6 +89,7 @@ something you already rejected for a clear reason.)*
 | 2026-08-25 | `/explain/` reserved, noindex until all 5 quality gates pass | Scaled-content-abuse policy has no volume threshold |
 | 2026-08-26 | Static-in-dist for landing pages | Zero Go changes; existing file server serves them; Vite copies public/ → dist/ on build |
 | 2026-08-26 | React Router routes for static landing pages | SPA fallback when users navigate from within app; static HTML for crawlers |
+| 2026-08-27 | Fingerprint = IP + User-Agent + Accept-Language (SHA256) | No-auth product; browser fingerprint sufficient for MVP usage tracking |
 
 ---
 
@@ -107,6 +109,10 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Explain publish registry + pages: `frontend/seo/explain-pages.json`, `frontend/src/pages/explain-page.jsx`, `frontend/public/explain/*.html`
 - Sitemap: `frontend/public/sitemap.xml`
 - Crawl policy: `frontend/public/robots.txt`
-- Migrations: `migrations/009_share_tokens.sql`, `migrations/010_document_share.sql`, `migrations/011_share_referrals.sql`, `migrations/012_usage_analytics.sql`
+- Migrations: `migrations/009_share_tokens.sql`, `migrations/010_document_share.sql`, `migrations/011_share_referrals.sql`, `migrations/012_usage_analytics.sql`, `migrations/013_usage_tiers.sql`
 - Analytics repo + handler: `internal/repository/analytics.go`, `internal/handlers/analytics.go`
+- Tier service: `internal/services/tier.go`
+- Usage middleware + fingerprint: `internal/handlers/middleware.go` (`UsageLimitMiddleware`), `internal/handlers/fingerprint.go`
+- Usage API: `internal/handlers/usage.go`
+- Frontend usage components: `frontend/src/components/usage-display.jsx`, `frontend/src/components/upgrade-cta.jsx`
 - Task/chunk docs: `docs/`
