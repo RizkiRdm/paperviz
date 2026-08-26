@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-26 — Chunk 5.3 merged: Programmatic SEO foundation (`/explain/{slug}` publish registry, crawlable explain page, `/sitemap.xml`, robots.txt Sitemap line, default noindex on `/explain/*`)
+**Last updated:** 2026-08-26 — Chunk 6.1 merged: Usage Measurement (`GET /api/analytics` endpoint, `analytics_events` table, `processing_time_ms` on documents, aggregate metrics: papers/figures/processing time/returning users/papers per user/share events/comparison events/success rate)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Chunk 6.1 — Usage Measurement (next chunk)
+- **Working on:** Chunk 6.2 — Usage Limits (next chunk)
 - **Active task file:** none yet
 - **Blocked on / pending decision:** none
-- **Next action if resuming a new session:** inspect current document create/stats/list endpoints and define minimal analytics fields for papers analyzed, returning users, share events, and comparison events
+- **Next action if resuming a new session:** design usage-based tiers (Free/Pro/Research) with limits on papers/month, figure analysis, comparison, export. Do not hard-code pricing yet.
 
 ---
 
@@ -107,5 +107,6 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Explain publish registry + pages: `frontend/seo/explain-pages.json`, `frontend/src/pages/explain-page.jsx`, `frontend/public/explain/*.html`
 - Sitemap: `frontend/public/sitemap.xml`
 - Crawl policy: `frontend/public/robots.txt`
-- Migrations: `migrations/009_share_tokens.sql`, `migrations/010_document_share.sql`, `migrations/011_share_referrals.sql`
+- Migrations: `migrations/009_share_tokens.sql`, `migrations/010_document_share.sql`, `migrations/011_share_referrals.sql`, `migrations/012_usage_analytics.sql`
+- Analytics repo + handler: `internal/repository/analytics.go`, `internal/handlers/analytics.go`
 - Task/chunk docs: `docs/`
