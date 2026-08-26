@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-25 — Chunk 5.1 merged: SEO architecture (URL taxonomy locked, true SPA fallback + API 404 contract in router dispatcher, noindex on share URLs)
+**Last updated:** 2026-08-26 — Chunk 5.2 merged: Product landing pages (3 SEO pages, robots.txt, React Router routes)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Chunk 5.2 — Product Pages (next chunk)
+- **Working on:** Chunk 5.3 — Programmatic SEO (next chunk)
 - **Active task file:** none yet
 - **Blocked on / pending decision:** none
-- **Next action if resuming a new session:** read `docs/seo-architecture.md` first — 5.2 builds the three KEEP landing pages (research-paper-summarizer, figure-explanation, compare-research-papers); ADR needed: static-in-dist vs Go templates; prerequisites listed in its §8/non-goals
+- **Next action if resuming a new session:** read `docs/seo-architecture.md` §6 — 5.3 builds `/explain/{slug}` pages behind quality gates; needs sitemap.xml generation, noindex→index promotion logic, copyright gate
 
 ---
 
@@ -47,6 +47,7 @@ something that should stay frozen.)*
 - Chunk 4.2 Shareable Paper Explanation — done 2026-08-25 (`POST/DELETE /api/documents/{id}/share`, `PATCH /api/documents/{id}/visibility`, public `GET /share/doc/{token}`, `/share/doc/:shareToken` page)
 - Chunk 4.3 Product-Led Referral Loop — done 2026-08-25 (`share_visits`/`share_conversions` counters on documents+charts, visit++ on public share GETs, `POST /api/share-referrals` conversion beacon, CTA links carry `?ref=`, upload page persists ref via `localStorage.paperviz_ref`)
 - Chunk 5.1 SEO Architecture — done 2026-08-25 (`docs/seo-architecture.md` = IA source of truth; router NotFound is now a real dispatcher: `/api/*`→404 JSON, static files served, GET/HEAD→SPA fallback; `X-Robots-Tag: noindex, nofollow` on share GET/HEAD)
+- Chunk 5.2 Product Pages — done 2026-08-26 (3 static HTML landing pages in `frontend/public/`: research-paper-summarizer, figure-explanation, compare-research-papers; `robots.txt`; React Router routes for SPA fallback; inline styles matching DESIGN.md; structured data + OG tags)
 
 ---
 
@@ -84,6 +85,8 @@ something you already rejected for a clear reason.)*
 | 2026-08-25 | Crawlable pages must be server-delivered full HTML | Zero-JS AI crawlers + social scrapers; WRS render lag |
 | 2026-08-25 | Share URLs: X-Robots-Tag header, never robots.txt Disallow | Disallow hides noindex from crawler; header works on CSR pages |
 | 2026-08-25 | `/explain/` reserved, noindex until all 5 quality gates pass | Scaled-content-abuse policy has no volume threshold |
+| 2026-08-26 | Static-in-dist for landing pages | Zero Go changes; existing file server serves them; Vite copies public/ → dist/ on build |
+| 2026-08-26 | React Router routes for static landing pages | SPA fallback when users navigate from within app; static HTML for crawlers |
 
 ---
 
@@ -99,5 +102,7 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Referral counters: repo methods in `internal/repository/documents.go` + `charts.go`, service in `internal/services/share.go` (`TrackReferralConversion`), route `POST /api/share-referrals`
 - Ref attribution: `frontend/src/pages/upload-page.jsx` (localStorage capture + beacon), CTA links on both share pages
 - SEO IA + URL-space contract: `docs/seo-architecture.md`; router dispatcher `internal/handlers/router.go` (`spaNotFound`, `noindexMiddleware`)
+- Landing pages (static HTML): `frontend/public/research-paper-summarizer.html`, `frontend/public/figure-explanation.html`, `frontend/public/compare-research-papers.html`
+- Crawl policy: `frontend/public/robots.txt`
 - Migrations: `migrations/009_share_tokens.sql`, `migrations/010_document_share.sql`, `migrations/011_share_referrals.sql`
 - Task/chunk docs: `docs/`
