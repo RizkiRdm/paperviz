@@ -24,6 +24,9 @@ func noindexMiddleware(next http.Handler) http.Handler {
 // spaNotFound dispatches unmatched paths per plan chunk 5.1 §1.7: API prefix gets 404 JSON, existing static files are served, GET/HEAD fall back to the SPA shell, other methods get 404.
 func spaNotFound(staticDir string, fileServer http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/explain/") {
+			w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			writeError(w, http.StatusNotFound, "not_found")
 			return

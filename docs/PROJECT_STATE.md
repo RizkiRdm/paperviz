@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-26 — Chunk 5.2 merged: Product landing pages (3 SEO pages, robots.txt, React Router routes)
+**Last updated:** 2026-08-26 — Chunk 5.3 merged: Programmatic SEO foundation (`/explain/{slug}` publish registry, crawlable explain page, `/sitemap.xml`, robots.txt Sitemap line, default noindex on `/explain/*`)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Chunk 5.3 — Programmatic SEO (next chunk)
+- **Working on:** Chunk 6.1 — Usage Measurement (next chunk)
 - **Active task file:** none yet
 - **Blocked on / pending decision:** none
-- **Next action if resuming a new session:** read `docs/seo-architecture.md` §6 — 5.3 builds `/explain/{slug}` pages behind quality gates; needs sitemap.xml generation, noindex→index promotion logic, copyright gate
+- **Next action if resuming a new session:** inspect current document create/stats/list endpoints and define minimal analytics fields for papers analyzed, returning users, share events, and comparison events
 
 ---
 
@@ -48,6 +48,7 @@ something that should stay frozen.)*
 - Chunk 4.3 Product-Led Referral Loop — done 2026-08-25 (`share_visits`/`share_conversions` counters on documents+charts, visit++ on public share GETs, `POST /api/share-referrals` conversion beacon, CTA links carry `?ref=`, upload page persists ref via `localStorage.paperviz_ref`)
 - Chunk 5.1 SEO Architecture — done 2026-08-25 (`docs/seo-architecture.md` = IA source of truth; router NotFound is now a real dispatcher: `/api/*`→404 JSON, static files served, GET/HEAD→SPA fallback; `X-Robots-Tag: noindex, nofollow` on share GET/HEAD)
 - Chunk 5.2 Product Pages — done 2026-08-26 (3 static HTML landing pages in `frontend/public/`: research-paper-summarizer, figure-explanation, compare-research-papers; `robots.txt`; React Router routes for SPA fallback; inline styles matching DESIGN.md; structured data + OG tags)
+- Chunk 5.3 Programmatic SEO foundation — done 2026-08-26 (`frontend/seo/explain-pages.json` publish registry, `/explain/:slug` route + `ExplainPage`, crawlable `frontend/public/explain/sleep-quality-executive-function.html`, `/sitemap.xml`, `robots.txt` Sitemap line, default `X-Robots-Tag: noindex, nofollow` on `/explain/*`)
 
 ---
 
@@ -103,6 +104,8 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Ref attribution: `frontend/src/pages/upload-page.jsx` (localStorage capture + beacon), CTA links on both share pages
 - SEO IA + URL-space contract: `docs/seo-architecture.md`; router dispatcher `internal/handlers/router.go` (`spaNotFound`, `noindexMiddleware`)
 - Landing pages (static HTML): `frontend/public/research-paper-summarizer.html`, `frontend/public/figure-explanation.html`, `frontend/public/compare-research-papers.html`
+- Explain publish registry + pages: `frontend/seo/explain-pages.json`, `frontend/src/pages/explain-page.jsx`, `frontend/public/explain/*.html`
+- Sitemap: `frontend/public/sitemap.xml`
 - Crawl policy: `frontend/public/robots.txt`
 - Migrations: `migrations/009_share_tokens.sql`, `migrations/010_document_share.sql`, `migrations/011_share_referrals.sql`
 - Task/chunk docs: `docs/`

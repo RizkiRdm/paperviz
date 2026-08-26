@@ -1,0 +1,16 @@
+{
+  "pages": [
+    {
+      "slug": "sleep-quality-executive-function",
+      "status": "published",
+      "title": "Sleep quality and executive function — explained",
+      "description": "Plain-language explanation of how sleep quality relates to executive function, with source attribution and research context.",
+      "lastmod": "2026-08-26",
+      "source": {
+        "paperTitle": "Moderating role of sleep quality in cognitive load and executive function",
+        "authors": ["Research example authors"],
+        "url": "https://example.org/paper"
+      }
+    }
+  ]
+}
