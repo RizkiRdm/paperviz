@@ -1,0 +1,58 @@
+{
+  "stage": "interview",
+  "title": "Chunk 6.3 — Cost Model",
+  "goalSlug": "cost-model",
+  "questions": [
+    {
+      "id": "scope",
+      "prompt": "What should be in scope for the cost model?",
+      "description": "Based on roadmap: estimate LLM cost, PDF processing cost, storage, bandwidth, infra, support. Calculate cost per paper, gross margin, max free-tier abuse.",
+      "answerMode": "multi",
+      "recommendedAnswer": "All cost drivers: Gemini API calls, PDF extraction, SQLite storage, bandwidth, server infra, support overhead. Model by operation type.",
+      "options": [
+        { "id": "full", "label": "Full cost model (all drivers)" },
+        { "id": "llm-only", "label": "LLM costs only" },
+        { "id": "baseline", "label": "Baseline estimates only (no detailed breakdown)" }
+      ],
+      "required": true
+    },
+    {
+      "id": "operations",
+      "prompt": "Which operations should have individual cost models?",
+      "description": "Roadmap says: single-paper analysis, figure analysis, comparison, bulk analysis, API, MCP",
+      "answerMode": "multi",
+      "recommendedAnswer": "Single-paper analysis, figure analysis, paper comparison. API/MCP deferred until those features ship.",
+      "options": [
+        { "id": "current", "label": "Current operations only (paper, figures, comparison)" },
+        { "id": "all", "label": "All including future API/MCP" },
+        { "id": "minimal", "label": "Just per-paper average" }
+      ],
+      "required": true
+    },
+    {
+      "id": "output",
+      "prompt": "What format should the cost model take?",
+      "description": "Document, spreadsheet-like markdown table, or interactive dashboard?",
+      "answerMode": "single",
+      "recommendedAnswer": "Markdown document with tables — fits existing docs/ pattern, version-controlled, easy to update.",
+      "options": [
+        { "id": "markdown", "label": "Markdown document (docs/cost-model.md)" },
+        { "id": "spreadsheet", "label": "CSV/spreadsheet format" },
+        { "id": "both", "label": "Markdown + CSV export" }
+      ],
+      "required": true
+    },
+    {
+      "id": "pricing-tiers",
+      "prompt": "Should the cost model include tier-specific (Free/Pro/Research) margin analysis?",
+      "description": "Compare cost-to-serve vs assumed revenue per tier",
+      "answerMode": "single",
+      "recommendedAnswer": "Yes — margin analysis per tier validates whether current tier limits are economically viable.",
+      "options": [
+        { "id": "yes", "label": "Yes, include tier margin analysis" },
+        { "id": "no", "label": "No, keep it operation-focused" }
+      ],
+      "required": true
+    }
+  ]
+}
