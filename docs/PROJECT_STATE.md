@@ -16,7 +16,7 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-27 — Chunk 6.2 merged: Usage Limits (Free/Pro/Research tiers, `user_tiers` table, fingerprint-based tracking, `UsageLimitMiddleware`, `GET /api/usage`, frontend `UsageDisplay` + `UpgradeCta` components)
+**Last updated:** 2026-08-28 — Chunk 6.3 merged: Cost Model (`docs/cost-model.md` — Gemini API pricing analysis, per-operation cost breakdown, tier margin analysis, storage/bandwidth estimates, sensitivity analysis)
 
 ---
 
@@ -50,6 +50,7 @@ something that should stay frozen.)*
 - Chunk 5.2 Product Pages — done 2026-08-26 (3 static HTML landing pages in `frontend/public/`: research-paper-summarizer, figure-explanation, compare-research-papers; `robots.txt`; React Router routes for SPA fallback; inline styles matching DESIGN.md; structured data + OG tags)
 - Chunk 5.3 Programmatic SEO foundation — done 2026-08-26 (`frontend/seo/explain-pages.json` publish registry, `/explain/:slug` route + `ExplainPage`, crawlable `frontend/public/explain/sleep-quality-executive-function.html`, `/sitemap.xml`, `robots.txt` Sitemap line, default `X-Robots-Tag: noindex, nofollow` on `/explain/*`)
 - Chunk 6.2 Usage Limits — done 2026-08-27 (Free/Pro/Research tiers, `user_tiers` table, fingerprint-based tracking, `UsageLimitMiddleware` on POST /api/documents, `GET /api/usage` endpoint, frontend `UsageDisplay` + `UpgradeCta` components)
+- Chunk 6.3 Cost Model — done 2026-08-28 (`docs/cost-model.md` — Gemini API pricing analysis, per-operation cost breakdown, tier margin analysis, storage/bandwidth estimates, sensitivity analysis)
 
 ---
 
@@ -116,3 +117,4 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Usage API: `internal/handlers/usage.go`
 - Frontend usage components: `frontend/src/components/usage-display.jsx`, `frontend/src/components/upgrade-cta.jsx`
 - Task/chunk docs: `docs/`
+- Cost model: `docs/cost-model.md`
