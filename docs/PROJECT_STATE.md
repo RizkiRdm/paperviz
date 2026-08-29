@@ -16,7 +16,7 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-29 — Chunk 7.1 merged: Structured Research API (`docs/structured-research-api.md` — comprehensive API documentation for all endpoints)
+**Last updated:** 2026-08-29 — Chunk 7.2 merged: Canonical Research Output Contract (`docs/canonical-research-output-contract.md` — 15 entity schemas with provenance and uncertainty models)
 
 ---
 
@@ -53,6 +53,7 @@ something that should stay frozen.)*
 - Chunk 6.3 Cost Model — done 2026-08-28 (`docs/cost-model.md` — Gemini API pricing analysis, per-operation cost breakdown, tier margin analysis, storage/bandwidth estimates, sensitivity analysis)
 - Chunk 6.4 Pricing & Packaging Experiment — done 2026-08-29 (`docs/pricing-strategy.md` — 3-tier pricing, experiment design; `frontend/src/pages/pricing-page.jsx` — 3-column pricing page; conversion tracking endpoints)
 - Chunk 7.1 Structured Research API — done 2026-08-29 (`docs/structured-research-api.md` — comprehensive API documentation for all endpoints)
+- Chunk 7.2 Canonical Research Output Contract — done 2026-08-29 (`docs/canonical-research-output-contract.md` — 15 entity schemas with provenance and uncertainty models)
 
 ---
 
@@ -127,3 +128,4 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Pricing page: `frontend/src/pages/pricing-page.jsx`
 - Conversion tracking: `internal/handlers/analytics.go` (`TrackPricingView`, `TrackUpgradeIntent`)
 - Structured Research API docs: `docs/structured-research-api.md`
+- Canonical Research Output Contract: `docs/canonical-research-output-contract.md`
