@@ -1,4 +1,5 @@
 // Upgrade CTA — shown when user has reached their plan limit.
+import { Link } from "react-router-dom"
 import { Button } from "./ui/button"
 
 export default function UpgradeCta() {
@@ -12,10 +13,7 @@ export default function UpgradeCta() {
       </p>
       <div className="flex items-center justify-center gap-3">
         <Button variant="primary" asChild>
-          <a href="#">Upgrade to Pro</a>
-        </Button>
-        <Button variant="secondary" asChild>
-          <a href="#">Upgrade to Research</a>
+          <Link to="/pricing">View Plans</Link>
         </Button>
       </div>
     </div>
