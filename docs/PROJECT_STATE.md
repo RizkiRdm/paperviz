@@ -16,7 +16,7 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-28 — Chunk 6.3 merged: Cost Model (`docs/cost-model.md` — Gemini API pricing analysis, per-operation cost breakdown, tier margin analysis, storage/bandwidth estimates, sensitivity analysis)
+**Last updated:** 2026-08-29 — Chunk 7.1 merged: Structured Research API (`docs/structured-research-api.md` — comprehensive API documentation for all endpoints)
 
 ---
 
@@ -51,6 +51,8 @@ something that should stay frozen.)*
 - Chunk 5.3 Programmatic SEO foundation — done 2026-08-26 (`frontend/seo/explain-pages.json` publish registry, `/explain/:slug` route + `ExplainPage`, crawlable `frontend/public/explain/sleep-quality-executive-function.html`, `/sitemap.xml`, `robots.txt` Sitemap line, default `X-Robots-Tag: noindex, nofollow` on `/explain/*`)
 - Chunk 6.2 Usage Limits — done 2026-08-27 (Free/Pro/Research tiers, `user_tiers` table, fingerprint-based tracking, `UsageLimitMiddleware` on POST /api/documents, `GET /api/usage` endpoint, frontend `UsageDisplay` + `UpgradeCta` components)
 - Chunk 6.3 Cost Model — done 2026-08-28 (`docs/cost-model.md` — Gemini API pricing analysis, per-operation cost breakdown, tier margin analysis, storage/bandwidth estimates, sensitivity analysis)
+- Chunk 6.4 Pricing & Packaging Experiment — done 2026-08-29 (`docs/pricing-strategy.md` — 3-tier pricing, experiment design; `frontend/src/pages/pricing-page.jsx` — 3-column pricing page; conversion tracking endpoints)
+- Chunk 7.1 Structured Research API — done 2026-08-29 (`docs/structured-research-api.md` — comprehensive API documentation for all endpoints)
 
 ---
 
@@ -91,6 +93,9 @@ something you already rejected for a clear reason.)*
 | 2026-08-26 | Static-in-dist for landing pages | Zero Go changes; existing file server serves them; Vite copies public/ → dist/ on build |
 | 2026-08-26 | React Router routes for static landing pages | SPA fallback when users navigate from within app; static HTML for crawlers |
 | 2026-08-27 | Fingerprint = IP + User-Agent + Accept-Language (SHA256) | No-auth product; browser fingerprint sufficient for MVP usage tracking |
+| 2026-08-29 | Pro tier $29/month for 50 papers | 52% margin at $0.30/paper cost; validates willingness to pay |
+| 2026-08-29 | Research tier = "Contact us" (no fixed price) | Avoids unprofitable fixed pricing; custom for high-volume users |
+| 2026-08-29 | Upgrade flow = waitlist/email capture | No payment processing yet; measures intent before building billing |
 
 ---
 
@@ -118,3 +123,7 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Frontend usage components: `frontend/src/components/usage-display.jsx`, `frontend/src/components/upgrade-cta.jsx`
 - Task/chunk docs: `docs/`
 - Cost model: `docs/cost-model.md`
+- Pricing strategy: `docs/pricing-strategy.md`
+- Pricing page: `frontend/src/pages/pricing-page.jsx`
+- Conversion tracking: `internal/handlers/analytics.go` (`TrackPricingView`, `TrackUpgradeIntent`)
+- Structured Research API docs: `docs/structured-research-api.md`
