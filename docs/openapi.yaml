@@ -1,0 +1,1748 @@
+openapi: "3.1.0"
+info:
+  title: "PaperViz API"
+  version: "0.1.0"
+  description: |
+    Research evidence understanding platform. Upload academic papers (PDF or pasted text), receive simplified-language summaries with re-visualized charts, and compare findings across papers.
+
+    ## Authentication
+
+    PaperViz uses session-based authentication via an httpOnly cookie (`session_token`, 7-day expiry).
+    - **Signup/Login** creates a session cookie
+    - **No API keys** — cookie-based authentication only
+    - **Protected endpoints** require a valid session cookie
+
+    ## Rate Limits
+
+    | Endpoint | Limit | Window |
+    |----------|-------|--------|
+    | `POST /api/documents` | 1 request | 30 seconds |
+    | All other endpoints | No limit | — |
+
+    Rate limits are enforced per IP fingerprint (SHA256 of IP + User-Agent + Accept-Language).
+
+    ## Usage Limits
+
+    | Tier | Monthly Paper Limit |
+    |------|---------------------|
+    | Free | 5 papers |
+    | Pro | Higher limit |
+    | Research | Highest limit |
+
+    Limits reset on the 1st of each month.
+
+    ## Error Format
+
+    All errors follow a consistent format:
+
+    ```json
+    { "error": "error_code" }
+    ```
+
+    | Code | HTTP Status | Meaning |
+    |------|-------------|---------|
+    | `not_found` | 404 | Resource doesn't exist |
+    | `invalid_json` | 400 | Request body is malformed JSON |
+    | `rate_limit_exceeded` | 429 | Too many requests (wait and retry) |
+    | `unauthenticated` | 401 | Authentication required |
+    | `unauthorized` | 401 | Authentication required |
+    | `forbidden` | 403 | Insufficient permissions |
+    | `internal_error` | 500 | Server error |
+    | `email_taken` | 409 | Email already registered |
+    | `invalid_email` | 400 | Malformed email address |
+    | `password_too_short` | 400 | Password < 8 characters |
+    | `file_too_large` | 400 | Upload exceeds 20 MiB |
+    | `missing_input` | 400 | Neither file nor text provided |
+    | `invalid_file_type` | 400 | Uploaded file is not a valid PDF |
+    | `invalid_reading_level` | 400 | Must be "simplified" or "eli5" |
+    | `no_text_layer` | 422 | PDF has no extractable text |
+    | `name_required` | 400 | Collection name is empty |
+    | `document_id_required` | 400 | Document ID is empty |
+    | `title_required` | 400 | Title is empty |
+    | `monthly limit reached` | 429 | Paper limit reached for tier |
+    | `document_ids_must_be_2_to_10` | 400 | Comparison requires 2-10 docs |
+    | `document_not_found` | 404 | Document for comparison not found |
+    | `extraction_failed` | 500 | Paper summary extraction failed |
+    | `comparison_failed` | 500 | Paper comparison failed |
+    | `invalid_visibility` | 400 | Visibility must be unlisted/public |
+    | `invalid_ref` | 400 | Referral token is empty |
+  contact:
+    name: PaperViz
+    url: https://paperviz.com
+  license:
+    name: MIT
+
+servers:
+  - url: https://paperviz.com
+    description: Production
+
+security:
+  - sessionCookie: []
+
+paths:
+  /api/auth/signup:
+    post:
+      operationId: signup
+      summary: "Create a new user account"
+      description: "Register with email and password. Creates a session cookie (httpOnly, 7-day expiry) on success."
+      tags: ["Authentication"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+            examples:
+              basic:
+                summary: "Basic signup"
+                value:
+                  email: "user@example.com"
+                  password: "securepass123"
+      responses:
+        "201":
+          description: "Account created, session cookie set"
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: "session_token=abc123; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_email:
+                  summary: "Invalid email"
+                  value:
+                    error: "invalid_email"
+                password_too_short:
+                  summary: "Password too short"
+                  value:
+                    error: "password_too_short"
+        "409":
+          description: "Email already taken"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/login:
+    post:
+      operationId: login
+      summary: "Authenticate an existing user"
+      description: "Login with email and password. Creates a session cookie (httpOnly, 7-day expiry) on success."
+      tags: ["Authentication"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              basic:
+                summary: "Basic login"
+                value:
+                  email: "user@example.com"
+                  password: "securepass123"
+      responses:
+        "200":
+          description: "Login successful, session cookie set"
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: "session_token=abc123; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "400":
+          description: "Invalid request"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Invalid credentials"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/auth/logout:
+    post:
+      operationId: logout
+      summary: "End current session"
+      description: "Clears the session cookie and invalidates the session."
+      tags: ["Authentication"]
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: "Session ended"
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: "session_token=; Path=/; Max-Age=0"
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/auth/me:
+    get:
+      operationId: getMe
+      summary: "Get current authenticated user"
+      description: "Returns the user associated with the current session cookie."
+      tags: ["Authentication"]
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: "Current user info"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/documents:
+    post:
+      operationId: createDocument
+      summary: "Create a new document for analysis"
+      description: |
+        Upload a PDF (max 20 MiB) or paste text for analysis. The backend extracts text and chart images, then runs simplification, claim verification, chapter detection, and chart generation via Gemini API.
+
+        **Rate limit:** 1 request per 30 seconds per IP fingerprint.
+        **Usage limit:** Monthly paper limit applies per tier (free: 5 papers).
+        Processing runs in the background — poll `GET /api/documents/{id}` until status is `complete`.
+
+        Accepts `multipart/form-data`.
+      tags: ["Documents"]
+      x-rateLimit:
+        limit: 1
+        window: 30
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+            examples:
+              pdf_upload:
+                summary: "Upload PDF"
+                encoding:
+                  file:
+                    contentType: application/pdf
+              paste_text:
+                summary: "Paste text"
+                value:
+                  text: "Your paper text here..."
+                  reading_level: "simplified"
+      responses:
+        "201":
+          description: "Document created, processing started"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateDocumentResponse"
+        "400":
+          description: "Invalid input"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                file_too_large:
+                  summary: "File too large"
+                  value:
+                    error: "file_too_large"
+                missing_input:
+                  summary: "Missing input"
+                  value:
+                    error: "missing_input"
+                invalid_file_type:
+                  summary: "Invalid file type"
+                  value:
+                    error: "invalid_file_type"
+                invalid_reading_level:
+                  summary: "Invalid reading level"
+                  value:
+                    error: "invalid_reading_level"
+        "429":
+          description: "Rate limit exceeded or monthly limit reached"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                rate_limit:
+                  summary: "Rate limit exceeded"
+                  value:
+                    error: "rate_limit_exceeded"
+                monthly_limit:
+                  summary: "Monthly limit reached"
+                  value:
+                    error: "monthly limit reached"
+
+    get:
+      operationId: listDocuments
+      summary: "List all documents for authenticated user"
+      description: "Returns paginated list of documents owned by the current user. Requires authentication."
+      tags: ["Documents"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: "Max results per page"
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: "Pagination offset"
+      responses:
+        "200":
+          description: "Paginated document list"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentListResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/documents/compare:
+    post:
+      operationId: compareDocuments
+      summary: "Compare multiple papers"
+      description: "Compare 2-10 documents side-by-side. Extracts structured paper summaries, identifies agreement/disagreement, and generates cross-paper evidence claims."
+      tags: ["Documents"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompareRequest"
+            examples:
+              two_papers:
+                summary: "Compare two papers"
+                value:
+                  document_ids: ["doc_abc123", "doc_def456"]
+      responses:
+        "200":
+          description: "Comparison complete"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comparison"
+        "400":
+          description: "Invalid document count (must be 2-10)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "One or more documents not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: "Extraction or comparison failed"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/documents/stats:
+    get:
+      operationId: getDocumentStats
+      summary: "Get document statistics"
+      description: "Returns aggregate counts for the authenticated user's documents."
+      tags: ["Documents"]
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: "Document statistics"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentStats"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/documents/{id}:
+    get:
+      operationId: getDocument
+      summary: "Get full document with analysis results"
+      description: |
+        Returns the complete document including simplified text, charts, chapters, claim diff, and evidence.
+        Touches `last_accessed_at` to extend the 7-day expiry window.
+      tags: ["Documents"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Document ID (e.g., doc_abc123)"
+      responses:
+        "200":
+          description: "Full document with all analysis results"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateDocumentTitle
+      summary: "Update document title"
+      description: "Change the title of an existing document. Requires authentication and ownership."
+      tags: ["Documents"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTitleRequest"
+      responses:
+        "200":
+          description: "Title updated"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  title:
+                    type: string
+        "400":
+          description: "Invalid input"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteDocument
+      summary: "Delete a document"
+      description: "Permanently delete a document and all associated data. Requires authentication and ownership."
+      tags: ["Documents"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Document deleted"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: ["deleted"]
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/documents/{id}/save:
+    put:
+      operationId: toggleSaved
+      summary: "Toggle saved/bookmark status"
+      description: "Bookmark or unbookmark a document. Requires authentication and ownership."
+      tags: ["Documents"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                saved:
+                  type: boolean
+              required: ["saved"]
+      responses:
+        "200":
+          description: "Saved status updated"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saved:
+                    type: boolean
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/documents/{id}/charts/{chartId}/image:
+    get:
+      operationId: getChartImage
+      summary: "Get chart as binary image"
+      description: "Returns the raw image bytes for a chart captured via image fallback. Content-Type is auto-detected (image/png, image/jpeg, etc.)."
+      tags: ["Documents"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chartId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Binary image data"
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: "Chart not found or no image"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/documents/{id}/charts/{chartId}/share:
+    post:
+      operationId: generateChartShareToken
+      summary: "Generate share link for a chart"
+      description: "Create a shareable token for a specific chart figure. Requires authentication and document ownership."
+      tags: ["Sharing"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chartId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Share token generated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareTokenResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "Not document owner"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Document or chart not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: revokeChartShareToken
+      summary: "Revoke chart share link"
+      description: "Remove the share token for a specific chart. Requires authentication and document ownership."
+      tags: ["Sharing"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: chartId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Share token revoked"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Document or chart not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/documents/{id}/share:
+    post:
+      operationId: generateDocShareToken
+      summary: "Generate share link for entire document"
+      description: "Create a shareable token for the full document. Requires authentication and document ownership."
+      tags: ["Sharing"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Share URL generated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocShareResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: revokeDocShareToken
+      summary: "Revoke document share link"
+      description: "Remove the share token for a document. Requires authentication and document ownership."
+      tags: ["Sharing"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: "Share token revoked"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/documents/{id}/visibility:
+    patch:
+      operationId: updateVisibility
+      summary: "Update document visibility"
+      description: "Change visibility between `public` and `unlisted`. Requires authentication and document ownership."
+      tags: ["Sharing"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVisibilityRequest"
+      responses:
+        "200":
+          description: "Visibility updated"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  visibility:
+                    type: string
+                    enum: ["public", "unlisted", "private"]
+        "400":
+          description: "Invalid visibility value"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /share/fig/{shareToken}:
+    get:
+      operationId: getSharedFigure
+      summary: "Access a shared chart figure"
+      description: "Public endpoint — no authentication required. Returns chart data as JSON or image binary."
+      tags: ["Public Sharing"]
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Shared chart data"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Chart"
+        "404":
+          description: "Share token not found or expired"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    head:
+      operationId: getSharedFigureHead
+      summary: "Check shared chart availability"
+      description: "HEAD request to check if a shared chart exists without downloading it."
+      tags: ["Public Sharing"]
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Chart exists"
+        "404":
+          description: "Share token not found or expired"
+
+  /share/doc/{shareToken}:
+    get:
+      operationId: getSharedPaper
+      summary: "Access a shared paper"
+      description: "Public endpoint — no authentication required. Returns full document JSON (same shape as `GET /api/documents/{id}`)."
+      tags: ["Public Sharing"]
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Shared document data"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "404":
+          description: "Share token not found or expired"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    head:
+      operationId: getSharedPaperHead
+      summary: "Check shared paper availability"
+      description: "HEAD request to check if a shared paper exists without downloading it."
+      tags: ["Public Sharing"]
+      parameters:
+        - name: shareToken
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Paper exists"
+        "404":
+          description: "Share token not found or expired"
+
+  /share-referrals:
+    post:
+      operationId: trackReferral
+      summary: "Track share-to-analysis conversion"
+      description: "Record a referral from a shared link. No authentication required."
+      tags: ["Analytics"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ref:
+                  type: string
+                  description: "Share token value"
+              required: ["ref"]
+      responses:
+        "204":
+          description: "Referral tracked"
+        "400":
+          description: "Invalid ref token"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /analytics:
+    get:
+      operationId: getAnalyticsSummary
+      summary: "Get aggregate analytics summary"
+      description: "Returns aggregate usage analytics for the authenticated user. Requires authentication."
+      tags: ["Analytics"]
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: "Analytics summary"
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/analytics/pricing-view:
+    post:
+      operationId: trackPricingView
+      summary: "Track pricing page view"
+      description: "Record a pricing page view event. No authentication required."
+      tags: ["Analytics"]
+      responses:
+        "204":
+          description: "Pricing view tracked"
+
+  /api/analytics/upgrade-intent:
+    post:
+      operationId: trackUpgradeIntent
+      summary: "Track upgrade CTA click"
+      description: "Record an upgrade intent event. No authentication required."
+      tags: ["Analytics"]
+      responses:
+        "204":
+          description: "Upgrade intent tracked"
+
+  /api/usage:
+    get:
+      operationId: getUsage
+      summary: "Get current usage stats"
+      description: "Returns usage stats for the current fingerprint or authenticated user (tier, papers used, limit, reset date)."
+      tags: ["Usage"]
+      responses:
+        "200":
+          description: "Usage statistics"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageResponse"
+
+  /api/collections:
+    post:
+      operationId: createCollection
+      summary: "Create a collection"
+      description: "Create a named grouping of papers. Requires authentication."
+      tags: ["Collections"]
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCollectionRequest"
+      responses:
+        "201":
+          description: "Collection created"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        "400":
+          description: "Invalid input"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    get:
+      operationId: listCollections
+      summary: "List all collections"
+      description: "Returns all collections owned by the authenticated user. Requires authentication."
+      tags: ["Collections"]
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: "Collection list"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectionListResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/collections/{id}:
+    get:
+      operationId: getCollection
+      summary: "Get collection with documents"
+      description: "Returns a collection with its linked documents. Requires authentication and ownership."
+      tags: ["Collections"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Collection with documents"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectionWithDocuments"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Collection not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: renameCollection
+      summary: "Rename a collection"
+      description: "Change the name of a collection. Requires authentication and ownership."
+      tags: ["Collections"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RenameCollectionRequest"
+      responses:
+        "200":
+          description: "Collection renamed"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+        "400":
+          description: "Invalid input"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Collection not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteCollection
+      summary: "Delete a collection"
+      description: "Permanently delete a collection. Documents are not deleted. Requires authentication and ownership."
+      tags: ["Collections"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Collection deleted"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: ["deleted"]
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Collection not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/collections/{id}/documents:
+    post:
+      operationId: addDocumentToCollection
+      summary: "Add document to collection"
+      description: "Link a document to a collection. Requires authentication and collection ownership."
+      tags: ["Collections"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddDocumentToCollectionRequest"
+      responses:
+        "200":
+          description: "Document added to collection"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: ["added"]
+        "400":
+          description: "Invalid input"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Collection or document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/collections/{id}/documents/{docId}:
+    delete:
+      operationId: removeDocumentFromCollection
+      summary: "Remove document from collection"
+      description: "Unlink a document from a collection. Requires authentication and collection ownership."
+      tags: ["Collections"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: docId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Document removed from collection"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: ["removed"]
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "Collection or document not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session_token
+      description: "httpOnly session cookie set by `/api/auth/login` or `/api/auth/signup`. Expires after 7 days."
+
+  schemas:
+    # ── Auth ──────────────────────────────────────────────────────
+    SignupRequest:
+      type: object
+      required: ["email", "password"]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+
+    LoginRequest:
+      type: object
+      required: ["email", "password"]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "usr_abc123"
+        email:
+          type: string
+          format: email
+
+    # ── Documents ─────────────────────────────────────────────────
+    CreateDocumentRequest:
+      type: object
+      description: "multipart/form-data — provide exactly one of `file` or `text`"
+      properties:
+        file:
+          type: string
+          format: binary
+          description: "PDF file (max 20 MiB)"
+        text:
+          type: string
+          description: "Pasted text content"
+        reading_level:
+          type: string
+          enum: ["simplified", "eli5"]
+          default: "simplified"
+
+    CreateDocumentResponse:
+      type: object
+      properties:
+        document_id:
+          type: string
+          example: "doc_abc123"
+        status:
+          type: string
+          enum: ["processing"]
+
+    Document:
+      type: object
+      description: "Full document with all analysis results"
+      properties:
+        id:
+          type: string
+          example: "doc_abc123"
+        title:
+          type: string
+        status:
+          type: string
+          enum: ["processing", "complete", "failed", "verification_failed"]
+        source_type:
+          type: string
+          enum: ["pdf", "pasted_text"]
+        reading_level:
+          type: string
+          enum: ["simplified", "eli5"]
+        created_at:
+          type: integer
+          description: "Unix timestamp (seconds)"
+        last_accessed_at:
+          type: integer
+          description: "Unix timestamp (seconds)"
+        original_text:
+          type: string
+          description: "Full original text (private, not exposed in public API)"
+        simplified_text:
+          type: ["string", "null"]
+          description: "Markdown-formatted simplified version"
+        error_message:
+          type: ["string", "null"]
+        chart_extraction_degraded:
+          type: boolean
+        processing_stage:
+          type: ["string", "null"]
+          description: "Current pipeline stage (intake, simplify, verify, chapters, charts)"
+        processing_time_ms:
+          type: ["integer", "null"]
+        user_id:
+          type: ["string", "null"]
+        saved:
+          type: boolean
+        visibility:
+          type: string
+          enum: ["public", "unlisted", "private"]
+        share_token:
+          type: ["string", "null"]
+        charts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Chart"
+        chapters:
+          type: array
+          items:
+            $ref: "#/components/schemas/Chapter"
+        claim_diff:
+          oneOf:
+            - $ref: "#/components/schemas/ClaimDiff"
+            - type: "null"
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Evidence"
+
+    UpdateTitleRequest:
+      type: object
+      required: ["title"]
+      properties:
+        title:
+          type: string
+          minLength: 1
+
+    DocumentStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        saved:
+          type: integer
+        collections:
+          type: integer
+
+    DocumentListItem:
+      type: object
+      description: "Lightweight row for paper-history list"
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        created_at:
+          type: integer
+        status:
+          type: string
+          enum: ["processing", "complete", "failed", "verification_failed"]
+        summary_preview:
+          type: string
+        chart_count:
+          type: integer
+        explanation_count:
+          type: integer
+
+    DocumentListResponse:
+      type: object
+      properties:
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentListItem"
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    CompareRequest:
+      type: object
+      required: ["document_ids"]
+      properties:
+        document_ids:
+          type: array
+          items:
+            type: string
+          minItems: 2
+          maxItems: 10
+
+    # ── Charts ────────────────────────────────────────────────────
+    Chart:
+      type: object
+      description: "Re-visualized figure or table from the paper"
+      properties:
+        id:
+          type: string
+          example: "chart_abc123"
+        document_id:
+          type: string
+        source_method:
+          type: string
+          enum: ["data_extracted", "image_fallback", "omitted"]
+        chart_type:
+          type: string
+          enum: ["bar", "line", "pie", "scatter", "area", "radar"]
+        chart_data:
+          oneOf:
+            - type: "object"
+              properties:
+                labels:
+                  type: array
+                  items:
+                    type: string
+                values:
+                  type: array
+                  items:
+                    type: number
+                title:
+                  type: string
+            - type: "null"
+          description: "Recharts-compatible data (null for image_fallback)"
+        annotation:
+          type: ["string", "null"]
+          description: "Plain-language explanation"
+        source_text:
+          type: ["string", "null"]
+          description: "Original text backing this chart"
+        page_number:
+          type: ["integer", "null"]
+          description: "Source page (0 if not applicable)"
+        display_order:
+          type: integer
+        chapter_id:
+          type: ["string", "null"]
+        share_token:
+          type: ["string", "null"]
+        image_url:
+          type: ["string", "null"]
+          description: "URL to chart image (if image_blob exists)"
+
+    # ── Chapters ──────────────────────────────────────────────────
+    Chapter:
+      type: object
+      description: "Detected section of the paper"
+      properties:
+        id:
+          type: string
+          example: "chapter_abc123"
+        document_id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        excerpt:
+          type: string
+        content:
+          type: string
+          description: "Full chapter text (from simplified text)"
+        display_order:
+          type: integer
+
+    # ── ClaimDiff ─────────────────────────────────────────────────
+    ClaimDiff:
+      type: object
+      description: "Claim verification data comparing original vs simplified claims"
+      properties:
+        original_claims:
+          type: array
+          items:
+            type: string
+        simplified_claims:
+          type: array
+          items:
+            type: string
+        mismatch_detected:
+          type: boolean
+        mismatch_detail:
+          type: ["string", "null"]
+
+    # ── Evidence ──────────────────────────────────────────────────
+    Evidence:
+      type: object
+      description: "Evidence linking claims to source material"
+      properties:
+        id:
+          type: string
+          example: "evidence_abc123"
+        paper_id:
+          type: string
+        page:
+          type: ["integer", "null"]
+        figure_id:
+          type: ["string", "null"]
+        table_id:
+          type: ["string", "null"]
+        section:
+          type: ["string", "null"]
+        source_text:
+          type: string
+          description: "Verbatim source text"
+        source_reference:
+          type: string
+          description: "Formatted citation (e.g., 'Page 3, Figure 2')"
+
+    # ── Comparison ────────────────────────────────────────────────
+    Comparison:
+      type: object
+      description: "Structured comparison across multiple papers"
+      properties:
+        papers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaperSummary"
+        dimensions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComparisonDimension"
+        agreement:
+          type: array
+          items:
+            type: string
+        disagreement:
+          type: array
+          items:
+            type: string
+        evidence_claims:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceClaim"
+
+    PaperSummary:
+      type: object
+      description: "Structured fields extracted from a single paper for comparison"
+      properties:
+        document_id:
+          type: string
+        title:
+          type: string
+        research_question:
+          type: string
+        methodology:
+          type: string
+        dataset:
+          type: string
+        sample_size:
+          type: string
+        findings:
+          type: array
+          items:
+            type: string
+        limitations:
+          type: array
+          items:
+            type: string
+        figures:
+          type: array
+          items:
+            type: string
+        evidence:
+          type: array
+          items:
+            type: string
+        conclusions:
+          type: string
+
+    ComparisonDimension:
+      type: object
+      description: "A single dimension of comparison across papers"
+      properties:
+        dimension:
+          type: string
+        values:
+          type: object
+          additionalProperties:
+            type: string
+        notes:
+          type: ["string", "null"]
+
+    EvidenceClaim:
+      type: object
+      description: "A cross-paper claim with per-paper stance"
+      properties:
+        claim:
+          type: string
+        stances:
+          type: object
+          additionalProperties:
+            type: string
+            enum: ["supporting", "contradicting", "unclear"]
+        source_refs:
+          type: object
+          additionalProperties:
+            type: string
+
+    # ── Collections ───────────────────────────────────────────────
+    Collection:
+      type: object
+      description: "A user-created grouping of papers"
+      properties:
+        id:
+          type: string
+          example: "col_abc123"
+        name:
+          type: string
+        created_at:
+          type: integer
+        document_count:
+          type: integer
+
+    CollectionListItem:
+      type: object
+      description: "Lightweight row for collections list"
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_at:
+          type: integer
+        document_count:
+          type: integer
+
+    CollectionWithDocuments:
+      type: object
+      description: "Collection with its linked documents"
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_at:
+          type: integer
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/DocumentListItem"
+
+    CollectionListResponse:
+      type: object
+      properties:
+        collections:
+          type: array
+          items:
+            $ref: "#/components/schemas/CollectionListItem"
+
+    CreateCollectionRequest:
+      type: object
+      required: ["name"]
+      properties:
+        name:
+          type: string
+          minLength: 1
+
+    RenameCollectionRequest:
+      type: object
+      required: ["name"]
+      properties:
+        name:
+          type: string
+          minLength: 1
+
+    AddDocumentToCollectionRequest:
+      type: object
+      required: ["document_id"]
+      properties:
+        document_id:
+          type: string
+
+    # ── Sharing ───────────────────────────────────────────────────
+    ShareTokenResponse:
+      type: object
+      properties:
+        share_token:
+          type: string
+        share_url:
+          type: string
+
+    DocShareResponse:
+      type: object
+      properties:
+        share_url:
+          type: string
+
+    UpdateVisibilityRequest:
+      type: object
+      required: ["visibility"]
+      properties:
+        visibility:
+          type: string
+          enum: ["unlisted", "public"]
+
+    # ── Usage ─────────────────────────────────────────────────────
+    UsageResponse:
+      type: object
+      properties:
+        tier:
+          type: string
+          enum: ["free", "pro", "research"]
+        papers_used:
+          type: integer
+        limit:
+          type: integer
+        reset_date:
+          type: string
+          format: date
+          example: "2026-09-01"
+
+    # ── Error ─────────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      description: "Standard error response"
+      properties:
+        error:
+          type: string
+          description: "Machine-readable error code"
+      required: ["error"]
