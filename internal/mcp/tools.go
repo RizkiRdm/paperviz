@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -108,6 +109,7 @@ type ChartInfo struct {
 	PageNumber   int             `json:"page_number,omitempty" jsonschema:"description=Source page in original document (0 if not applicable)"`
 	DisplayOrder int             `json:"display_order" jsonschema:"description=Ordering within document"`
 	ChapterID    string          `json:"chapter_id,omitempty" jsonschema:"description=Linked chapter ID"`
+	ImageURL     string          `json:"image_url,omitempty" jsonschema:"description=Base64-encoded original chart image (present for image_fallback charts)"`
 }
 
 // FiguresResult is the output of the get_figures tool.
@@ -272,6 +274,9 @@ func handleGetFigures(ctx context.Context, db *sql.DB, args DocIDInput) (*mcp.Ca
 		}
 		if c.ChapterID != nil {
 			info.ChapterID = *c.ChapterID
+		}
+		if len(c.ImageBlob) > 0 {
+			info.ImageURL = base64.StdEncoding.EncodeToString(c.ImageBlob)
 		}
 		chartInfos = append(chartInfos, info)
 	}

@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-31 — Chunk 7.4 merged: MCP Server (`cmd/mcp/`, `internal/mcp/` — 6 research tools via official Go SDK, stdio transport)
+**Last updated:** 2026-08-31 — Chunk 7.5 merged: Human/Agent Capability Parity (MCP↔REST parity map, image_url in MCP get_figures, parity documentation)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Chunk 7.5 — Human/Agent Capability Parity
+- **Working on:** Chunk 7.6 — MCP Usage, Security & Cost Controls
 - **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** Map MCP tools to REST API endpoints, verify parity
+- **Next action if resuming:** Implement API-key/token handling, per-user usage accounting, rate limits for MCP
 
 ---
 
@@ -56,6 +56,7 @@ something that should stay frozen.)*
 - Chunk 7.2 Canonical Research Output Contract — done 2026-08-29 (`docs/canonical-research-output-contract.md` — 15 entity schemas with provenance and uncertainty models)
 - Chunk 7.3 OpenAPI — done 2026-08-31 (`docs/openapi.yaml` — 1748-line OpenAPI 3.1.0 spec, 34 endpoints, 31 component schemas, session cookie auth, rate limits, error codes)
 - Chunk 7.4 MCP — done 2026-08-31 (`cmd/mcp/main.go`, `internal/mcp/` — 6 research tools: analyze_paper, get_summary, get_figures, get_claims, get_evidence, compare_papers; official Go SDK, stdio transport)
+- Chunk 7.5 Human/Agent Capability Parity — done 2026-08-31 (`docs/mcp-parity.md` — MCP↔REST parity map; `internal/mcp/tools.go` — added image_url base64 to get_figures; documented intentionally unavailable agent operations)
 
 ---
 
@@ -133,3 +134,4 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Canonical Research Output Contract: `docs/canonical-research-output-contract.md`
 - OpenAPI spec: `docs/openapi.yaml`
 - MCP server: `cmd/mcp/main.go`, `internal/mcp/server.go`, `internal/mcp/tools.go`
+- MCP↔REST parity map: `docs/mcp-parity.md`
