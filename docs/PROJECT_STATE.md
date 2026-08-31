@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-29 — Chunk 7.2 merged: Canonical Research Output Contract (`docs/canonical-research-output-contract.md` — 15 entity schemas with provenance and uncertainty models)
+**Last updated:** 2026-08-31 — Chunk 7.4 merged: MCP Server (`cmd/mcp/`, `internal/mcp/` — 6 research tools via official Go SDK, stdio transport)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** none — awaiting next task
+- **Working on:** Chunk 7.5 — Human/Agent Capability Parity
 - **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming a new session:** ready for new work
+- **Next action if resuming:** Map MCP tools to REST API endpoints, verify parity
 
 ---
 
@@ -54,6 +54,8 @@ something that should stay frozen.)*
 - Chunk 6.4 Pricing & Packaging Experiment — done 2026-08-29 (`docs/pricing-strategy.md` — 3-tier pricing, experiment design; `frontend/src/pages/pricing-page.jsx` — 3-column pricing page; conversion tracking endpoints)
 - Chunk 7.1 Structured Research API — done 2026-08-29 (`docs/structured-research-api.md` — comprehensive API documentation for all endpoints)
 - Chunk 7.2 Canonical Research Output Contract — done 2026-08-29 (`docs/canonical-research-output-contract.md` — 15 entity schemas with provenance and uncertainty models)
+- Chunk 7.3 OpenAPI — done 2026-08-31 (`docs/openapi.yaml` — 1748-line OpenAPI 3.1.0 spec, 34 endpoints, 31 component schemas, session cookie auth, rate limits, error codes)
+- Chunk 7.4 MCP — done 2026-08-31 (`cmd/mcp/main.go`, `internal/mcp/` — 6 research tools: analyze_paper, get_summary, get_figures, get_claims, get_evidence, compare_papers; official Go SDK, stdio transport)
 
 ---
 
@@ -129,3 +131,5 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Conversion tracking: `internal/handlers/analytics.go` (`TrackPricingView`, `TrackUpgradeIntent`)
 - Structured Research API docs: `docs/structured-research-api.md`
 - Canonical Research Output Contract: `docs/canonical-research-output-contract.md`
+- OpenAPI spec: `docs/openapi.yaml`
+- MCP server: `cmd/mcp/main.go`, `internal/mcp/server.go`, `internal/mcp/tools.go`
