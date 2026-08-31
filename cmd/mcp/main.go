@@ -70,6 +70,11 @@ func main() {
 		migrationsDir = "migrations"
 	}
 
+	papervizAPIKey := os.Getenv("PAPERVIZ_API_KEY")
+	if papervizAPIKey == "" {
+		log.Fatal("PAPERVIZ_API_KEY environment variable is required")
+	}
+
 	migrations, err := loadMigrations(migrationsDir)
 	if err != nil {
 		log.Fatalf("failed to load migrations: %v", err)
@@ -83,9 +88,9 @@ func main() {
 
 	gemini := external.NewGeminiClient(geminiAPIKey, geminiModel)
 
-	server := papervizMCP.NewMCPServer(db, gemini)
+	srv := papervizMCP.NewMCPServer(db, gemini, papervizAPIKey)
 
-	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
+	if err := srv.Server().Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatalf("MCP server failed: %v", err)
 	}
 }

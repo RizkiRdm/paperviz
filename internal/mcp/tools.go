@@ -10,53 +10,51 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"paperviz/internal/external"
 	"paperviz/internal/repository"
 	"paperviz/internal/services"
 )
 
-// registerTools wires all 6 MCP tools to the server.
-func registerTools(server *mcp.Server, db *sql.DB, gemini *external.GeminiClient) {
+func registerTools(server *mcp.Server, srv *MCPServer) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "analyze_paper",
 		Description: "Submit a paper for analysis. Accepts raw text, runs the full simplification + verification + chart pipeline, and returns the document ID once processing begins.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args AnalyzePaperInput) (*mcp.CallToolResult, AnalysisResult, error) {
-		return handleAnalyzePaper(ctx, db, gemini, args)
+		return handleAnalyzePaper(ctx, srv, args)
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_summary",
 		Description: "Retrieve the simplified text and detected chapters for an analyzed paper.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args DocIDInput) (*mcp.CallToolResult, SummaryResult, error) {
-		return handleGetSummary(ctx, db, args)
+		return handleGetSummary(ctx, srv, args)
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_figures",
 		Description: "Retrieve re-visualized charts and figures for an analyzed paper.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args DocIDInput) (*mcp.CallToolResult, FiguresResult, error) {
-		return handleGetFigures(ctx, db, args)
+		return handleGetFigures(ctx, srv, args)
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_claims",
 		Description: "Retrieve claim verification data comparing original vs simplified text for a paper.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args DocIDInput) (*mcp.CallToolResult, ClaimsResult, error) {
-		return handleGetClaims(ctx, db, args)
+		return handleGetClaims(ctx, srv, args)
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_evidence",
 		Description: "Retrieve evidence references linking claims to source material for a paper.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args DocIDInput) (*mcp.CallToolResult, EvidenceResult, error) {
-		return handleGetEvidence(ctx, db, args)
+		return handleGetEvidence(ctx, srv, args)
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "compare_papers",
 		Description: "Generate a structured comparison across 2+ analyzed papers. Returns side-by-side dimensions, agreements, disagreements, and cross-paper evidence claims.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args ComparePapersInput) (*mcp.CallToolResult, CompareResult, error) {
-		return handleComparePapers(ctx, db, gemini, args)
+		return handleComparePapers(ctx, srv, args)
 	})
 }
 
@@ -163,13 +161,35 @@ type CompareResult struct {
 // --- Tool handlers ---
 
 // handleAnalyzePaper runs the full pipeline for pasted text and returns the document ID.
-func handleAnalyzePaper(ctx context.Context, db *sql.DB, gemini *external.GeminiClient, args AnalyzePaperInput) (*mcp.CallToolResult, AnalysisResult, error) {
+func handleAnalyzePaper(ctx context.Context, srv *MCPServer, args AnalyzePaperInput) (*mcp.CallToolResult, AnalysisResult, error) {
 	if args.Text == "" {
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: `{"error":"text is required"}`}},
 			IsError: true,
 		}, AnalysisResult{}, nil
 	}
+
+	if len(args.Text) > 500*1024 {
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf(`{"error":"%s"}`, ErrSizeLimit.Message)}},
+			IsError: true,
+		}, AnalysisResult{}, nil
+	}
+
+	if !srv.rateLimiter.AllowAnalyze(srv.apiKey) {
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf(`{"error":"%s"}`, ErrRateLimited.Message)}},
+			IsError: true,
+		}, AnalysisResult{}, nil
+	}
+
+	if !srv.jobLimiter.Acquire(srv.apiKey) {
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf(`{"error":"%s"}`, ErrJobLimit.Message)}},
+			IsError: true,
+		}, AnalysisResult{}, nil
+	}
+	defer srv.jobLimiter.Release(srv.apiKey)
 
 	readingLevel := args.ReadingLevel
 	if readingLevel == "" {
@@ -182,8 +202,7 @@ func handleAnalyzePaper(ctx context.Context, db *sql.DB, gemini *external.Gemini
 		}, AnalysisResult{}, nil
 	}
 
-	// Validate, extract text, and insert document row.
-	intake, _, err := services.ValidateAndInsert(db, readingLevel, false, nil, args.Text, nil)
+	intake, _, err := services.ValidateAndInsert(srv.db, readingLevel, false, nil, args.Text, nil)
 	if err != nil {
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf(`{"error":"intake failed: %s"}`, err.Error())}},
@@ -193,8 +212,7 @@ func handleAnalyzePaper(ctx context.Context, db *sql.DB, gemini *external.Gemini
 
 	startTime := time.Now()
 
-	// Run the full pipeline asynchronously (simplification + verification + charts).
-	go services.RunPipelineAndPersist(db, gemini, intake.DocumentID, services.PipelineInput{
+	go services.RunPipelineAndPersist(srv.db, srv.gemini, intake.DocumentID, services.PipelineInput{
 		OriginalText: intake.OriginalText,
 		SourceType:   intake.SourceType,
 		ReadingLevel: readingLevel,
@@ -212,13 +230,17 @@ func handleAnalyzePaper(ctx context.Context, db *sql.DB, gemini *external.Gemini
 }
 
 // handleGetSummary returns simplified text + chapters for a document.
-func handleGetSummary(ctx context.Context, db *sql.DB, args DocIDInput) (*mcp.CallToolResult, SummaryResult, error) {
-	doc, err := getDocumentOrError(db, args.DocumentID)
+func handleGetSummary(ctx context.Context, srv *MCPServer, args DocIDInput) (*mcp.CallToolResult, SummaryResult, error) {
+	if !srv.rateLimiter.AllowRead(srv.apiKey) {
+		return errResult(ErrRateLimited), SummaryResult{}, nil
+	}
+
+	doc, err := getDocumentOrError(srv.db, args.DocumentID)
 	if err != nil {
 		return errResult(err), SummaryResult{}, nil
 	}
 
-	chapters, err := repository.NewChapterRepo(db).ListByDocument(args.DocumentID)
+	chapters, err := repository.NewChapterRepo(srv.db).ListByDocument(args.DocumentID)
 	if err != nil {
 		return errResult(err), SummaryResult{}, nil
 	}
@@ -246,12 +268,16 @@ func handleGetSummary(ctx context.Context, db *sql.DB, args DocIDInput) (*mcp.Ca
 }
 
 // handleGetFigures returns charts for a document.
-func handleGetFigures(ctx context.Context, db *sql.DB, args DocIDInput) (*mcp.CallToolResult, FiguresResult, error) {
-	if _, err := getDocumentOrError(db, args.DocumentID); err != nil {
+func handleGetFigures(ctx context.Context, srv *MCPServer, args DocIDInput) (*mcp.CallToolResult, FiguresResult, error) {
+	if !srv.rateLimiter.AllowRead(srv.apiKey) {
+		return errResult(ErrRateLimited), FiguresResult{}, nil
+	}
+
+	if _, err := getDocumentOrError(srv.db, args.DocumentID); err != nil {
 		return errResult(err), FiguresResult{}, nil
 	}
 
-	charts, err := repository.NewChartRepo(db).ListByDocument(args.DocumentID)
+	charts, err := repository.NewChartRepo(srv.db).ListByDocument(args.DocumentID)
 	if err != nil {
 		return errResult(err), FiguresResult{}, nil
 	}
@@ -287,12 +313,16 @@ func handleGetFigures(ctx context.Context, db *sql.DB, args DocIDInput) (*mcp.Ca
 }
 
 // handleGetClaims returns claim verification data for a document.
-func handleGetClaims(ctx context.Context, db *sql.DB, args DocIDInput) (*mcp.CallToolResult, ClaimsResult, error) {
-	if _, err := getDocumentOrError(db, args.DocumentID); err != nil {
+func handleGetClaims(ctx context.Context, srv *MCPServer, args DocIDInput) (*mcp.CallToolResult, ClaimsResult, error) {
+	if !srv.rateLimiter.AllowRead(srv.apiKey) {
+		return errResult(ErrRateLimited), ClaimsResult{}, nil
+	}
+
+	if _, err := getDocumentOrError(srv.db, args.DocumentID); err != nil {
 		return errResult(err), ClaimsResult{}, nil
 	}
 
-	cd, err := repository.NewClaimDiffRepo(db).GetByDocument(args.DocumentID)
+	cd, err := repository.NewClaimDiffRepo(srv.db).GetByDocument(args.DocumentID)
 	if err != nil {
 		// No claim_diff row yet — document may still be processing.
 		return nil, ClaimsResult{ClaimDiff: nil}, nil
@@ -318,12 +348,16 @@ func handleGetClaims(ctx context.Context, db *sql.DB, args DocIDInput) (*mcp.Cal
 }
 
 // handleGetEvidence returns evidence references for a document.
-func handleGetEvidence(ctx context.Context, db *sql.DB, args DocIDInput) (*mcp.CallToolResult, EvidenceResult, error) {
-	if _, err := getDocumentOrError(db, args.DocumentID); err != nil {
+func handleGetEvidence(ctx context.Context, srv *MCPServer, args DocIDInput) (*mcp.CallToolResult, EvidenceResult, error) {
+	if !srv.rateLimiter.AllowRead(srv.apiKey) {
+		return errResult(ErrRateLimited), EvidenceResult{}, nil
+	}
+
+	if _, err := getDocumentOrError(srv.db, args.DocumentID); err != nil {
 		return errResult(err), EvidenceResult{}, nil
 	}
 
-	evidenceList, err := repository.NewEvidenceRepo(db).ListByPaper(args.DocumentID)
+	evidenceList, err := repository.NewEvidenceRepo(srv.db).ListByPaper(args.DocumentID)
 	if err != nil {
 		return errResult(err), EvidenceResult{}, nil
 	}
@@ -356,7 +390,11 @@ func handleGetEvidence(ctx context.Context, db *sql.DB, args DocIDInput) (*mcp.C
 }
 
 // handleComparePapers extracts paper summaries and generates a cross-paper comparison.
-func handleComparePapers(ctx context.Context, db *sql.DB, gemini *external.GeminiClient, args ComparePapersInput) (*mcp.CallToolResult, CompareResult, error) {
+func handleComparePapers(ctx context.Context, srv *MCPServer, args ComparePapersInput) (*mcp.CallToolResult, CompareResult, error) {
+	if !srv.rateLimiter.AllowCompare(srv.apiKey) {
+		return errResult(ErrRateLimited), CompareResult{}, nil
+	}
+
 	if len(args.DocumentIDs) < 2 {
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{&mcp.TextContent{Text: `{"error":"at least 2 document_ids required for comparison"}`}},
@@ -364,21 +402,21 @@ func handleComparePapers(ctx context.Context, db *sql.DB, gemini *external.Gemin
 		}, CompareResult{}, nil
 	}
 
-	docRepo := repository.NewDocumentRepo(db)
+	docRepo := repository.NewDocumentRepo(srv.db)
 	var papers []services.PaperSummary
 	for _, docID := range args.DocumentIDs {
 		doc, err := docRepo.Get(docID)
 		if err != nil {
 			return errResult(fmt.Errorf("document %s: %w", docID, err)), CompareResult{}, nil
 		}
-		summary, err := services.ExtractPaperSummary(ctx, gemini, doc.ID, doc.Title, doc.OriginalText)
+		summary, err := services.ExtractPaperSummary(ctx, srv.gemini, doc.ID, doc.Title, doc.OriginalText)
 		if err != nil {
 			return errResult(fmt.Errorf("extract summary for %s: %w", docID, err)), CompareResult{}, nil
 		}
 		papers = append(papers, summary)
 	}
 
-	comparison, err := services.ComparePapers(ctx, gemini, papers)
+	comparison, err := services.ComparePapers(ctx, srv.gemini, papers)
 	if err != nil {
 		return errResult(err), CompareResult{}, nil
 	}
