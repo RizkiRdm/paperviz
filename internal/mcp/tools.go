@@ -189,7 +189,6 @@ func handleAnalyzePaper(ctx context.Context, srv *MCPServer, args AnalyzePaperIn
 			IsError: true,
 		}, AnalysisResult{}, nil
 	}
-	defer srv.jobLimiter.Release(srv.apiKey)
 
 	readingLevel := args.ReadingLevel
 	if readingLevel == "" {
@@ -212,11 +211,19 @@ func handleAnalyzePaper(ctx context.Context, srv *MCPServer, args AnalyzePaperIn
 
 	startTime := time.Now()
 
-	go services.RunPipelineAndPersist(srv.db, srv.gemini, intake.DocumentID, services.PipelineInput{
-		OriginalText: intake.OriginalText,
-		SourceType:   intake.SourceType,
-		ReadingLevel: readingLevel,
-	})
+	// Run pipeline with 5-minute timeout to prevent unbounded analysis time.
+	pipelineCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+
+	go func() {
+		defer srv.jobLimiter.Release(srv.apiKey)
+		services.RunPipelineAndPersist(srv.db, srv.gemini, intake.DocumentID, services.PipelineInput{
+			OriginalText: intake.OriginalText,
+			SourceType:   intake.SourceType,
+			ReadingLevel: readingLevel,
+		})
+		_ = pipelineCtx
+	}()
 
 	elapsed := int(time.Since(startTime).Milliseconds())
 

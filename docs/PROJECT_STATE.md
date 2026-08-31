@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-31 — Chunk 7.5 merged: Human/Agent Capability Parity (MCP↔REST parity map, image_url in MCP get_figures, parity documentation)
+**Last updated:** 2026-08-31 — Chunk 7.6 merged: MCP Usage, Security & Cost Controls (API key auth, rate limits, job limits, size validation, timeout, error types)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Chunk 7.6 — MCP Usage, Security & Cost Controls
+- **Working on:** Phase 8 — Research Knowledge Layer
 - **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** Implement API-key/token handling, per-user usage accounting, rate limits for MCP
+- **Next action if resuming:** Start Chunk 8.1 — Structured Research Objects
 
 ---
 
@@ -57,6 +57,7 @@ something that should stay frozen.)*
 - Chunk 7.3 OpenAPI — done 2026-08-31 (`docs/openapi.yaml` — 1748-line OpenAPI 3.1.0 spec, 34 endpoints, 31 component schemas, session cookie auth, rate limits, error codes)
 - Chunk 7.4 MCP — done 2026-08-31 (`cmd/mcp/main.go`, `internal/mcp/` — 6 research tools: analyze_paper, get_summary, get_figures, get_claims, get_evidence, compare_papers; official Go SDK, stdio transport)
 - Chunk 7.5 Human/Agent Capability Parity — done 2026-08-31 (`docs/mcp-parity.md` — MCP↔REST parity map; `internal/mcp/tools.go` — added image_url base64 to get_figures; documented intentionally unavailable agent operations)
+- Chunk 7.6 MCP Usage, Security & Cost Controls — done 2026-08-31 (`internal/mcp/errors.go` — MCPError type + sentinels; `internal/mcp/ratelimit.go` — per-key token bucket (analyze 5/min, read 30/min, compare 2/min); `internal/mcp/jobs.go` — concurrent job limiter; `internal/mcp/server.go` — API key auth; `internal/mcp/tools.go` — 500KB size cap, 5-min timeout, rate/job checks; `cmd/mcp/main.go` — PAPERVIZ_API_KEY required)
 
 ---
 
@@ -133,5 +134,5 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Structured Research API docs: `docs/structured-research-api.md`
 - Canonical Research Output Contract: `docs/canonical-research-output-contract.md`
 - OpenAPI spec: `docs/openapi.yaml`
-- MCP server: `cmd/mcp/main.go`, `internal/mcp/server.go`, `internal/mcp/tools.go`
+- MCP server: `cmd/mcp/main.go`, `internal/mcp/server.go`, `internal/mcp/tools.go`, `internal/mcp/errors.go`, `internal/mcp/ratelimit.go`, `internal/mcp/jobs.go`
 - MCP↔REST parity map: `docs/mcp-parity.md`
