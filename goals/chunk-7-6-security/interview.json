@@ -1,0 +1,105 @@
+{
+  "stage": "interview",
+  "title": "Chunk 7.6 — MCP Usage, Security & Cost Controls",
+  "goalSlug": "chunk-7-6-security",
+  "questions": [
+    {
+      "id": "api-key-format",
+      "prompt": "How should MCP clients authenticate?",
+      "description": "MCP uses stdio transport, not HTTP. Options: env var API key, MCP config token, or both.",
+      "answerMode": "single",
+      "recommendedAnswer": "Environment variable PAPERVIZ_API_KEY — simplest for stdio MCP, matches existing GEMINI_API_KEY pattern",
+      "recommendedOptionIds": ["env-var"],
+      "options": [
+        { "id": "env-var", "label": "Env var PAPERVIZ_API_KEY" },
+        { "id": "mcp-config", "label": "MCP config token field" },
+        { "id": "both", "label": "Both (env var + config)" }
+      ],
+      "required": true
+    },
+    {
+      "id": "rate-limits",
+      "prompt": "What rate limits for MCP operations?",
+      "description": "Per API key. analyze_paper is expensive (Gemini calls), read operations are cheap.",
+      "answerMode": "single",
+      "recommendedAnswer": "analyze_paper: 5/min, read ops: 30/min, compare: 2/min",
+      "recommendedOptionIds": ["balanced"],
+      "options": [
+        { "id": "conservative", "label": "Conservative (2/10/1)" },
+        { "id": "balanced", "label": "Balanced (5/30/2)" },
+        { "id": "generous", "label": "Generous (10/60/5)" }
+      ],
+      "required": true
+    },
+    {
+      "id": "request-size",
+      "prompt": "Max text size for analyze_paper?",
+      "description": "Agents paste paper text. Too large wastes Gemini tokens, too small limits usefulness.",
+      "answerMode": "single",
+      "recommendedAnswer": "500KB (roughly 100K words, covers most papers)",
+      "recommendedOptionIds": ["500kb"],
+      "options": [
+        { "id": "200kb", "label": "200KB (~40K words)" },
+        { "id": "500kb", "label": "500KB (~100K words)" },
+        { "id": "1mb", "label": "1MB (~200K words)" }
+      ],
+      "required": true
+    },
+    {
+      "id": "concurrent-jobs",
+      "prompt": "Max concurrent analyze_paper jobs per API key?",
+      "description": "Prevents one agent from monopolizing Gemini quota.",
+      "answerMode": "single",
+      "recommendedAnswer": "2 concurrent analyses per key",
+      "recommendedOptionIds": ["2"],
+      "options": [
+        { "id": "1", "label": "1 (sequential)" },
+        { "id": "2", "label": "2 concurrent" },
+        { "id": "3", "label": "3 concurrent" }
+      ],
+      "required": true
+    },
+    {
+      "id": "timeout",
+      "prompt": "Analysis timeout for MCP?",
+      "description": "How long before an analyze_paper call times out? Papers can take 1-3 minutes.",
+      "answerMode": "single",
+      "recommendedAnswer": "5 minutes (covers most papers with retry headroom)",
+      "recommendedOptionIds": ["5min"],
+      "options": [
+        { "id": "3min", "label": "3 minutes" },
+        { "id": "5min", "label": "5 minutes" },
+        { "id": "10min", "label": "10 minutes" }
+      ],
+      "required": true
+    },
+    {
+      "id": "tier-reuse",
+      "prompt": "Should MCP reuse the existing free/pro/research tier system?",
+      "description": "Current tiers are fingerprint-based (IP+UA). MCP uses API keys.",
+      "answerMode": "single",
+      "recommendedAnswer": "Yes — map API keys to tiers, reuse same limits. Pro agents get Pro limits.",
+      "recommendedOptionIds": ["reuse"],
+      "options": [
+        { "id": "reuse", "label": "Reuse existing tiers" },
+        { "id": "separate", "label": "Separate MCP tiers" },
+        { "id": "unlimited", "label": "No tiers for MCP (flat limits)" }
+      ],
+      "required": true
+    },
+    {
+      "id": "cost-attribution",
+      "prompt": "Track cost attribution per MCP operation?",
+      "description": "Log Gemini token usage per tool call for cost analysis.",
+      "answerMode": "single",
+      "recommendedAnswer": "Yes — log operation, tokens used, estimated cost to analytics_events",
+      "recommendedOptionIds": ["yes"],
+      "options": [
+        { "id": "yes", "label": "Yes, full tracking" },
+        { "id": "basic", "label": "Basic (operation count only)" },
+        { "id": "no", "label": "No tracking" }
+      ],
+      "required": true
+    }
+  ]
+}
