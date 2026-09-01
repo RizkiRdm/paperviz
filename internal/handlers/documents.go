@@ -560,6 +560,215 @@ type compareResponse struct {
 	EvidenceClaims []services.EvidenceClaim       `json:"evidence_claims"`
 }
 
+// GetClaims handles GET /api/documents/:id/claims. Returns all claims for a document.
+func (h *DocumentHandler) GetClaims(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	docRepo := repository.NewDocumentRepo(h.db)
+	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	} else if err != nil {
+		slog.Error("get document for claims failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	claimRepo := repository.NewClaimRepo(h.db)
+	claims, err := claimRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list claims failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	type claimResp struct {
+		ID         string  `json:"id"`
+		ClaimText  string  `json:"claim_text"`
+		ClaimType  string  `json:"claim_type"`
+		Confidence string  `json:"confidence"`
+		SourcePage *int    `json:"source_page,omitempty"`
+		SourceText *string `json:"source_text,omitempty"`
+		CreatedAt  int64   `json:"created_at"`
+	}
+	resp := make([]claimResp, 0, len(claims))
+	for _, c := range claims {
+		resp = append(resp, claimResp{
+			ID: c.ID, ClaimText: c.ClaimText, ClaimType: c.ClaimType,
+			Confidence: c.Confidence, SourcePage: c.SourcePage,
+			SourceText: c.SourceText, CreatedAt: c.CreatedAt,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// GetTables handles GET /api/documents/:id/tables. Returns all paper tables for a document.
+func (h *DocumentHandler) GetTables(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	docRepo := repository.NewDocumentRepo(h.db)
+	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	} else if err != nil {
+		slog.Error("get document for tables failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	tableRepo := repository.NewPaperTableRepo(h.db)
+	tables, err := tableRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list tables failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	type tableResp struct {
+		ID           string  `json:"id"`
+		PageNumber   *int    `json:"page_number,omitempty"`
+		Caption      *string `json:"caption,omitempty"`
+		Headers      string  `json:"headers"`
+		Rows         string  `json:"rows"`
+		SourceText   *string `json:"source_text,omitempty"`
+		DisplayOrder int     `json:"display_order"`
+	}
+	resp := make([]tableResp, 0, len(tables))
+	for _, t := range tables {
+		resp = append(resp, tableResp{
+			ID: t.ID, PageNumber: t.PageNumber, Caption: t.Caption,
+			Headers: t.Headers, Rows: t.Rows, SourceText: t.SourceText,
+			DisplayOrder: t.DisplayOrder,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// GetMethods handles GET /api/documents/:id/methods. Returns all methods for a document.
+func (h *DocumentHandler) GetMethods(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	docRepo := repository.NewDocumentRepo(h.db)
+	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	} else if err != nil {
+		slog.Error("get document for methods failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	methodRepo := repository.NewMethodRepo(h.db)
+	methods, err := methodRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list methods failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	type methodResp struct {
+		ID          string  `json:"id"`
+		MethodName  string  `json:"method_name"`
+		Description *string `json:"description,omitempty"`
+		MethodType  string  `json:"method_type"`
+		SourcePage  *int    `json:"source_page,omitempty"`
+		SourceText  *string `json:"source_text,omitempty"`
+	}
+	resp := make([]methodResp, 0, len(methods))
+	for _, m := range methods {
+		resp = append(resp, methodResp{
+			ID: m.ID, MethodName: m.MethodName, Description: m.Description,
+			MethodType: m.MethodType, SourcePage: m.SourcePage, SourceText: m.SourceText,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// GetResults handles GET /api/documents/:id/results. Returns all results for a document.
+func (h *DocumentHandler) GetResults(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	docRepo := repository.NewDocumentRepo(h.db)
+	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	} else if err != nil {
+		slog.Error("get document for results failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	resultRepo := repository.NewResultRepo(h.db)
+	results, err := resultRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list results failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	type resultResp struct {
+		ID                   string  `json:"id"`
+		ResultText           string  `json:"result_text"`
+		ResultType           string  `json:"result_type"`
+		SupportingEvidenceID *string `json:"supporting_evidence_id,omitempty"`
+		SourcePage           *int    `json:"source_page,omitempty"`
+		SourceText           *string `json:"source_text,omitempty"`
+	}
+	resp := make([]resultResp, 0, len(results))
+	for _, res := range results {
+		resp = append(resp, resultResp{
+			ID: res.ID, ResultText: res.ResultText, ResultType: res.ResultType,
+			SupportingEvidenceID: res.SupportingEvidenceID, SourcePage: res.SourcePage,
+			SourceText: res.SourceText,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// GetCitations handles GET /api/documents/:id/citations. Returns all citations for a document.
+func (h *DocumentHandler) GetCitations(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	docRepo := repository.NewDocumentRepo(h.db)
+	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	} else if err != nil {
+		slog.Error("get document for citations failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	citationRepo := repository.NewCitationRepo(h.db)
+	citations, err := citationRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list citations failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	type citationResp struct {
+		ID           string  `json:"id"`
+		CitedPaperID *string `json:"cited_paper_id,omitempty"`
+		Authors      *string `json:"authors,omitempty"`
+		Title        *string `json:"title,omitempty"`
+		Year         *int    `json:"year,omitempty"`
+		Venue        *string `json:"venue,omitempty"`
+		DOI          *string `json:"doi,omitempty"`
+		URL          *string `json:"url,omitempty"`
+		SourcePage   *int    `json:"source_page,omitempty"`
+	}
+	resp := make([]citationResp, 0, len(citations))
+	for _, c := range citations {
+		resp = append(resp, citationResp{
+			ID: c.ID, CitedPaperID: c.CitedPaperID, Authors: c.Authors,
+			Title: c.Title, Year: c.Year, Venue: c.Venue, DOI: c.DOI,
+			URL: c.URL, SourcePage: c.SourcePage,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
 // Compare handles POST /api/documents/compare.
 func (h *DocumentHandler) Compare(w http.ResponseWriter, r *http.Request) {
 	var req compareRequest
