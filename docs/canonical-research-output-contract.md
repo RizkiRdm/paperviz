@@ -43,7 +43,11 @@ The root entity representing an analyzed research document.
   "claims": ["Claim[] — extracted claims from the paper"],
   "methods": ["Method[] — research methods described"],
   "results": ["Result[] — research findings and outcomes"],
-  "citations": ["Citation[] — referenced works"]
+  "citations": ["Citation[] — referenced works"],
+  "evidence_graph": {
+    "claim_evidence": ["ClaimEvidence[] — links between claims and their supporting evidence"],
+    "paper_relationships": ["PaperRelationship[] — cross-paper links via citations or shared evidence"]
+  }
 }
 ```
 
@@ -243,6 +247,46 @@ A reference to another work cited in the paper.
 
 ---
 
+### ClaimEvidence
+A link between a claim and its supporting evidence, forming the edge in the evidence graph.
+
+```json
+{
+  "id": "string — unique identifier (ce_abc123)",
+  "claim_id": "string — source claim ID",
+  "evidence_id": "string — target evidence ID",
+  "relationship_type": "supports | contradicts | clarifies | extends",
+  "created_at": "integer — Unix timestamp (seconds)"
+}
+```
+
+**Provenance fields:**
+- `claim_id` and `evidence_id` trace the exact source entities
+- `relationship_type` classifies the semantic connection between claim and evidence
+
+---
+
+### PaperRelationship
+A directed link between two papers in the corpus, representing citation or shared-evidence relationships.
+
+```json
+{
+  "id": "string — unique identifier (pr_abc123)",
+  "source_paper_id": "string — originating document ID",
+  "target_paper_id": "string — destination document ID",
+  "relationship_type": "cites | shares_evidence | contradicts | supports | extends",
+  "evidence_text": "string | null — verbatim text establishing the relationship",
+  "created_at": "integer — Unix timestamp (seconds)"
+}
+```
+
+**Provenance fields:**
+- `source_paper_id` / `target_paper_id` are Document IDs
+- `evidence_text` provides the textual basis for the relationship (verbatim when available)
+- `relationship_type` classifies the inter-paper connection
+
+---
+
 ### Table
 An extracted table from the paper.
 
@@ -427,6 +471,8 @@ Full result of one pipeline run, ready for persistence.
 | Result | `result_` | `result_abc123` |
 | Citation | `citation_` | `citation_abc123` |
 | Evidence | `evidence_` | `evidence_abc123` |
+| ClaimEvidence | `ce_` | `ce_abc123` |
+| PaperRelationship | `pr_` | `pr_abc123` |
 | Table | `table_` | `table_abc123` |
 | Collection | `col_` | `col_abc123` |
 | Share Token | (no prefix) | `abc123xyz` |
@@ -453,6 +499,21 @@ Full result of one pipeline run, ready for persistence.
 - `chapters` — Chapter detection
 - `charts` — Chart generation
 
+### Relationship Types
+
+**Claim-Evidence relationships:**
+- `supports` — Evidence directly backs the claim
+- `contradicts` — Evidence disputes the claim
+- `clarifies` — Evidence provides context or definition for the claim
+- `extends` — Evidence builds upon or generalizes the claim
+
+**Paper-Paper relationships:**
+- `cites` — Source paper references target paper
+- `shares_evidence` — Papers share common evidence or data
+- `contradicts` — Papers present opposing findings
+- `supports` — Papers corroborate each other's findings
+- `extends` — Source paper builds on target paper's work
+
 ---
 
 ## Provenance Model
@@ -476,6 +537,19 @@ Evidence
   ├── source_reference: "Page 3, Figure 2"
   ├── figure_id: "chart_abc123" (optional)
   └── table_id: "table_abc123" (optional)
+
+Evidence Graph (Document.evidence_graph)
+  ├── ClaimEvidence
+  │   ├── claim_id → Claim
+  │   ├── evidence_id → Evidence
+  │   ├── relationship_type: supports | contradicts | clarifies | extends
+  │   └── created_at: timestamp
+  └── PaperRelationship
+      ├── source_paper_id → Document
+      ├── target_paper_id → Document
+      ├── relationship_type: cites | shares_evidence | contradicts | supports | extends
+      ├── evidence_text: "verbatim basis" (optional)
+      └── created_at: timestamp
 ```
 
 **Rule:** No output is presented without provenance. If provenance cannot be determined, the output must include `confidence: null` or a note explaining the gap.
@@ -511,7 +585,7 @@ This contract is pre-release (v0.x). Breaking changes may occur, but will be doc
 | Interface | Uses |
 |-----------|------|
 | Web UI | Full entity set, presentation layer |
-| REST API | Document, Chart, ClaimDiff, Chapter, Evidence, Claim, Method, Result, Citation (via /api/documents) |
+| REST API | Document, Chart, ClaimDiff, Chapter, Evidence, Claim, Method, Result, Citation, ClaimEvidence, PaperRelationship (via /api/documents) |
 | MCP (future) | PaperSummary, Comparison, EvidenceClaim, Claim, Method, Result, Citation |
 | SDK (future) | All entities |
 

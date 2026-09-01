@@ -183,6 +183,41 @@ type Citation struct {
 	SourcePage   *int
 }
 
+// ClaimEvidence mirrors the claim_evidence table.
+type ClaimEvidence struct {
+	ID               string
+	ClaimID          string
+	EvidenceID       string
+	RelationshipType string // supports | contradicts | clarifies
+	CreatedAt        int64
+}
+
+// PaperRelationship mirrors the paper_relationships table.
+type PaperRelationship struct {
+	ID               string
+	SourcePaperID    string
+	TargetPaperID    string
+	RelationshipType string // supporting | contradicting | citing | similar_methodology | different_findings
+	EvidenceText     *string
+	CreatedAt        int64
+}
+
+// ClaimEvidenceRelationshipType enum values.
+const (
+	ClaimEvidenceRelationshipSupports    = "supports"
+	ClaimEvidenceRelationshipContradicts = "contradicts"
+	ClaimEvidenceRelationshipClarifies   = "clarifies"
+)
+
+// PaperRelationshipType enum values.
+const (
+	PaperRelationshipSupporting          = "supporting"
+	PaperRelationshipContradicting       = "contradicting"
+	PaperRelationshipCiting              = "citing"
+	PaperRelationshipSimilarMethodology  = "similar_methodology"
+	PaperRelationshipDifferentFindings   = "different_findings"
+)
+
 // ClaimType enum values.
 const (
 	ClaimTypeHypothesis  = "hypothesis"

@@ -47,3 +47,27 @@ func (r *EvidenceRepo) ListByPaper(paperID string) ([]Evidence, error) {
 	}
 	return list, nil
 }
+
+func (r *EvidenceRepo) GetClaims(evidenceID string) ([]Claim, error) {
+	rows, err := r.db.Query(
+		`SELECT c.id, c.paper_id, c.claim_text, c.claim_type, c.confidence, c.source_page, c.source_text, c.created_at
+		FROM claims c INNER JOIN claim_evidence ce ON c.id = ce.claim_id WHERE ce.evidence_id = ? ORDER BY c.created_at ASC`, evidenceID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get claims for evidence: %w", err)
+	}
+	defer rows.Close()
+
+	var claims []Claim
+	for rows.Next() {
+		var c Claim
+		if err := rows.Scan(&c.ID, &c.PaperID, &c.ClaimText, &c.ClaimType, &c.Confidence, &c.SourcePage, &c.SourceText, &c.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan claim: %w", err)
+		}
+		claims = append(claims, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate claims: %w", err)
+	}
+	return claims, nil
+}

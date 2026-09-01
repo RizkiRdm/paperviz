@@ -73,3 +73,29 @@ func (r *ClaimRepo) GetByID(paperID, claimID string) (*Claim, error) {
 	}
 	return &c, nil
 }
+
+// GetEvidence returns all evidence rows linked to a claim via claim_evidence.
+func (r *ClaimRepo) GetEvidence(claimID string) ([]Evidence, error) {
+	rows, err := r.db.Query(
+		`SELECT e.id, e.paper_id, e.page, e.figure_id, e.table_id, e.section, e.source_text, e.source_reference
+		FROM evidence e INNER JOIN claim_evidence ce ON e.id = ce.evidence_id
+		WHERE ce.claim_id = ? ORDER BY e.id ASC`, claimID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get evidence for claim: %w", err)
+	}
+	defer rows.Close()
+
+	var list []Evidence
+	for rows.Next() {
+		var ev Evidence
+		if err := rows.Scan(&ev.ID, &ev.PaperID, &ev.Page, &ev.FigureID, &ev.TableID, &ev.Section, &ev.SourceText, &ev.SourceReference); err != nil {
+			return nil, fmt.Errorf("scan evidence: %w", err)
+		}
+		list = append(list, ev)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate evidence: %w", err)
+	}
+	return list, nil
+}
