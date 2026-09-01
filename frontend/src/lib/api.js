@@ -63,6 +63,46 @@ export async function createDocument({ file, text, readingLevel }) {
   }
 }
 
+// importByDOI imports a paper by its DOI identifier.
+export async function importByDOI(doi) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
+  try {
+    const response = await fetch("/api/import/doi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ doi }),
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// importByURL imports a paper from a URL (arxiv, pubmed, or direct PDF).
+export async function importByURL(url) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
+  try {
+    const response = await fetch("/api/import/url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 // getDocument polls a document's current state. Per ARCHITECTURE.md
 // Section E, the caller MUST wait at least 2 seconds between calls while
 // status is "processing" — that interval is enforced in ResultPage.jsx's
