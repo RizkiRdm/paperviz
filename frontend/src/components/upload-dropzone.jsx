@@ -1,10 +1,9 @@
 // ponytail: upload dropzone redesign matching DESIGN.md hairline cards & pill feature tags
 import { useRef, useState } from "react"
-import { Upload, FileText, Sparkles, ShieldCheck, BarChart3 } from "lucide-react"
+import { Upload, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export function UploadDropzone({ file, text, onFileChange, onTextChange }) {
-  const [mode, setMode] = useState("file") // "file" | "text"
+export function UploadDropzone({ file, text, mode, onFileChange, onTextChange }) {
   const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef(null)
 
@@ -15,37 +14,6 @@ export function UploadDropzone({ file, text, onFileChange, onTextChange }) {
 
   return (
     <div>
-      {/* Mode toggle pill selector per DESIGN.md */}
-      <div className="mb-4 flex items-center justify-between">
-        <div className="inline-flex gap-1 rounded-full border border-[#e5e5e5] bg-[#ffffff] p-1 shadow-xs">
-          <button
-            type="button"
-            onClick={() => setMode("file")}
-            className={cn(
-              "rounded-full px-3.5 py-1 text-xs font-medium transition-colors",
-              mode === "file" ? "bg-[#0a0a0a] text-white" : "text-[#737373] hover:text-[#171717]",
-            )}
-          >
-            Upload PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("text")}
-            className={cn(
-              "rounded-full px-3.5 py-1 text-xs font-medium transition-colors",
-              mode === "text" ? "bg-[#0a0a0a] text-white" : "text-[#737373] hover:text-[#171717]",
-            )}
-          >
-            Paste Text
-          </button>
-        </div>
-
-        <span className="text-xs text-[#737373] flex items-center gap-1">
-          <ShieldCheck className="h-3.5 w-3.5 text-[#16a34a]" />
-          Instant verification
-        </span>
-      </div>
-
       {mode === "file" ? (
         <>
           <input

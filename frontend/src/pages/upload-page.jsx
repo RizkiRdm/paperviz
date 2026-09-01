@@ -3,10 +3,13 @@ import { useEffect, useState } from "react"
 import { useNavigate, useSearchParams, Link } from "react-router-dom"
 import { UploadDropzone } from "@/components/upload-dropzone"
 import { ReadingLevelSelector } from "@/components/ui/reading-level-selector"
+import { DOIImport } from "@/components/doi-import"
+import { URLImport } from "@/components/url-import"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ErrorBanner } from "@/components/ui/status-banners"
 import { createDocument, trackReferral } from "@/lib/api"
-import { Sparkles, FileText, BarChart3, ArrowRight } from "lucide-react"
+import { Sparkles, FileText, BarChart3, ArrowRight, ShieldCheck } from "lucide-react"
 
 const ERROR_MESSAGES = {
   no_text_layer:
@@ -30,6 +33,8 @@ export function UploadPage() {
   const [readingLevel, setReadingLevel] = useState("simplified")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  // Tab selector: upload PDF, paste text, DOI import, or URL import
+  const [activeTab, setActiveTab] = useState("upload")
 
   // Capture ?ref= referral token on mount so attribution survives the
   // post-upload redirect to the result page.
@@ -43,9 +48,12 @@ export function UploadPage() {
   async function handleSubmit() {
     setError(null)
 
-    if (!file && !text.trim()) {
-      setError(ERROR_MESSAGES.missing_input)
-      return
+    // Skip file/text validation for DOI and URL tabs (they self-validate)
+    if (activeTab !== "doi" && activeTab !== "url") {
+      if (!file && !text.trim()) {
+        setError(ERROR_MESSAGES.missing_input)
+        return
+      }
     }
 
     setIsSubmitting(true)
@@ -113,28 +121,93 @@ export function UploadPage() {
 
         {/* Dashboard Card Container per DESIGN.md */}
         <div className="mt-10 mx-auto max-w-2xl rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
-          <UploadDropzone
-            file={file}
-            text={text}
-            onFileChange={(f) => {
-              if (f.size > MAX_FILE_SIZE_BYTES) {
-                setFile(null)
-                setError(ERROR_MESSAGES.file_too_large)
-                return
-              }
-              if (f.type !== "application/pdf") {
-                setFile(null)
-                setError(ERROR_MESSAGES.invalid_file_type)
-                return
-              }
-              setFile(f)
-              setError(null)
-            }}
-            onTextChange={(t) => {
-              setText(t)
-              setError(null)
-            }}
-          />
+          {/* Four-tab mode selector using DESIGN.md pill pattern */}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="inline-flex gap-1 rounded-full border border-[#e5e5e5] bg-[#ffffff] p-1 shadow-xs">
+              {[
+                { id: "upload", label: "Upload PDF" },
+                { id: "text", label: "Paste Text" },
+                { id: "doi", label: "Import by DOI" },
+                { id: "url", label: "Import by URL" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "rounded-full px-3.5 py-1 text-xs font-medium transition-colors",
+                    activeTab === tab.id
+                      ? "bg-[#0a0a0a] text-white"
+                      : "text-[#737373] hover:text-[#171717]",
+                  )}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <span className="text-xs text-[#737373] flex items-center gap-1">
+              <ShieldCheck className="h-3.5 w-3.5 text-[#16a34a]" />
+              Instant verification
+            </span>
+          </div>
+
+          {/* Render the active input method */}
+          {activeTab === "upload" && (
+            <UploadDropzone
+              file={file}
+              text={text}
+              mode="file"
+              onFileChange={(f) => {
+                if (f.size > MAX_FILE_SIZE_BYTES) {
+                  setFile(null)
+                  setError(ERROR_MESSAGES.file_too_large)
+                  return
+                }
+                if (f.type !== "application/pdf") {
+                  setFile(null)
+                  setError(ERROR_MESSAGES.invalid_file_type)
+                  return
+                }
+                setFile(f)
+                setError(null)
+              }}
+              onTextChange={(t) => {
+                setText(t)
+                setError(null)
+              }}
+            />
+          )}
+
+          {activeTab === "text" && (
+            <UploadDropzone
+              file={file}
+              text={text}
+              mode="text"
+              onFileChange={(f) => {
+                if (f.size > MAX_FILE_SIZE_BYTES) {
+                  setFile(null)
+                  setError(ERROR_MESSAGES.file_too_large)
+                  return
+                }
+                if (f.type !== "application/pdf") {
+                  setFile(null)
+                  setError(ERROR_MESSAGES.invalid_file_type)
+                  return
+                }
+                setFile(f)
+                setError(null)
+              }}
+              onTextChange={(t) => {
+                setText(t)
+                setError(null)
+              }}
+            />
+          )}
+
+          {activeTab === "doi" && <DOIImport />}
+
+          {activeTab === "url" && <URLImport />}
 
           <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[#f5f5f5]">
             <div className="flex items-center gap-2">
