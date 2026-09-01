@@ -105,6 +105,7 @@ something you already rejected for a clear reason.)*
 | 2026-08-29 | Pro tier $29/month for 50 papers | 52% margin at $0.30/paper cost; validates willingness to pay |
 | 2026-08-29 | Research tier = "Contact us" (no fixed price) | Avoids unprofitable fixed pricing; custom for high-volume users |
 | 2026-08-29 | Upgrade flow = waitlist/email capture | No payment processing yet; measures intent before building billing |
+| 2026-09-02 | URL import: https-only + block private IPs | SSRF protection; prevents user-controlled URLs from hitting internal network |
 
 ---
 
