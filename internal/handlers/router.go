@@ -94,6 +94,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.Get("/{id}/results", docHandler.GetResults)
 		r.Get("/{id}/citations", docHandler.GetCitations)
 		r.Get("/{id}/evidence-graph", docHandler.GetEvidenceGraph)
+		r.Get("/{id}/research-map", docHandler.GetResearchMap)
 		r.With(authMiddleware.RequireAuth).Get("/stats", docHandler.Stats)
 		r.With(authMiddleware.RequireAuth).Get("/", docHandler.List)
 		r.With(authMiddleware.RequireAuth).Put("/{id}/save", docHandler.ToggleSaved)

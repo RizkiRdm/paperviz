@@ -1079,6 +1079,61 @@ func (h *DocumentHandler) CreatePaperRelationship(w http.ResponseWriter, r *http
 	})
 }
 
+type researchMapResponse struct {
+	DocumentID    string                                 `json:"document_id"`
+	Relationships map[string][]researchMapRelationshipItem `json:"relationships"`
+	TotalCount    int                                    `json:"total_count"`
+}
+
+type researchMapRelationshipItem struct {
+	ID               string  `json:"id"`
+	SourcePaperID    string  `json:"source_paper_id"`
+	TargetPaperID    string  `json:"target_paper_id"`
+	TargetPaperTitle string  `json:"target_paper_title"`
+	RelationshipType string  `json:"relationship_type"`
+	EvidenceText     *string `json:"evidence_text,omitempty"`
+	CreatedAt        int64   `json:"created_at"`
+}
+
+// GetResearchMap handles GET /api/documents/:id/research-map.
+func (h *DocumentHandler) GetResearchMap(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	result, err := services.GetResearchMap(h.db, id)
+	if err != nil {
+		if err.Error() == "document not found" {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
+		slog.Error("get research map failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	relationships := make(map[string][]researchMapRelationshipItem, len(result.Relationships))
+	for relType, items := range result.Relationships {
+		respItems := make([]researchMapRelationshipItem, 0, len(items))
+		for _, item := range items {
+			respItems = append(respItems, researchMapRelationshipItem{
+				ID:               item.ID,
+				SourcePaperID:    item.SourcePaperID,
+				TargetPaperID:    item.TargetPaperID,
+				TargetPaperTitle: item.TargetPaperTitle,
+				RelationshipType: item.RelationshipType,
+				EvidenceText:     item.EvidenceText,
+				CreatedAt:        item.CreatedAt,
+			})
+		}
+		relationships[relType] = respItems
+	}
+
+	writeJSON(w, http.StatusOK, researchMapResponse{
+		DocumentID:    result.DocumentID,
+		Relationships: relationships,
+		TotalCount:    result.TotalCount,
+	})
+}
+
 // Compare handles POST /api/documents/compare.
 func (h *DocumentHandler) Compare(w http.ResponseWriter, r *http.Request) {
 	var req compareRequest

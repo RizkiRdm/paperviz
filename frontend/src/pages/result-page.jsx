@@ -3,11 +3,12 @@ import { useParams, useNavigate, Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { VerificationBadge, WarningBanner, ErrorBanner, ClaimComparisonPanel } from "@/components/ui/status-banners"
 import { ChartCard } from "@/components/chart-card"
+import { ResearchMap } from "@/components/research-map"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useDocumentPoll } from "@/hooks/use-document-poll"
 import { generateDocumentShare, updateDocumentVisibility } from "@/lib/api"
-import { ArrowLeft, ArrowRight, Copy, Check, RefreshCw, BarChart2, Link2, FolderPlus, LayoutDashboard } from "lucide-react"
+import { ArrowLeft, ArrowRight, Copy, Check, RefreshCw, BarChart2, Link2, FolderPlus, LayoutDashboard, Network } from "lucide-react"
 import { NotFoundPage } from "@/pages/not-found-page"
 import ReactMarkdown from "react-markdown"
 
@@ -117,6 +118,7 @@ export function ResultPage() {
   const [activeChapter, setActiveChapter] = useState(-1)
   const [collections, setCollections] = useState([])
   const [showAddToCollection, setShowAddToCollection] = useState(false)
+  const [showResearchMap, setShowResearchMap] = useState(false)
   const copyTimerRef = useRef(null)
 
   useEffect(() => () => clearTimeout(copyTimerRef.current), [])
@@ -358,6 +360,26 @@ const STAGE_LABELS = {
           </div>
         )}
 
+        {showResearchMap && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Network className="h-4 w-4 text-[#2563eb]" />
+                <h2 className="font-satoshi text-lg font-medium text-[#0a0a0a]">
+                  Research Map
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowResearchMap(false)}
+                className="text-xs text-[#737373] hover:text-[#0a0a0a] transition-colors"
+              >
+                Close
+              </button>
+            </div>
+            <ResearchMap documentId={documentId} />
+          </div>
+        )}
+
         {/* Action bar — reading level badge + view toggle + copy text */}
         <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-[#e5e5e5]">
           <div className="flex items-center gap-3">
@@ -370,6 +392,20 @@ const STAGE_LABELS = {
           </div>
 
           <div className="flex items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowResearchMap(v => !v)}
+                  className={`h-8 px-2.5 text-xs gap-1.5 font-medium ${showResearchMap ? "bg-[#dbeaff] text-[#2563eb] border-[#bfdbfe]" : ""}`}
+                >
+                  <Network className="h-3.5 w-3.5" />
+                  Research Map
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>View how this paper relates to others</TooltipContent>
+            </Tooltip>
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

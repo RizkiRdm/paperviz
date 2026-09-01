@@ -16,7 +16,7 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-01 — Chunk 8.2 merged: Evidence Graph (claim_evidence junction, paper_relationships, graph traversal methods, 3 API endpoints)
+**Last updated:** 2026-09-01 — Chunk 8.3 merged: Cross-Paper Research Map (relationship type constants, GetResearchMap service, GET /api/documents/:id/research-map endpoint, ResearchMap frontend component, 6 new tests)
 
 ---
 
@@ -26,7 +26,7 @@
 - **Working on:** Phase 8 — Research Knowledge Layer
 - **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** Start Chunk 8.3 — Cross-Paper Research Map
+- **Next action if resuming:** Start Phase 9 — Growth & Ecosystem (Chunk 9.1 — Integrations)
 
 ---
 
@@ -60,6 +60,7 @@ something that should stay frozen.)*
 - Chunk 7.6 MCP Usage, Security & Cost Controls — done 2026-08-31 (`internal/mcp/errors.go` — MCPError type + sentinels; `internal/mcp/ratelimit.go` — per-key token bucket (analyze 5/min, read 30/min, compare 2/min); `internal/mcp/jobs.go` — concurrent job limiter; `internal/mcp/server.go` — API key auth; `internal/mcp/tools.go` — 500KB size cap, 5-min timeout, rate/job checks; `cmd/mcp/main.go` — PAPERVIZ_API_KEY required)
 - Chunk 8.1 Structured Research Objects — done 2026-09-01 (`migrations/014_structured_research_objects.sql` — 5 new tables: claims, paper_tables, methods, results, citations; `internal/repository/` — 5 new repos: ClaimRepo, PaperTableRepo, MethodRepo, ResultRepo, CitationRepo; `internal/handlers/documents.go` — 5 GET endpoints; `docs/canonical-research-output-contract.md` — updated with new entity schemas; 203 tests passing)
 - Chunk 8.2 Evidence Graph — done 2026-09-01 (`migrations/015_evidence_graph.sql` — 2 new tables: claim_evidence, paper_relationships; `internal/repository/` — 2 new repos: ClaimEvidenceRepo, PaperRelationshipRepo + traversal methods on Claims/Evidence; `internal/handlers/documents.go` — 3 endpoints: GET evidence-graph, GET/POST relationships; 219 tests passing)
+- Chunk 8.3 Cross-Paper Research Map — done 2026-09-01 (`internal/repository/types.go` — 5 relationship type constants; `internal/services/research_map.go` — GetResearchMap service grouping relationships by type with paper titles; `internal/handlers/documents.go` — GET /api/documents/:id/research-map endpoint; `frontend/src/components/research-map.jsx` — collapsible type groups with color-coded cards; `frontend/src/pages/result-page.jsx` — Research Map toggle button; 6 new tests, 225 total)
 
 ---
 
@@ -145,3 +146,7 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Evidence graph repos: `internal/repository/claim_evidence.go`, `internal/repository/paper_relationships.go`
 - Evidence graph traversal: `internal/repository/claims.go` (GetEvidence), `internal/repository/evidence.go` (GetClaims)
 - Evidence graph API endpoints: `internal/handlers/documents.go` (GET evidence-graph, GET/POST relationships)
+- Research map service: `internal/services/research_map.go`
+- Research map API endpoint: `internal/handlers/documents.go` (GET /api/documents/:id/research-map)
+- Research map frontend: `frontend/src/components/research-map.jsx`
+- Relationship type constants: `internal/repository/types.go` (PaperRelationshipSupporting, etc.)
