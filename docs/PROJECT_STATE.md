@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-01 — Chunk 8.3 merged: Cross-Paper Research Map (relationship type constants, GetResearchMap service, GET /api/documents/:id/research-map endpoint, ResearchMap frontend component, 6 new tests)
+**Last updated:** 2026-09-02 — Chunk 9.1 merged: DOI & URL Import (CrossRef/Unpaywall clients, FetchByDOI/FetchByURL services, POST /api/import/doi and /api/import/url handlers, frontend import tabs on upload page, 297 tests passing)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Phase 8 — Research Knowledge Layer
+- **Working on:** Phase 9 — Growth & Ecosystem
 - **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** Start Phase 9 — Growth & Ecosystem (Chunk 9.1 — Integrations)
+- **Next action if resuming:** Chunk 9.2 — Developer SDKs (or revisit integration priorities based on user demand)
 
 ---
 
@@ -61,6 +61,7 @@ something that should stay frozen.)*
 - Chunk 8.1 Structured Research Objects — done 2026-09-01 (`migrations/014_structured_research_objects.sql` — 5 new tables: claims, paper_tables, methods, results, citations; `internal/repository/` — 5 new repos: ClaimRepo, PaperTableRepo, MethodRepo, ResultRepo, CitationRepo; `internal/handlers/documents.go` — 5 GET endpoints; `docs/canonical-research-output-contract.md` — updated with new entity schemas; 203 tests passing)
 - Chunk 8.2 Evidence Graph — done 2026-09-01 (`migrations/015_evidence_graph.sql` — 2 new tables: claim_evidence, paper_relationships; `internal/repository/` — 2 new repos: ClaimEvidenceRepo, PaperRelationshipRepo + traversal methods on Claims/Evidence; `internal/handlers/documents.go` — 3 endpoints: GET evidence-graph, GET/POST relationships; 219 tests passing)
 - Chunk 8.3 Cross-Paper Research Map — done 2026-09-01 (`internal/repository/types.go` — 5 relationship type constants; `internal/services/research_map.go` — GetResearchMap service grouping relationships by type with paper titles; `internal/handlers/documents.go` — GET /api/documents/:id/research-map endpoint; `frontend/src/components/research-map.jsx` — collapsible type groups with color-coded cards; `frontend/src/pages/result-page.jsx` — Research Map toggle button; 6 new tests, 225 total)
+- Chunk 9.1 DOI & URL Import — done 2026-09-02 (`internal/external/crossref.go` + `unpaywall.go` — DOI resolution clients; `internal/services/import.go` — FetchByDOI + FetchByURL with SSRF protection; `internal/handlers/import.go` — POST /api/import/doi + /api/import/url; `internal/services/import_fetcher.go` — paperFetcher adapter; `internal/handlers/router.go` — wired /api/import routes; `frontend/src/lib/api.js` — importByDOI + importByURL functions; `frontend/src/components/doi-import.jsx` + `url-import.jsx` — import UI components; `frontend/src/pages/upload-page.jsx` — 4-tab mode selector; 297 tests passing)
 
 ---
 
@@ -150,3 +151,9 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Research map API endpoint: `internal/handlers/documents.go` (GET /api/documents/:id/research-map)
 - Research map frontend: `frontend/src/components/research-map.jsx`
 - Relationship type constants: `internal/repository/types.go` (PaperRelationshipSupporting, etc.)
+- DOI/URL import external clients: `internal/external/crossref.go`, `internal/external/unpaywall.go`
+- DOI/URL import service: `internal/services/import.go`, `internal/services/import_fetcher.go`
+- DOI/URL import handler: `internal/handlers/import.go` (POST /api/import/doi, POST /api/import/url)
+- Import API client functions: `frontend/src/lib/api.js` (importByDOI, importByURL)
+- Import UI components: `frontend/src/components/doi-import.jsx`, `frontend/src/components/url-import.jsx`
+- Upload page with import tabs: `frontend/src/pages/upload-page.jsx`

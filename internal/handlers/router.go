@@ -79,6 +79,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	r.Use(slogRequestLogger)
 
 	docHandler := NewDocumentHandler(db, gemini)
+	importHandler := NewImportHandler(db, gemini, services.NewPaperFetcher())
 	authMiddleware := NewAuthMiddleware(db)
 	shareHandler := NewShareHandler(db)
 	analyticsHandler := NewAnalyticsHandler(db)
@@ -106,6 +107,12 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.With(authMiddleware.RequireAuth).Delete("/{id}/share", shareHandler.RevokeDocToken)
 		r.With(authMiddleware.RequireAuth).Patch("/{id}/visibility", shareHandler.UpdateVisibility)
 		r.Post("/compare", docHandler.Compare)
+	})
+
+	// Import routes handle DOI/URL-based paper ingestion.
+	r.Route("/api/import", func(r chi.Router) {
+		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/doi", importHandler.ImportByDOI)
+		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/url", importHandler.ImportByURL)
 	})
 
 	r.With(noindexMiddleware).Get("/share/fig/{shareToken}", shareHandler.GetSharedFigure)
