@@ -23,6 +23,8 @@ func openTestDB(t *testing.T) *sql.DB {
 		10: "010_document_share.sql",
 		11: "011_share_referrals.sql",
 		12: "012_usage_analytics.sql",
+		13: "013_usage_tiers.sql",
+		14: "014_structured_research_objects.sql",
 	} {
 		sqlStr, err := ReadMigration(filepath.Join("..", "..", "migrations", file))
 		if err != nil {
