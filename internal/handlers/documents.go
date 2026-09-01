@@ -769,6 +769,316 @@ func (h *DocumentHandler) GetCitations(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+type claimWithEvidenceResponse struct {
+	ID         string             `json:"id"`
+	ClaimText  string             `json:"claim_text"`
+	ClaimType  string             `json:"claim_type"`
+	Confidence string             `json:"confidence"`
+	SourcePage *int               `json:"source_page,omitempty"`
+	SourceText *string            `json:"source_text,omitempty"`
+	CreatedAt  int64              `json:"created_at"`
+	Evidence   []evidenceResponse `json:"evidence"`
+}
+
+type egTableResp struct {
+	ID           string  `json:"id"`
+	PageNumber   *int    `json:"page_number,omitempty"`
+	Caption      *string `json:"caption,omitempty"`
+	Headers      string  `json:"headers"`
+	Rows         string  `json:"rows"`
+	SourceText   *string `json:"source_text,omitempty"`
+	DisplayOrder int     `json:"display_order"`
+}
+
+type egMethodResp struct {
+	ID          string  `json:"id"`
+	MethodName  string  `json:"method_name"`
+	Description *string `json:"description,omitempty"`
+	MethodType  string  `json:"method_type"`
+	SourcePage  *int    `json:"source_page,omitempty"`
+	SourceText  *string `json:"source_text,omitempty"`
+}
+
+type egResultResp struct {
+	ID                   string  `json:"id"`
+	ResultText           string  `json:"result_text"`
+	ResultType           string  `json:"result_type"`
+	SupportingEvidenceID *string `json:"supporting_evidence_id,omitempty"`
+	SourcePage           *int    `json:"source_page,omitempty"`
+	SourceText           *string `json:"source_text,omitempty"`
+}
+
+type egCitationResp struct {
+	ID           string  `json:"id"`
+	CitedPaperID *string `json:"cited_paper_id,omitempty"`
+	Authors      *string `json:"authors,omitempty"`
+	Title        *string `json:"title,omitempty"`
+	Year         *int    `json:"year,omitempty"`
+	Venue        *string `json:"venue,omitempty"`
+	DOI          *string `json:"doi,omitempty"`
+	URL          *string `json:"url,omitempty"`
+	SourcePage   *int    `json:"source_page,omitempty"`
+}
+
+type evidenceGraphResponse struct {
+	Claims    []claimWithEvidenceResponse `json:"claims"`
+	Tables    []egTableResp               `json:"tables"`
+	Methods   []egMethodResp              `json:"methods"`
+	Results   []egResultResp              `json:"results"`
+	Citations []egCitationResp            `json:"citations"`
+}
+
+func (h *DocumentHandler) GetEvidenceGraph(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	docRepo := repository.NewDocumentRepo(h.db)
+	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	} else if err != nil {
+		slog.Error("get document for evidence graph failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	claimRepo := repository.NewClaimRepo(h.db)
+	claims, err := claimRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list claims for evidence graph failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	claimResponses := make([]claimWithEvidenceResponse, 0, len(claims))
+	for _, c := range claims {
+		evidence, err := claimRepo.GetEvidence(c.ID)
+		if err != nil {
+			slog.Error("get evidence for claim failed", "claim_id", c.ID, "error", err)
+			writeError(w, http.StatusInternalServerError, "internal_error")
+			return
+		}
+		evResponses := make([]evidenceResponse, 0, len(evidence))
+		for _, e := range evidence {
+			evResponses = append(evResponses, evidenceResponse{
+				ID:              e.ID,
+				Page:            e.Page,
+				FigureID:        e.FigureID,
+				TableID:         e.TableID,
+				Section:         e.Section,
+				SourceText:      e.SourceText,
+				SourceReference: e.SourceReference,
+			})
+		}
+		claimResponses = append(claimResponses, claimWithEvidenceResponse{
+			ID: c.ID, ClaimText: c.ClaimText, ClaimType: c.ClaimType,
+			Confidence: c.Confidence, SourcePage: c.SourcePage,
+			SourceText: c.SourceText, CreatedAt: c.CreatedAt,
+			Evidence: evResponses,
+		})
+	}
+
+	tableRepo := repository.NewPaperTableRepo(h.db)
+	tables, err := tableRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list tables for evidence graph failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	tableResponses := make([]egTableResp, 0, len(tables))
+	for _, t := range tables {
+		tableResponses = append(tableResponses, egTableResp{
+			ID: t.ID, PageNumber: t.PageNumber, Caption: t.Caption,
+			Headers: t.Headers, Rows: t.Rows, SourceText: t.SourceText,
+			DisplayOrder: t.DisplayOrder,
+		})
+	}
+
+	methodRepo := repository.NewMethodRepo(h.db)
+	methods, err := methodRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list methods for evidence graph failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	methodResponses := make([]egMethodResp, 0, len(methods))
+	for _, m := range methods {
+		methodResponses = append(methodResponses, egMethodResp{
+			ID: m.ID, MethodName: m.MethodName, Description: m.Description,
+			MethodType: m.MethodType, SourcePage: m.SourcePage, SourceText: m.SourceText,
+		})
+	}
+
+	resultRepo := repository.NewResultRepo(h.db)
+	results, err := resultRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list results for evidence graph failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	resultResponses := make([]egResultResp, 0, len(results))
+	for _, res := range results {
+		resultResponses = append(resultResponses, egResultResp{
+			ID: res.ID, ResultText: res.ResultText, ResultType: res.ResultType,
+			SupportingEvidenceID: res.SupportingEvidenceID, SourcePage: res.SourcePage,
+			SourceText: res.SourceText,
+		})
+	}
+
+	citationRepo := repository.NewCitationRepo(h.db)
+	citations, err := citationRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list citations for evidence graph failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	citationResponses := make([]egCitationResp, 0, len(citations))
+	for _, c := range citations {
+		citationResponses = append(citationResponses, egCitationResp{
+			ID: c.ID, CitedPaperID: c.CitedPaperID, Authors: c.Authors,
+			Title: c.Title, Year: c.Year, Venue: c.Venue, DOI: c.DOI,
+			URL: c.URL, SourcePage: c.SourcePage,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, evidenceGraphResponse{
+		Claims:    claimResponses,
+		Tables:    tableResponses,
+		Methods:   methodResponses,
+		Results:   resultResponses,
+		Citations: citationResponses,
+	})
+}
+
+type paperRelationshipResponse struct {
+	ID               string  `json:"id"`
+	SourcePaperID    string  `json:"source_paper_id"`
+	TargetPaperID    string  `json:"target_paper_id"`
+	RelationshipType string  `json:"relationship_type"`
+	EvidenceText     *string `json:"evidence_text,omitempty"`
+	CreatedAt        int64   `json:"created_at"`
+}
+
+type createRelationshipRequest struct {
+	TargetPaperID    string  `json:"target_paper_id"`
+	RelationshipType string  `json:"relationship_type"`
+	EvidenceText     *string `json:"evidence_text,omitempty"`
+}
+
+var validRelationshipTypes = map[string]bool{
+	repository.PaperRelationshipSupporting:         true,
+	repository.PaperRelationshipContradicting:      true,
+	repository.PaperRelationshipCiting:             true,
+	repository.PaperRelationshipSimilarMethodology: true,
+	repository.PaperRelationshipDifferentFindings:  true,
+}
+
+func (h *DocumentHandler) GetPaperRelationships(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	docRepo := repository.NewDocumentRepo(h.db)
+	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	} else if err != nil {
+		slog.Error("get document for relationships failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	relRepo := repository.NewPaperRelationshipRepo(h.db)
+	rels, err := relRepo.ListByPaper(id)
+	if err != nil {
+		slog.Error("list paper relationships failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	resp := make([]paperRelationshipResponse, 0, len(rels))
+	for _, rel := range rels {
+		resp = append(resp, paperRelationshipResponse{
+			ID: rel.ID, SourcePaperID: rel.SourcePaperID,
+			TargetPaperID: rel.TargetPaperID, RelationshipType: rel.RelationshipType,
+			EvidenceText: rel.EvidenceText, CreatedAt: rel.CreatedAt,
+		})
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *DocumentHandler) CreatePaperRelationship(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	docRepo := repository.NewDocumentRepo(h.db)
+	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	} else if err != nil {
+		slog.Error("get document for create relationship failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	var req createRelationshipRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	if req.TargetPaperID == "" {
+		writeError(w, http.StatusBadRequest, "target_paper_id_required")
+		return
+	}
+	if req.RelationshipType == "" {
+		writeError(w, http.StatusBadRequest, "relationship_type_required")
+		return
+	}
+	if !validRelationshipTypes[req.RelationshipType] {
+		writeError(w, http.StatusBadRequest, "invalid_relationship_type")
+		return
+	}
+
+	if req.TargetPaperID == id {
+		writeError(w, http.StatusBadRequest, "cannot_self_reference")
+		return
+	}
+
+	if _, err := docRepo.Get(req.TargetPaperID); errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "target_paper_not_found")
+		return
+	} else if err != nil {
+		slog.Error("get target document failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	relID, err := repository.NewID()
+	if err != nil {
+		slog.Error("generate relationship id failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	rel := repository.PaperRelationship{
+		ID:               relID,
+		SourcePaperID:    id,
+		TargetPaperID:    req.TargetPaperID,
+		RelationshipType: req.RelationshipType,
+		EvidenceText:     req.EvidenceText,
+		CreatedAt:        time.Now().Unix(),
+	}
+
+	relRepo := repository.NewPaperRelationshipRepo(h.db)
+	if err := relRepo.Insert(rel); err != nil {
+		slog.Error("insert paper relationship failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, paperRelationshipResponse{
+		ID: rel.ID, SourcePaperID: rel.SourcePaperID,
+		TargetPaperID: rel.TargetPaperID, RelationshipType: rel.RelationshipType,
+		EvidenceText: rel.EvidenceText, CreatedAt: rel.CreatedAt,
+	})
+}
+
 // Compare handles POST /api/documents/compare.
 func (h *DocumentHandler) Compare(w http.ResponseWriter, r *http.Request) {
 	var req compareRequest

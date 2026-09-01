@@ -93,6 +93,7 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.Get("/{id}/methods", docHandler.GetMethods)
 		r.Get("/{id}/results", docHandler.GetResults)
 		r.Get("/{id}/citations", docHandler.GetCitations)
+		r.Get("/{id}/evidence-graph", docHandler.GetEvidenceGraph)
 		r.With(authMiddleware.RequireAuth).Get("/stats", docHandler.Stats)
 		r.With(authMiddleware.RequireAuth).Get("/", docHandler.List)
 		r.With(authMiddleware.RequireAuth).Put("/{id}/save", docHandler.ToggleSaved)
@@ -134,6 +135,11 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.With(authMiddleware.RequireAuth).Delete("/{id}", collectionHandler.Delete)
 		r.With(authMiddleware.RequireAuth).Post("/{id}/documents", collectionHandler.AddDocument)
 		r.With(authMiddleware.RequireAuth).Delete("/{id}/documents/{docId}", collectionHandler.RemoveDocument)
+	})
+
+	r.Route("/api/papers", func(r chi.Router) {
+		r.Get("/{id}/relationships", docHandler.GetPaperRelationships)
+		r.Post("/{id}/relationships", docHandler.CreatePaperRelationship)
 	})
 
 	// spaNotFound serves API 404 JSON, real static files, and the SPA fallback for deep links.
