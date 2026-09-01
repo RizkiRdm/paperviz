@@ -39,7 +39,11 @@ The root entity representing an analyzed research document.
   "charts": ["Chart[] — re-visualized figures"],
   "chapters": ["Chapter[] — detected sections"],
   "claim_diff": "ClaimDiff | null — claim verification data",
-  "evidence": ["Evidence[] — source evidence references"]
+  "evidence": ["Evidence[] — source evidence references"],
+  "claims": ["Claim[] — extracted claims from the paper"],
+  "methods": ["Method[] — research methods described"],
+  "results": ["Result[] — research findings and outcomes"],
+  "citations": ["Citation[] — referenced works"]
 }
 ```
 
@@ -47,7 +51,7 @@ The root entity representing an analyzed research document.
 - `id` is permanent once created
 - `status` transitions: `processing → complete | failed | verification_failed`
 - `simplified_text` format is markdown, but structure may evolve
-- `charts`, `chapters`, `claim_diff`, `evidence` are separate entities linked by document_id
+- `charts`, `chapters`, `claim_diff`, `evidence`, `claims`, `methods`, `results`, `citations` are separate entities linked by document_id
 
 ---
 
@@ -146,6 +150,96 @@ A piece of evidence linking claims to source material.
 - `source_text` is always verbatim from the original
 - `source_reference` provides human-readable location
 - `figure_id` / `table_id` link to specific visual elements
+
+---
+
+### Claim
+A factual assertion extracted from the paper.
+
+```json
+{
+  "id": "string — unique identifier (claim_abc123)",
+  "paper_id": "string — parent paper ID",
+  "claim_text": "string — the claim statement",
+  "claim_type": "hypothesis | finding | conclusion | method | null",
+  "confidence": "high | medium | low | null — extraction reliability",
+  "source_page": "integer | null — source page (0 if not applicable)",
+  "source_text": "string | null — verbatim text backing this claim",
+  "created_at": "integer — Unix timestamp (seconds)"
+}
+```
+
+**Provenance fields:**
+- `source_text`: Original text that supports this claim
+- `source_page`: Where in the original document
+- `confidence`: How reliably the claim was extracted
+
+---
+
+### Method
+A research method or technique described in the paper.
+
+```json
+{
+  "id": "string — unique identifier (method_abc123)",
+  "paper_id": "string — parent paper ID",
+  "method_name": "string — name of the method",
+  "description": "string — plain-language explanation of the method",
+  "method_type": "experimental | observational | computational | theoretical | null",
+  "source_page": "integer | null — source page (0 if not applicable)",
+  "source_text": "string | null — verbatim text describing this method"
+}
+```
+
+**Provenance fields:**
+- `source_text`: Original text describing the method
+- `source_page`: Where in the original document
+
+---
+
+### Result
+A research finding or outcome reported in the paper.
+
+```json
+{
+  "id": "string — unique identifier (result_abc123)",
+  "paper_id": "string — parent paper ID",
+  "result_text": "string — the finding or outcome statement",
+  "result_type": "quantitative | qualitative | null",
+  "supporting_evidence_id": "string | null — linked evidence ID",
+  "source_page": "integer | null — source page (0 if not applicable)",
+  "source_text": "string | null — verbatim text supporting this result"
+}
+```
+
+**Provenance fields:**
+- `source_text`: Original text supporting this result
+- `source_page`: Where in the original document
+- `supporting_evidence_id`: Links to an Evidence entity for verification
+
+---
+
+### Citation
+A reference to another work cited in the paper.
+
+```json
+{
+  "id": "string — unique identifier (citation_abc123)",
+  "paper_id": "string — parent paper ID",
+  "cited_paper_id": "string | null — linked Document ID if in corpus",
+  "authors": "string — author names",
+  "title": "string — cited work title",
+  "year": "integer | null — publication year",
+  "venue": "string | null — journal or conference name",
+  "doi": "string | null — DOI identifier",
+  "url": "string | null — URL to the cited work",
+  "source_page": "integer | null — page where citation appears"
+}
+```
+
+**Provenance fields:**
+- `source_page`: Where in the original document this citation appears
+- `cited_paper_id`: Links to a Document entity if the cited work is in the user's corpus
 
 ---
 
@@ -329,6 +423,9 @@ Full result of one pipeline run, ready for persistence.
 | Chart | `chart_` | `chart_abc123` |
 | Chapter | `chapter_` | `chapter_abc123` |
 | Claim | `claim_` | `claim_abc123` |
+| Method | `method_` | `method_abc123` |
+| Result | `result_` | `result_abc123` |
+| Citation | `citation_` | `citation_abc123` |
 | Evidence | `evidence_` | `evidence_abc123` |
 | Table | `table_` | `table_abc123` |
 | Collection | `col_` | `col_abc123` |
@@ -414,8 +511,8 @@ This contract is pre-release (v0.x). Breaking changes may occur, but will be doc
 | Interface | Uses |
 |-----------|------|
 | Web UI | Full entity set, presentation layer |
-| REST API | Document, Chart, ClaimDiff, Chapter, Evidence (via /api/documents) |
-| MCP (future) | PaperSummary, Comparison, EvidenceClaim |
+| REST API | Document, Chart, ClaimDiff, Chapter, Evidence, Claim, Method, Result, Citation (via /api/documents) |
+| MCP (future) | PaperSummary, Comparison, EvidenceClaim, Claim, Method, Result, Citation |
 | SDK (future) | All entities |
 
 **Rule:** Business logic lives in core layer. Web UI, API, MCP, and SDK are thin adapters over the same canonical data.

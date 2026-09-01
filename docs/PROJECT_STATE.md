@@ -16,7 +16,7 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-08-31 — Chunk 7.6 merged: MCP Usage, Security & Cost Controls (API key auth, rate limits, job limits, size validation, timeout, error types)
+**Last updated:** 2026-09-01 — Chunk 8.1 merged: Structured Research Objects (claims, tables, methods, results, citations tables + repos + API endpoints)
 
 ---
 
@@ -26,7 +26,7 @@
 - **Working on:** Phase 8 — Research Knowledge Layer
 - **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** Start Chunk 8.1 — Structured Research Objects
+- **Next action if resuming:** Start Chunk 8.2 — Evidence Graph
 
 ---
 
@@ -58,6 +58,7 @@ something that should stay frozen.)*
 - Chunk 7.4 MCP — done 2026-08-31 (`cmd/mcp/main.go`, `internal/mcp/` — 6 research tools: analyze_paper, get_summary, get_figures, get_claims, get_evidence, compare_papers; official Go SDK, stdio transport)
 - Chunk 7.5 Human/Agent Capability Parity — done 2026-08-31 (`docs/mcp-parity.md` — MCP↔REST parity map; `internal/mcp/tools.go` — added image_url base64 to get_figures; documented intentionally unavailable agent operations)
 - Chunk 7.6 MCP Usage, Security & Cost Controls — done 2026-08-31 (`internal/mcp/errors.go` — MCPError type + sentinels; `internal/mcp/ratelimit.go` — per-key token bucket (analyze 5/min, read 30/min, compare 2/min); `internal/mcp/jobs.go` — concurrent job limiter; `internal/mcp/server.go` — API key auth; `internal/mcp/tools.go` — 500KB size cap, 5-min timeout, rate/job checks; `cmd/mcp/main.go` — PAPERVIZ_API_KEY required)
+- Chunk 8.1 Structured Research Objects — done 2026-09-01 (`migrations/014_structured_research_objects.sql` — 5 new tables: claims, paper_tables, methods, results, citations; `internal/repository/` — 5 new repos: ClaimRepo, PaperTableRepo, MethodRepo, ResultRepo, CitationRepo; `internal/handlers/documents.go` — 5 GET endpoints; `docs/canonical-research-output-contract.md` — updated with new entity schemas; 203 tests passing)
 
 ---
 
@@ -136,3 +137,6 @@ just a fast map: "if I need to change X, which file do I open".)*
 - OpenAPI spec: `docs/openapi.yaml`
 - MCP server: `cmd/mcp/main.go`, `internal/mcp/server.go`, `internal/mcp/tools.go`, `internal/mcp/errors.go`, `internal/mcp/ratelimit.go`, `internal/mcp/jobs.go`
 - MCP↔REST parity map: `docs/mcp-parity.md`
+- Structured research objects migration: `migrations/014_structured_research_objects.sql`
+- Structured research repos: `internal/repository/claims.go`, `internal/repository/tables.go`, `internal/repository/methods.go`, `internal/repository/results.go`, `internal/repository/citations.go`
+- Structured research API endpoints: `internal/handlers/documents.go` (GET /api/documents/:id/{claims,tables,methods,results,citations})

@@ -1,0 +1,77 @@
+{
+  "stage": "interview",
+  "title": "Chunk 8.1 — Structured Research Objects",
+  "goalSlug": "chunk-8.1-structured-research-objects",
+  "questions": [
+    {
+      "id": "scope",
+      "prompt": "The roadmap says to formalize: Paper, Claim, Evidence, Figure, Table, Method, Result, Citation. Which of these need NEW database tables vs just formalizing existing structures?",
+      "description": "Currently: Document (Paper), Chart (Figure), Evidence exist. ClaimDiff exists but is for verification only. Table has schema defined but no implementation. Method, Result, Citation don't exist.",
+      "answerMode": "single",
+      "recommendedAnswer": "Create new tables for: Claim, Table, Method, Result, Citation. Formalize existing Document/Chart/Evidence with stable IDs.",
+      "recommendedOptionIds": ["new-tables"],
+      "options": [
+        { "id": "new-tables", "label": "Create new tables for Claim, Table, Method, Result, Citation" },
+        { "id": "minimal", "label": "Only add Table (already has schema). Method/Result/Citation are fields, not entities" },
+        { "id": "full", "label": "Create ALL as separate entities with own tables" }
+      ],
+      "required": true
+    },
+    {
+      "id": "method-result-citation",
+      "prompt": "Method, Result, Citation — should these be separate entities with their own IDs, or fields within Paper/Document?",
+      "description": "Currently PaperSummary has methodology, findings, conclusions as strings. Should these become structured entities?",
+      "answerMode": "single",
+      "recommendedAnswer": "Separate entities with IDs — enables cross-paper comparison and evidence linking.",
+      "recommendedOptionIds": ["separate-entities"],
+      "options": [
+        { "id": "separate-entities", "label": "Separate entities with own tables and IDs" },
+        { "id": "fields-only", "label": "Keep as fields in Document/PaperSummary" },
+        { "id": "hybrid", "label": "Method/Result as entities, Citation as field" }
+      ],
+      "required": true
+    },
+    {
+      "id": "pipeline-integration",
+      "prompt": "Should these new entities be extracted during the existing analysis pipeline, or added later via a separate process?",
+      "description": "Current pipeline: intake → simplify → verify → chapters → charts. Where do Method/Result/Citation extraction fit?",
+      "answerMode": "single",
+      "recommendedAnswer": "Add to existing pipeline — extract Method/Result/Citation during simplify stage alongside claims.",
+      "recommendedOptionIds": ["pipeline"],
+      "options": [
+        { "id": "pipeline", "label": "Add to existing pipeline (simplify stage)" },
+        { "id": "post-pipeline", "label": "Separate post-processing step" },
+        { "id": "on-demand", "label": "Extract on-demand via API" }
+      ],
+      "required": true
+    },
+    {
+      "id": "backward-compatibility",
+      "prompt": "How should we handle backward compatibility with existing data?",
+      "description": "Existing documents don't have Method/Result/Citation data. Should we backfill or leave null?",
+      "answerMode": "single",
+      "recommendedAnswer": "Leave null for existing documents — no backfill. New entities only for new analyses.",
+      "recommendedOptionIds": ["no-backfill"],
+      "options": [
+        { "id": "no-backfill", "label": "Leave null for existing docs, extract for new analyses only" },
+        { "id": "backfill", "label": "Backfill existing docs via re-analysis" },
+        { "id": "lazy", "label": "Extract on-demand when accessed" }
+      ],
+      "required": true
+    },
+    {
+      "id": "claim-formalization",
+      "prompt": "Currently ClaimDiff stores original vs simplified claims for verification. Should the new Claim entity replace ClaimDiff or coexist?",
+      "description": "ClaimDiff is used for simplification verification. New Claim entity would be for structured research claims.",
+      "answerMode": "single",
+      "recommendedAnswer": "Coexist — ClaimDiff for verification, Claim for structured research claims with evidence links.",
+      "recommendedOptionIds": ["coexist"],
+      "options": [
+        { "id": "coexist", "label": "Coexist — different purposes" },
+        { "id": "replace", "label": "Replace ClaimDiff with new Claim entity" },
+        { "id": "merge", "label": "Merge into Claim entity with verification flag" }
+      ],
+      "required": true
+    }
+  ]
+}

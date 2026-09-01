@@ -122,3 +122,96 @@ const (
 	ChartSourceImageFallback = "image_fallback"
 	ChartSourceOmitted       = "omitted"
 )
+
+// Claim mirrors the claims table.
+type Claim struct {
+	ID         string
+	PaperID    string
+	ClaimText  string
+	ClaimType  string
+	Confidence string
+	SourcePage *int
+	SourceText *string
+	CreatedAt  int64
+}
+
+// PaperTable mirrors the paper_tables table.
+type PaperTable struct {
+	ID           string
+	DocumentID   string
+	PageNumber   *int
+	Caption      *string
+	Headers      string // JSON array of column headers
+	Rows         string // JSON array of row arrays
+	SourceText   *string
+	DisplayOrder int
+}
+
+// Method mirrors the methods table.
+type Method struct {
+	ID          string
+	PaperID     string
+	MethodName  string
+	Description *string
+	MethodType  string
+	SourcePage  *int
+	SourceText  *string
+}
+
+// Result mirrors the results table.
+type Result struct {
+	ID                   string
+	PaperID              string
+	ResultText           string
+	ResultType           string
+	SupportingEvidenceID *string
+	SourcePage           *int
+	SourceText           *string
+}
+
+// Citation mirrors the citations table.
+type Citation struct {
+	ID           string
+	PaperID      string
+	CitedPaperID *string
+	Authors      *string
+	Title        *string
+	Year         *int
+	Venue        *string
+	DOI          *string
+	URL          *string
+	SourcePage   *int
+}
+
+// ClaimType enum values.
+const (
+	ClaimTypeHypothesis  = "hypothesis"
+	ClaimTypeFinding     = "finding"
+	ClaimTypeConclusion  = "conclusion"
+	ClaimTypeMethod      = "method"
+	ClaimTypeLimitation  = "limitation"
+)
+
+// Confidence enum values.
+const (
+	ConfidenceHigh   = "high"
+	ConfidenceMedium = "medium"
+	ConfidenceLow    = "low"
+)
+
+// MethodType enum values.
+const (
+	MethodTypeExperimental   = "experimental"
+	MethodTypeSurvey         = "survey"
+	MethodTypeQualitative    = "qualitative"
+	MethodTypeQuantitative   = "quantitative"
+	MethodTypeComputational  = "computational"
+	MethodTypeOther          = "other"
+)
+
+// ResultType enum values.
+const (
+	ResultTypePrimary   = "primary"
+	ResultTypeSecondary = "secondary"
+	ResultTypeNegative  = "negative"
+)
