@@ -13,8 +13,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	papervizMCP "paperviz/internal/mcp"
 	"paperviz/internal/external"
+	papervizMCP "paperviz/internal/mcp"
 	"paperviz/internal/repository"
 )
 
@@ -37,6 +37,9 @@ func loadMigrations(migrationsDir string) (map[int]string, error) {
 		11: "011_share_referrals.sql",
 		12: "012_usage_analytics.sql",
 		13: "013_usage_tiers.sql",
+		14: "014_structured_research_objects.sql",
+		15: "015_evidence_graph.sql",
+		16: "016_annotations.sql",
 	}
 
 	for version, file := range paths {

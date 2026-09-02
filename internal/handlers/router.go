@@ -85,6 +85,9 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	analyticsHandler := NewAnalyticsHandler(db)
 	usageHandler := NewUsageHandler(services.NewTierService(db))
 
+	annotationHandler := NewAnnotationHandler(db)
+	exportHandler := NewExportHandler(db)
+
 	r.Route("/api/documents", func(r chi.Router) {
 		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/", docHandler.Create)
 		r.Get("/{id}", docHandler.Get)
@@ -107,6 +110,12 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 		r.With(authMiddleware.RequireAuth).Delete("/{id}/share", shareHandler.RevokeDocToken)
 		r.With(authMiddleware.RequireAuth).Patch("/{id}/visibility", shareHandler.UpdateVisibility)
 		r.Post("/compare", docHandler.Compare)
+
+		r.With(authMiddleware.RequireAuth).Get("/{id}/annotations", annotationHandler.List)
+		r.With(authMiddleware.RequireAuth).Post("/{id}/annotations", annotationHandler.Create)
+		r.With(authMiddleware.RequireAuth).Put("/{id}/annotations/{annotationId}", annotationHandler.Update)
+		r.With(authMiddleware.RequireAuth).Delete("/{id}/annotations/{annotationId}", annotationHandler.Delete)
+		r.With(authMiddleware.RequireAuth).Get("/{id}/export", exportHandler.Export)
 	})
 
 	// Import routes handle DOI/URL-based paper ingestion.

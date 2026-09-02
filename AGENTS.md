@@ -34,6 +34,8 @@ Rules:
 
 - **B3 (single-call verification) skipped** — requires live API key + real-document regression testing against B2 before shipping. Plan still describes it as optional.
 
+- **Annotations require authentication.** Unauthenticated users cannot create/edit/delete annotations. Export endpoint also requires auth. Design decision: annotations are per-user research context, not collaborative.
+
 ## DB Reset Protocol
 
 When schema changes (new column/table):
@@ -54,6 +56,8 @@ When schema changes (new column/table):
    - New `GenerateChapterChart()` in `charts.go`: one Gemini call per chapter, chart type varies (bar/line/pie/scatter)
    - Old `ExtractChartsFromText`, `fullTextChartPrompt` removed. `textChartElem` kept (test compat).
    - Image fallback path (`ReVisualizeCharts`) unchanged.
+7. D1: Annotations enforce per-user ownership — service layer checks `userID` matches before update/delete. 403 returned on ownership mismatch.
+8. D2: Export endpoint excludes `OriginalText` and `SimplifiedText` — copyright compliance. Only structured metadata and user annotations are exported.
 
 ---
 

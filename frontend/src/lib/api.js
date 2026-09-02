@@ -197,3 +197,56 @@ export async function trackReferral(ref) {
     // intentionally ignored — referral tracking is best-effort
   }
 }
+
+// listAnnotations returns the current user's annotations for a document.
+export async function listAnnotations(documentId) {
+  const response = await fetch(`/api/documents/${documentId}/annotations`)
+  if (!response.ok) throw await parseErrorResponse(response)
+  return response.json()
+}
+
+// createAnnotation adds a new annotation to a document.
+export async function createAnnotation(documentId, { targetType, targetId, content }) {
+  const response = await fetch(`/api/documents/${documentId}/annotations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ target_type: targetType, target_id: targetId, content }),
+  })
+  if (!response.ok) throw await parseErrorResponse(response)
+  return response.json()
+}
+
+// updateAnnotation changes the content of an existing annotation.
+export async function updateAnnotation(documentId, annotationId, content) {
+  const response = await fetch(`/api/documents/${documentId}/annotations/${annotationId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  })
+  if (!response.ok) throw await parseErrorResponse(response)
+  return response.json()
+}
+
+// deleteAnnotation removes an annotation.
+export async function deleteAnnotation(documentId, annotationId) {
+  const response = await fetch(`/api/documents/${documentId}/annotations/${annotationId}`, {
+    method: "DELETE",
+  })
+  if (!response.ok) throw await parseErrorResponse(response)
+}
+
+// exportResearchContext downloads the full research context as JSON.
+export async function exportResearchContext(documentId) {
+  const response = await fetch(`/api/documents/${documentId}/export`)
+  if (!response.ok) throw await parseErrorResponse(response)
+  const data = await response.json()
+  // Trigger download
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `research-context-${documentId}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+  return data
+}

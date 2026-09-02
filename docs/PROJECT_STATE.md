@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-02 — Chunk 9.1 merged: DOI & URL Import (CrossRef/Unpaywall clients, FetchByDOI/FetchByURL services, POST /api/import/doi and /api/import/url handlers, frontend import tabs on upload page, 297 tests passing)
+**Last updated:** 2026-09-03 — Chunk 9.3 merged: Research Knowledge Accumulation (user annotations on papers/claims, research context JSON export, 315 tests passing)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Phase 9 — Growth & Ecosystem
+- **Working on:** Phase 10 — Defensibility
 - **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** Chunk 9.2 — Developer SDKs (or revisit integration priorities based on user demand)
+- **Next action if resuming:** Chunk 10.1 — Research Knowledge Accumulation (deepening) or revisit based on user demand
 
 ---
 
@@ -62,6 +62,7 @@ something that should stay frozen.)*
 - Chunk 8.2 Evidence Graph — done 2026-09-01 (`migrations/015_evidence_graph.sql` — 2 new tables: claim_evidence, paper_relationships; `internal/repository/` — 2 new repos: ClaimEvidenceRepo, PaperRelationshipRepo + traversal methods on Claims/Evidence; `internal/handlers/documents.go` — 3 endpoints: GET evidence-graph, GET/POST relationships; 219 tests passing)
 - Chunk 8.3 Cross-Paper Research Map — done 2026-09-01 (`internal/repository/types.go` — 5 relationship type constants; `internal/services/research_map.go` — GetResearchMap service grouping relationships by type with paper titles; `internal/handlers/documents.go` — GET /api/documents/:id/research-map endpoint; `frontend/src/components/research-map.jsx` — collapsible type groups with color-coded cards; `frontend/src/pages/result-page.jsx` — Research Map toggle button; 6 new tests, 225 total)
 - Chunk 9.1 DOI & URL Import — done 2026-09-02 (`internal/external/crossref.go` + `unpaywall.go` — DOI resolution clients; `internal/services/import.go` — FetchByDOI + FetchByURL with SSRF protection; `internal/handlers/import.go` — POST /api/import/doi + /api/import/url; `internal/services/import_fetcher.go` — paperFetcher adapter; `internal/handlers/router.go` — wired /api/import routes; `frontend/src/lib/api.js` — importByDOI + importByURL functions; `frontend/src/components/doi-import.jsx` + `url-import.jsx` — import UI components; `frontend/src/pages/upload-page.jsx` — 4-tab mode selector; 297 tests passing)
+- Chunk 9.3 Research Knowledge Accumulation — done 2026-09-03 (`migrations/016_annotations.sql` — annotations table; `internal/repository/annotations.go` — AnnotationRepo CRUD; `internal/services/annotations.go` — annotation service with ownership enforcement; `internal/services/export.go` — ExportResearchContext assembles full research context JSON; `internal/handlers/annotations.go` — 4 CRUD endpoints; `internal/handlers/export.go` — GET export endpoint; `frontend/src/components/annotation-panel.jsx` — collapsible annotation UI; `frontend/src/pages/result-page.jsx` — annotation panel + export button; 315 tests passing)
 
 ---
 
@@ -106,6 +107,8 @@ something you already rejected for a clear reason.)*
 | 2026-08-29 | Research tier = "Contact us" (no fixed price) | Avoids unprofitable fixed pricing; custom for high-volume users |
 | 2026-08-29 | Upgrade flow = waitlist/email capture | No payment processing yet; measures intent before building billing |
 | 2026-09-02 | URL import: https-only + block private IPs | SSRF protection; prevents user-controlled URLs from hitting internal network |
+| 2026-09-03 | Annotations are per-user, not per-document | Ownership enforcement ensures users can only edit/delete their own annotations |
+| 2026-09-03 | Export excludes OriginalText/SimplifiedText | Copyright compliance — users export structured metadata and their own annotations, not source text |
 
 ---
 
@@ -158,3 +161,10 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Import API client functions: `frontend/src/lib/api.js` (importByDOI, importByURL)
 - Import UI components: `frontend/src/components/doi-import.jsx`, `frontend/src/components/url-import.jsx`
 - Upload page with import tabs: `frontend/src/pages/upload-page.jsx`
+- Annotations migration: `migrations/016_annotations.sql`
+- Annotations repo: `internal/repository/annotations.go`
+- Annotations service: `internal/services/annotations.go`
+- Annotations handler: `internal/handlers/annotations.go` (POST/PUT/DELETE/GET /api/documents/:id/annotations)
+- Export service: `internal/services/export.go`
+- Export handler: `internal/handlers/export.go` (GET /api/documents/:id/export)
+- Annotation frontend: `frontend/src/components/annotation-panel.jsx`
