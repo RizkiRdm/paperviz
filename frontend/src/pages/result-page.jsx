@@ -8,7 +8,9 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useDocumentPoll } from "@/hooks/use-document-poll"
 import { generateDocumentShare, updateDocumentVisibility } from "@/lib/api"
-import { ArrowLeft, ArrowRight, Copy, Check, RefreshCw, BarChart2, Link2, FolderPlus, LayoutDashboard, Network } from "lucide-react"
+import { ArrowLeft, ArrowRight, Copy, Check, RefreshCw, BarChart2, Link2, FolderPlus, LayoutDashboard, Network, StickyNote } from "lucide-react"
+import AnnotationPanel from "@/components/annotation-panel"
+import { exportResearchContext } from "@/lib/api"
 import { NotFoundPage } from "@/pages/not-found-page"
 import ReactMarkdown from "react-markdown"
 
@@ -119,6 +121,7 @@ export function ResultPage() {
   const [collections, setCollections] = useState([])
   const [showAddToCollection, setShowAddToCollection] = useState(false)
   const [showResearchMap, setShowResearchMap] = useState(false)
+  const [showAnnotations, setShowAnnotations] = useState(false)
   const copyTimerRef = useRef(null)
 
   useEffect(() => () => clearTimeout(copyTimerRef.current), [])
@@ -380,6 +383,24 @@ const STAGE_LABELS = {
           </div>
         )}
 
+        {showAnnotations && (
+          <div className="mb-6 rounded-[12px] border border-[#e5e5e5] bg-white p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <StickyNote className="h-4 w-4 text-[#92400e]" />
+                <h3 className="text-sm font-medium text-[#0a0a0a]">Personal Notes</h3>
+              </div>
+              <button
+                onClick={() => setShowAnnotations(false)}
+                className="text-xs text-[#737373] hover:text-[#0a0a0a]"
+              >
+                Close
+              </button>
+            </div>
+            <AnnotationPanel documentId={documentId} />
+          </div>
+        )}
+
         {/* Action bar — reading level badge + view toggle + copy text */}
         <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-[#e5e5e5]">
           <div className="flex items-center gap-3">
@@ -404,6 +425,20 @@ const STAGE_LABELS = {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>View how this paper relates to others</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowAnnotations(v => !v)}
+                  className={`h-8 px-2.5 text-xs gap-1.5 font-medium ${showAnnotations ? "bg-[#fef3c7] text-[#92400e] border-[#fde68a]" : ""}`}
+                >
+                  <StickyNote className="h-3.5 w-3.5" />
+                  Notes
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Add personal notes to this paper</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -660,6 +695,12 @@ const STAGE_LABELS = {
               >
                 <LayoutDashboard className="h-3.5 w-3.5" /> View All Papers
               </Link>
+              <button
+                onClick={() => exportResearchContext(documentId)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#737373] bg-white border border-[#e5e5e5] rounded-full hover:bg-[#f5f5f5] transition-colors"
+              >
+                Export Research Data
+              </button>
             </div>
           </div>
         )}
