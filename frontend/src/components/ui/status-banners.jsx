@@ -1,13 +1,14 @@
 // ponytail: status indicators styled per DESIGN.md (Soft Mint badge, Tangerine warning, Red error)
 import { ShieldCheck, AlertTriangle, AlertCircle } from "lucide-react"
 
-export function VerificationBadge({ onClick, ...props }) {
+export function VerificationBadge({ onClick, disabled, ...props }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
       {...props}
-      className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-medium text-[#16a34a] border border-[#bbf7d0] hover:bg-[#d1fae5] transition-colors cursor-pointer"
+      className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-medium text-[#16a34a] border border-[#bbf7d0] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16a34a]/40 disabled:cursor-not-allowed disabled:opacity-60 enabled:hover:bg-[#d1fae5] enabled:cursor-pointer"
     >
       <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
       Verified
@@ -16,28 +17,44 @@ export function VerificationBadge({ onClick, ...props }) {
 }
 
 export function ClaimComparisonPanel({ claimDiff, onClose }) {
-  const original = JSON.parse(claimDiff.original_claims || "[]")
-  const simplified = JSON.parse(claimDiff.simplified_claims || "[]")
+  // Parse one claim list safely; malformed JSON yields [] plus a dev console error.
+  const parseClaims = (value) => {
+    try {
+      const parsed = JSON.parse(value || "[]")
+      return Array.isArray(parsed) ? parsed : []
+    } catch (e) {
+      console.error("Failed to parse claim list", e)
+      return []
+    }
+  }
+  const original = parseClaims(claimDiff?.original_claims)
+  const simplified = parseClaims(claimDiff?.simplified_claims)
+  const total = original.length + simplified.length
   return (
-    <div className="mt-3 rounded-[12px] border border-[#e5e5e5] bg-[#f5f5f5] p-4">
+    <div id="claim-comparison-panel" className="mt-3 rounded-[12px] border border-[#e5e5e5] bg-[#f5f5f5] p-4">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold text-[#0a0a0a]">Claims checked</p>
-        <button onClick={onClose} className="text-[11px] text-[#737373] hover:text-[#0a0a0a]">Hide</button>
+        <p className="text-xs font-semibold text-[#0a0a0a]">{total} claims checked</p>
+        <button type="button" onClick={onClose} className="text-[11px] text-[#737373] hover:text-[#0a0a0a]">Hide</button>
       </div>
+      {total === 0 && (
+        <p className="text-xs text-[#737373]">No claim details available</p>
+      )}
+      {total > 0 && (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
         <div>
-          <p className="font-medium text-[#737373] mb-1.5">Original</p>
-          <ul className="space-y-1 text-[#171717]">
+          <p className="font-medium text-[#737373] mb-1.5">Original ({original.length})</p>
+          <ul className="space-y-1 text-[#171717] max-h-48 overflow-y-auto">
             {original.map((c, i) => <li key={i}>• {c}</li>)}
           </ul>
         </div>
         <div>
-          <p className="font-medium text-[#737373] mb-1.5">Simplified</p>
-          <ul className="space-y-1 text-[#171717]">
+          <p className="font-medium text-[#737373] mb-1.5">Simplified ({simplified.length})</p>
+          <ul className="space-y-1 text-[#171717] max-h-48 overflow-y-auto">
             {simplified.map((c, i) => <li key={i}>• {c}</li>)}
           </ul>
         </div>
       </div>
+      )}
     </div>
   )
 }

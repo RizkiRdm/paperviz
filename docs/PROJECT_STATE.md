@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-04 — Chunk 12.1 ponytail slice merged (`comparison.go` ceiling comments), 328 tests green
+**Last updated:** 2026-09-04 — Verification-polish chunk merged (impeccable critique P0/P1 fixes + claims table fan-out), 331 tests passing
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Phase 12 Cleanup (ponytail mode — ceiling comments, no logic change)
+- **Working on:** Phase 12 Cleanup (unused-export audit or tooltip/a11y polish — pick one)
 - **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** Ponytail `internal/services/research_map.go` per-paper title fetch N+1 ceiling comment — closest related heuristic to comparison slice, same comment-only pattern
+- **Next action if resuming:** unused-export audit (grep exported symbols with zero callers) OR tooltip/a11y polish pass — whichever scoped chunk fits the session
 
 ---
 
@@ -67,6 +67,7 @@ something that should stay frozen.)*
 - Chunk 12.1 silent-error hardening (frontend-only, no backend change) — done 2026-09-04 (`frontend/src/components/annotation-panel.jsx` — row saveError/deleteError + loadError/createError Retry; `frontend/src/components/chart-card.jsx` — shareError + Retry; `frontend/src/components/collections-panel.jsx` — loadError/actionError + Retry; zero empty catch; inputs preserved on failure; DESIGN.md tokens only; grep catch audit: remaining bare catches only with handling bodies — clipboard fallback select + cancelled-guarded error; go test 328 passed 7 pkgs)
 - Chunk 12.1 dead-code slice (`textChartElem` purge) — done 2026-09-04 (`internal/services/charts.go` 86-95 deleted, `internal/services/charts_test.go` `TestChartValuesInStruct` retargeted to `chapterChartJSON` with `has_chart` wrap; `chartValues` + `UnmarshalJSON` untouched/live; `GenerateChapterChart`/`tryExtractChartData` unchanged; grep `textChartElem` zero in `internal/`; `gofmt` clean; `go vet` clean; `go test` 328 passed 7 pkgs)
 - Chunk 12.1 ponytail slice (`comparison.go` ceiling comments) — done 2026-09-04 (`internal/services/comparison.go` ~136/163/189/221/252: fixed-8-dimensions; single-prompt join; first-2-papers stance; joined-evidence prompt; exact-overlap keywords; each `// ponytail: ... — ceiling: ... ; upgrade: ...`; YAGNI kept: buildComparisonDimensions, synthesizeDimensions, identifyAgreementsAndDisagreements, findCommonKeywords+stopWords, ExtractPaperSummary/ComparePapers/CompareEvidence; zero logic change, no dead lines; grep ponytail 5 hits; `gofmt` clean; `go vet` clean; `go test` 328 passed 7 pkgs)
+- Verification-polish chunk — done 2026-09-04 (`frontend/src/pages/result-page.jsx` ~313-328 badge gating + ~364-394 banner detail/claims opener/compare; `frontend/src/components/status-banners.jsx` 29+/12− hardened panel + badge; `internal/services/intake.go` ~154-172 claims fan-out tx; `save_pipeline_result_test.go` 3 new test cases; behavior: verification_failed now shows real `mismatch_detail` + claims opener + Compare-with-Original; Verified badge disabled when no claim_diff + aria-expanded on opener; ClaimComparisonPanel try/catch + empty state + count badge; pipeline writes one claims row per `OriginalClaims` in the same tx; `go test` 331 passed 7 pkgs; `npm run build` clean; screenshots snap-16/17 confirmed)
 
 ---
 
@@ -117,6 +118,7 @@ something you already rejected for a clear reason.)*
 | 2026-09-04 | Frontend inline-error standard | User msg friendly no stack, dev console.error, retry preserves input; research-map block is canonical |
 | 2026-09-04 | Test-only shims live in _test.go or retarget to live types, never in production files | Dead-shim purge rule; `textChartElem` removed from `charts.go`, test retargeted to `chapterChartJSON` |
 | 2026-09-04 | Ponytail comment standard: `// ponytail: <simplification> — ceiling: <limit> ; upgrade: <path>` | Comments only, never logic with the marking; records simplification ceiling + upgrade path without changing behavior |
+| 2026-09-04 | mismatch_detail is evidence, not decoration | Always surface to user on verification_failed — pipeline populates claims table from verification output (YAGNI, no separate LLM extraction step) |
 
 ---
 
@@ -183,3 +185,6 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Export collections join: `internal/services/export.go` (research context joins collections)
 - Charts service: `internal/services/charts.go` (`GenerateChapterChart`, `tryExtractChartData`; `textChartElem` purged 2026-09-04, live type `chapterChartJSON`)
 - Comparison service: `internal/services/comparison.go` (ponytail ceiling comments 2026-09-04, 5 hits, zero logic change)
+- Verification UI: `frontend/src/pages/result-page.jsx` (~313-328 badge gating, ~364-394 banner detail + claims opener + compare)
+- Verification banners: `frontend/src/components/status-banners.jsx` (hardened panel + disabled badge)
+- Claims fan-out from verification: `internal/services/intake.go` (~154-172, writes one claims row per OriginalClaims in pipeline tx)

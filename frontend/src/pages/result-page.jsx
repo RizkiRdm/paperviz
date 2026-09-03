@@ -310,10 +310,18 @@ const STAGE_LABELS = {
           </div>
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-3">
+              {/* Gate badge on claim_diff; absent data renders a disabled non-interactive badge. */}
               {doc.status === "complete" && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <VerificationBadge onClick={() => setShowClaims(v => !v)} />
+                    <VerificationBadge
+                      onClick={() => setShowClaims(v => !v)}
+                      disabled={!doc.claim_diff}
+                      title={doc.claim_diff ? "Claims checked against the original text. Click to compare." : "Verification data not available"}
+                      aria-expanded={showClaims}
+                      aria-controls="claim-comparison-panel"
+                      aria-label={doc.claim_diff ? "Claims checked against the original text. Click to compare." : "Verification data not available"}
+                    />
                   </TooltipTrigger>
                   <TooltipContent>Claims checked against the original text. Click to compare.</TooltipContent>
                 </Tooltip>
@@ -353,8 +361,31 @@ const STAGE_LABELS = {
       </header>
 
       <main className="mx-auto max-w-[900px] px-6 py-12">
+        {/* Surface real mismatch_detail plus claims opener and compare action on verification failure. */}
         {doc.status === "verification_failed" && (
-          <div className="mb-6"><WarningBanner /></div>
+          <div className="mb-6">
+            <WarningBanner detail={doc.claim_diff?.mismatch_detail} />
+            {doc.claim_diff && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowClaims(v => !v)}
+                  aria-expanded={showClaims}
+                  aria-controls="claim-comparison-panel"
+                  className="inline-flex items-center rounded-[8px] border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors"
+                >
+                  {showClaims ? "Hide checked claims" : "View checked claims"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowOriginal(true); document.querySelector("main article")?.scrollIntoView({ behavior: "smooth" }) }}
+                  className="inline-flex items-center rounded-[8px] border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors"
+                >
+                  Compare with Original
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {showClaims && doc.claim_diff && (

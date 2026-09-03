@@ -37,6 +37,7 @@ Rules:
 - **B3 (single-call verification) skipped** — requires live API key + real-document regression testing against B2 before shipping. Plan still describes it as optional.
 
 - **Annotations require authentication.** Unauthenticated users cannot create/edit/delete annotations. Export endpoint also requires auth. Design decision: annotations are per-user research context, not collaborative.
+- **Verification is not decoration (12.1 precedent).** `mismatch_detail` is evidence, not UI polish — always surface to user when status is `verification_failed`; pipeline populates claims table from verification output in the same tx, no separate LLM extraction step.
 
 ## DB Reset Protocol
 

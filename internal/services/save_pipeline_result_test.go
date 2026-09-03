@@ -25,6 +25,7 @@ func openTestServicesDB(t *testing.T) *sql.DB {
 		11: "011_share_referrals.sql",
 		12: "012_usage_analytics.sql",
 		13: "013_usage_tiers.sql",
+		14: "014_structured_research_objects.sql",
 	} {
 		sqlStr, err := repository.ReadMigration(filepath.Join("..", "..", "migrations", file))
 		if err != nil {
@@ -146,5 +147,49 @@ func TestSavePipelineResultUnlinkedChartHasNilChapterID(t *testing.T) {
 	// Chart 1: ChapterIndex 1 -> ChapterID must be non-nil
 	if charts[1].ChapterID == nil {
 		t.Errorf("chart 1 ChapterID is nil, want non-nil")
+	}
+}
+
+func TestSavePipelineResultWritesClaims(t *testing.T) {
+	// TableDrivenClaims covers populated and empty verify output fan-out.
+	tests := []struct {
+		name      string
+		claims    []string
+		wantCount int
+	}{
+		{"populated", []string{"claim one", "claim two", "claim three"}, 3},
+		{"empty", []string{}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := openTestServicesDB(t)
+			docID, err := repository.NewID()
+			if err != nil {
+				t.Fatalf("new id: %v", err)
+			}
+			docRepo := repository.NewDocumentRepo(db)
+			if err := docRepo.Insert(repository.Document{ID: docID, CreatedAt: 1, LastAccessedAt: 1, Status: repository.StatusProcessing, SourceType: repository.SourceTypePDF, ReadingLevel: repository.ReadingLevelSimplified, OriginalText: "original"}); err != nil {
+				t.Fatalf("insert document: %v", err)
+			}
+			output := PipelineOutput{
+				Status:         pipelineStatusComplete,
+				SimplifiedText: "simplified",
+				Verify:         VerifyResult{OriginalClaims: tt.claims, SimplifiedClaims: []string{}},
+				Chapters:       []Chapter{{Title: "Intro", Summary: "summary", Excerpt: "excerpt"}},
+			}
+			if err := savePipelineResult(db, docID, output); err != nil {
+				t.Fatalf("save pipeline result: %v", err)
+			}
+			list, err := repository.NewClaimRepo(db).ListByPaper(docID)
+			if err != nil {
+				t.Fatalf("list claims: %v", err)
+			}
+			if len(list) != tt.wantCount {
+				t.Fatalf("got %d claims, want %d", len(list), tt.wantCount)
+			}
+			if tt.wantCount > 0 && list[0].ClaimText != tt.claims[0] {
+				t.Errorf("got claim_text %q, want %q", list[0].ClaimText, tt.claims[0])
+			}
+		})
 	}
 }

@@ -151,6 +151,26 @@ func savePipelineResult(db *sql.DB, documentID string, output PipelineOutput) er
 		return err
 	}
 
+	// ponytail: reuse verify OriginalClaims, skip simplified/pages/confidence — ceiling: no per-claim provenance ; upgrade: dedicated claim extractor with pages/confidence
+	// FanOutClaims persists verified original claims atomically with claim_diff row.
+	claimRepo := repository.NewClaimRepo(tx)
+	for i, claimText := range output.Verify.OriginalClaims {
+		claimID, err := repository.NewID()
+		if err != nil {
+			return fmt.Errorf("generate claim id: %w", err)
+		}
+		if err := claimRepo.Insert(repository.Claim{
+			ID:         claimID,
+			PaperID:    documentID,
+			ClaimText:  claimText,
+			ClaimType:  "finding",
+			Confidence: "medium",
+			CreatedAt:  time.Now().Unix(),
+		}); err != nil {
+			return fmt.Errorf("insert claim %d: %w", i, err)
+		}
+	}
+
 	chapterRepo := repository.NewChapterRepo(tx)
 	chapterIndexToID := make(map[int]string, len(output.Chapters))
 	for i, ch := range output.Chapters {
