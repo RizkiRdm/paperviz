@@ -33,7 +33,7 @@ function EvidenceBlock({ evidence }) {
             Page {evidence.page}
           </span>
         )}
-      </div>
+        </div>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -105,6 +105,7 @@ function ShareFigureDialog({ url, onClose }) {
 export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
   const [shareUrl, setShareUrl] = useState(null)
   const [sharing, setSharing] = useState(false)
+  const [shareError, setShareError] = useState(null)
   const pageNumber = chart.page_number || 0
   const isDataExtracted = chart.source_method === "data_extracted"
   const isImageFallback = chart.source_method === "image_fallback"
@@ -113,16 +114,18 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
   async function handleShare() {
     if (sharing) return
     setSharing(true)
+    setShareError(null)
     try {
       const res = await fetch(`/api/documents/${documentId}/charts/${chart.id}/share`, {
         method: "POST",
       })
-      if (res.ok) {
-        const data = await res.json()
-        const fullUrl = window.location.origin + data.share_url
-        setShareUrl(fullUrl)
-      }
-    } catch {
+      if (!res.ok) throw new Error(`share failed (${res.status})`)
+      const data = await res.json()
+      const fullUrl = window.location.origin + data.share_url
+      setShareUrl(fullUrl)
+    } catch (err) {
+      console.error("share figure failed:", err)
+      setShareError("Share failed, retry")
     } finally {
       setSharing(false)
     }
@@ -184,6 +187,18 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
               </button>
             )}
           </div>
+          {shareError && (
+            <p className="mt-1 text-[11px] text-[#ea580c]">
+              {shareError}{" "}
+              <button
+                type="button"
+                onClick={handleShare}
+                className="font-medium text-[#2563eb] hover:text-[#1e40af] transition-colors cursor-pointer"
+              >
+                Retry
+              </button>
+            </p>
+          )}
           <div className="mt-3">
             {isDataExtracted && (
               <Suspense

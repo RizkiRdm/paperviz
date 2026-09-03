@@ -28,6 +28,8 @@ Rules:
 
 ## Known Issues
 
+- **Silent catches banned in frontend (12.1 precedent).** Every `catch` MUST handle: user-facing inline error + Retry, dev `console.error`, preserve inputs; `research-map.jsx` block is canonical standard.
+- **Ponytail full-mode convention (12.1 precedent).** Ceiling comments only, format `// ponytail: <simplification> — ceiling: <limit> ; upgrade: <path>`; never logic with the marking; `comparison.go` 5 hits is canonical example.
 - **Chart image_fallback has no image-serving endpoint.** `charts` table stores `image_blob BLOB` but `GET /api/documents/:id` response has no image field. Frontend shows annotation only. Fix requires new endpoint or base64-inline decision. Not blocking — satisfies PLAN.md Phase 4 "done means" (demonstrated capture). Revisit before chart re-visualization ships fully.
 
 - **WAL mode required after DB reset.** Enabled via PRAGMA journal_mode=WAL + synchronous=NORMAL in `repository/db.go`. DB file must be deleted when schema changes (single flat migration). Already gitignored.
@@ -54,10 +56,11 @@ When schema changes (new column/table):
 6. C1-C3: Replaced full-text-scan chart pipeline with chapter-based approach:
    - New `internal/services/chapters.go`: `DetectChapters()` splits simplified text into ≤10 chapters
    - New `GenerateChapterChart()` in `charts.go`: one Gemini call per chapter, chart type varies (bar/line/pie/scatter)
-   - Old `ExtractChartsFromText`, `fullTextChartPrompt` removed. `textChartElem` kept (test compat).
+   - Old `ExtractChartsFromText`, `fullTextChartPrompt` removed. `textChartElem` purged 2026-09-04 (12.1 dead-code slice; C-series cleanup closed).
    - Image fallback path (`ReVisualizeCharts`) unchanged.
 7. D1: Annotations enforce per-user ownership — service layer checks `userID` matches before update/delete. 403 returned on ownership mismatch.
 8. D2: Export endpoint excludes `OriginalText` and `SimplifiedText` — copyright compliance. Only structured metadata and user annotations are exported.
+9. D3: Collections enforce per-user ownership — service Get/Rename/Delete/Add/Remove/ListDocuments take userID, ErrForbidden on mismatch; handler maps forbidden→403. Closes IDOR, mirrors D1.
 
 ---
 

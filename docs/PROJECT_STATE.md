@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-03 — Chunk 9.3 merged: Research Knowledge Accumulation (user annotations on papers/claims, research context JSON export, 315 tests passing)
+**Last updated:** 2026-09-04 — Chunk 12.1 ponytail slice merged (`comparison.go` ceiling comments), 328 tests green
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Phase 10 — Defensibility
+- **Working on:** Phase 12 Cleanup (ponytail mode — ceiling comments, no logic change)
 - **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** Chunk 10.1 — Research Knowledge Accumulation (deepening) or revisit based on user demand
+- **Next action if resuming:** Ponytail `internal/services/research_map.go` per-paper title fetch N+1 ceiling comment — closest related heuristic to comparison slice, same comment-only pattern
 
 ---
 
@@ -63,6 +63,10 @@ something that should stay frozen.)*
 - Chunk 8.3 Cross-Paper Research Map — done 2026-09-01 (`internal/repository/types.go` — 5 relationship type constants; `internal/services/research_map.go` — GetResearchMap service grouping relationships by type with paper titles; `internal/handlers/documents.go` — GET /api/documents/:id/research-map endpoint; `frontend/src/components/research-map.jsx` — collapsible type groups with color-coded cards; `frontend/src/pages/result-page.jsx` — Research Map toggle button; 6 new tests, 225 total)
 - Chunk 9.1 DOI & URL Import — done 2026-09-02 (`internal/external/crossref.go` + `unpaywall.go` — DOI resolution clients; `internal/services/import.go` — FetchByDOI + FetchByURL with SSRF protection; `internal/handlers/import.go` — POST /api/import/doi + /api/import/url; `internal/services/import_fetcher.go` — paperFetcher adapter; `internal/handlers/router.go` — wired /api/import routes; `frontend/src/lib/api.js` — importByDOI + importByURL functions; `frontend/src/components/doi-import.jsx` + `url-import.jsx` — import UI components; `frontend/src/pages/upload-page.jsx` — 4-tab mode selector; 297 tests passing)
 - Chunk 9.3 Research Knowledge Accumulation — done 2026-09-03 (`migrations/016_annotations.sql` — annotations table; `internal/repository/annotations.go` — AnnotationRepo CRUD; `internal/services/annotations.go` — annotation service with ownership enforcement; `internal/services/export.go` — ExportResearchContext assembles full research context JSON; `internal/handlers/annotations.go` — 4 CRUD endpoints; `internal/handlers/export.go` — GET export endpoint; `frontend/src/components/annotation-panel.jsx` — collapsible annotation UI; `frontend/src/pages/result-page.jsx` — annotation panel + export button; 315 tests passing)
+- Chunk 10.2 Workflow Lock-In — done 2026-09-03 (`internal/services/collections.go` + `collections_test.go` — Get/Rename/Delete/Add/Remove/ListDocuments take userID, ErrForbidden on mismatch; `internal/handlers/collections.go` — UserIDFromContext 401, forbidden→403, notFound→404; `frontend/src/lib/api.js` — 5 fns listCollections/createCollection/getCollection/addDocumentToCollection/removeDocumentFromCollection; `frontend/src/components/collections-panel.jsx` — collapsible panel; 328 tests passing in 7 packages)
+- Chunk 12.1 silent-error hardening (frontend-only, no backend change) — done 2026-09-04 (`frontend/src/components/annotation-panel.jsx` — row saveError/deleteError + loadError/createError Retry; `frontend/src/components/chart-card.jsx` — shareError + Retry; `frontend/src/components/collections-panel.jsx` — loadError/actionError + Retry; zero empty catch; inputs preserved on failure; DESIGN.md tokens only; grep catch audit: remaining bare catches only with handling bodies — clipboard fallback select + cancelled-guarded error; go test 328 passed 7 pkgs)
+- Chunk 12.1 dead-code slice (`textChartElem` purge) — done 2026-09-04 (`internal/services/charts.go` 86-95 deleted, `internal/services/charts_test.go` `TestChartValuesInStruct` retargeted to `chapterChartJSON` with `has_chart` wrap; `chartValues` + `UnmarshalJSON` untouched/live; `GenerateChapterChart`/`tryExtractChartData` unchanged; grep `textChartElem` zero in `internal/`; `gofmt` clean; `go vet` clean; `go test` 328 passed 7 pkgs)
+- Chunk 12.1 ponytail slice (`comparison.go` ceiling comments) — done 2026-09-04 (`internal/services/comparison.go` ~136/163/189/221/252: fixed-8-dimensions; single-prompt join; first-2-papers stance; joined-evidence prompt; exact-overlap keywords; each `// ponytail: ... — ceiling: ... ; upgrade: ...`; YAGNI kept: buildComparisonDimensions, synthesizeDimensions, identifyAgreementsAndDisagreements, findCommonKeywords+stopWords, ExtractPaperSummary/ComparePapers/CompareEvidence; zero logic change, no dead lines; grep ponytail 5 hits; `gofmt` clean; `go vet` clean; `go test` 328 passed 7 pkgs)
 
 ---
 
@@ -109,6 +113,10 @@ something you already rejected for a clear reason.)*
 | 2026-09-02 | URL import: https-only + block private IPs | SSRF protection; prevents user-controlled URLs from hitting internal network |
 | 2026-09-03 | Annotations are per-user, not per-document | Ownership enforcement ensures users can only edit/delete their own annotations |
 | 2026-09-03 | Export excludes OriginalText/SimplifiedText | Copyright compliance — users export structured metadata and their own annotations, not source text |
+| 2026-09-03 | Collections enforce owner, 403 on mismatch | Mirrors annotations D1; per-user ownership closes IDOR on saved collections |
+| 2026-09-04 | Frontend inline-error standard | User msg friendly no stack, dev console.error, retry preserves input; research-map block is canonical |
+| 2026-09-04 | Test-only shims live in _test.go or retarget to live types, never in production files | Dead-shim purge rule; `textChartElem` removed from `charts.go`, test retargeted to `chapterChartJSON` |
+| 2026-09-04 | Ponytail comment standard: `// ponytail: <simplification> — ceiling: <limit> ; upgrade: <path>` | Comments only, never logic with the marking; records simplification ceiling + upgrade path without changing behavior |
 
 ---
 
@@ -167,4 +175,11 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Annotations handler: `internal/handlers/annotations.go` (POST/PUT/DELETE/GET /api/documents/:id/annotations)
 - Export service: `internal/services/export.go`
 - Export handler: `internal/handlers/export.go` (GET /api/documents/:id/export)
-- Annotation frontend: `frontend/src/components/annotation-panel.jsx`
+- Annotation frontend: `frontend/src/components/annotation-panel.jsx` (row saveError/deleteError, loadError/createError Retry inline blocks)
+- Chart card frontend: `frontend/src/components/chart-card.jsx` (shareError Retry inline block)
+- Collections panel frontend: `frontend/src/components/collections-panel.jsx` (loadError/actionError Retry inline blocks)
+- Collections backend: `internal/services/collections.go`, `internal/handlers/collections.go`
+- Collections frontend: `frontend/src/lib/api.js` (listCollections, createCollection, getCollection, addDocumentToCollection, removeDocumentFromCollection), `frontend/src/components/collections-panel.jsx`
+- Export collections join: `internal/services/export.go` (research context joins collections)
+- Charts service: `internal/services/charts.go` (`GenerateChapterChart`, `tryExtractChartData`; `textChartElem` purged 2026-09-04, live type `chapterChartJSON`)
+- Comparison service: `internal/services/comparison.go` (ponytail ceiling comments 2026-09-04, 5 hits, zero logic change)

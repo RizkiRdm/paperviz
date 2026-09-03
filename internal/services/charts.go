@@ -83,17 +83,6 @@ Do not return any explanatory text outside of this JSON. Use the specified forma
 Page text:
 %s`
 
-// textChartElem is the per-element struct for parsing a text-scan chart JSON
-// object. Kept for test compatibility (charts_test.go tests chartValues
-// unmarshal via this struct); the actual text-scan path was replaced by the
-// chapter-based approach in GenerateChapterChart.
-type textChartElem struct {
-	ChartType string      `json:"chart_type"`
-	Labels    []string    `json:"labels"`
-	Values    chartValues `json:"values"`
-	Title     string      `json:"title"`
-}
-
 // imageAnnotationPrompt asks Gemini to write a plain-language caption for a
 // chart image that couldn't be converted to structured data. This is the
 // FALLBACK path (ARCHITECTURE.md: "extract the original chart image ...

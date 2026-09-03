@@ -133,6 +133,7 @@ func ComparePapers(ctx context.Context, client *external.GeminiClient, papers []
 	}, nil
 }
 
+// ponytail: fixed 8 dimensions — ceiling: drops aspects outside preset set ; upgrade: derive dimensions from extracted fields per corpus
 func buildComparisonDimensions(papers []PaperSummary) []ComparisonDimension {
 	dims := []ComparisonDimension{
 		{Dimension: "research_question", Values: make(map[string]string)},
@@ -159,6 +160,7 @@ func buildComparisonDimensions(papers []PaperSummary) []ComparisonDimension {
 	return dims
 }
 
+// ponytail: joins all papers into one prompt — ceiling: token bloat past ~10 papers/long findings ; upgrade: batched per-dimension synthesis with truncation
 func synthesizeDimensions(ctx context.Context, client *external.GeminiClient, dims []ComparisonDimension, papers []PaperSummary) ([]dimensionSynthesis, error) {
 	var dimensionNames []string
 	for _, d := range dims {
@@ -184,6 +186,7 @@ func synthesizeDimensions(ctx context.Context, client *external.GeminiClient, di
 	return parsed, nil
 }
 
+// ponytail: first-2-papers overlap plus 4 substring checks — ceiling: ignores papers 3+, misses paraphrase, threshold arbitrary ; upgrade: per-claim stance aggregation via embeddings
 func identifyAgreementsAndDisagreements(papers []PaperSummary) (agreement []string, disagreement []string) {
 	if len(papers) < 2 {
 		return agreement, disagreement
@@ -215,6 +218,7 @@ func identifyAgreementsAndDisagreements(papers []PaperSummary) (agreement []stri
 }
 
 // CompareEvidence identifies cross-paper claims and per-paper stance.
+// ponytail: single prompt over joined evidence — ceiling: prompt bloat on many/long evidence, drops solo claims ; upgrade: chunked compare with per-claim stance votes
 func CompareEvidence(ctx context.Context, client *external.GeminiClient, papers []PaperSummary) ([]EvidenceClaim, error) {
 	if len(papers) < 2 {
 		return nil, nil
@@ -245,6 +249,7 @@ func CompareEvidence(ctx context.Context, client *external.GeminiClient, papers 
 	return claims, nil
 }
 
+// ponytail: exact overlap len>3 minus stopwords — ceiling: misses paraphrase/synonyms, case-folded only ; upgrade: embeddings similarity for semantic overlap
 func findCommonKeywords(text1, text2 string) []string {
 	words1 := strings.Fields(text1)
 	words2 := strings.Fields(text2)

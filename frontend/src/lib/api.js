@@ -235,6 +235,98 @@ export async function deleteAnnotation(documentId, annotationId) {
   if (!response.ok) throw await parseErrorResponse(response)
 }
 
+// listCollections returns all collections owned by current user.
+export async function listCollections() {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
+  try {
+    const response = await fetch("/api/collections", {
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// createCollection creates a new collection with given name.
+export async function createCollection(name) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
+  try {
+    const response = await fetch("/api/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// getCollection returns collection detail with documents.
+export async function getCollection(id) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
+  try {
+    const response = await fetch(`/api/collections/${id}`, {
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// addDocumentToCollection adds a document to a collection.
+export async function addDocumentToCollection(collectionId, documentId) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
+  try {
+    const response = await fetch(`/api/collections/${collectionId}/documents`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_id: documentId }),
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// removeDocumentFromCollection removes a document from a collection.
+export async function removeDocumentFromCollection(collectionId, docId) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
+  try {
+    const response = await fetch(`/api/collections/${collectionId}/documents/${docId}`, {
+      method: "DELETE",
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      throw await parseErrorResponse(response)
+    }
+    return response.json()
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 // exportResearchContext downloads the full research context as JSON.
 export async function exportResearchContext(documentId) {
   const response = await fetch(`/api/documents/${documentId}/export`)

@@ -63,16 +63,20 @@ function AnnotationRow({ annotation, documentId, onUpdate, onDelete }) {
   const [editContent, setEditContent] = useState(annotation.content)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
+  const [deleteError, setDeleteError] = useState(null)
 
   async function handleSave() {
     if (!editContent.trim() || saving) return
     setSaving(true)
+    setSaveError(null)
     try {
       await updateAnnotation(documentId, annotation.id, editContent.trim())
       onUpdate(annotation.id, editContent.trim())
       setEditing(false)
-    } catch {
-      // error handled silently — row stays in edit state
+    } catch (err) {
+      console.error("save annotation failed:", err)
+      setSaveError(err && err.code ? `Save failed (${err.code}), retry` : "Save failed, retry")
     } finally {
       setSaving(false)
     }
@@ -83,11 +87,13 @@ function AnnotationRow({ annotation, documentId, onUpdate, onDelete }) {
       setConfirmDelete(true)
       return
     }
+    setDeleteError(null)
     try {
       await deleteAnnotation(documentId, annotation.id)
       onDelete(annotation.id)
-    } catch {
-      // error handled silently
+    } catch (err) {
+      console.error("delete annotation failed:", err)
+      setDeleteError(err && err.code ? `Delete failed (${err.code}), retry` : "Delete failed, retry")
     }
   }
 
@@ -136,7 +142,7 @@ function AnnotationRow({ annotation, documentId, onUpdate, onDelete }) {
         <div className="mt-2">
           <textarea
             value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
+            onChange={(e) => { setEditContent(e.target.value); setSaveError(null) }}
             rows={3}
             className="w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-[14px] text-[#111827] leading-[1.43] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 resize-none"
           />
@@ -157,6 +163,11 @@ function AnnotationRow({ annotation, documentId, onUpdate, onDelete }) {
               Cancel
             </button>
           </div>
+          {saveError && (
+            <p className="mt-1.5 text-[11px] text-[#ea580c]">
+              {saveError}
+            </p>
+          )}
         </div>
       ) : (
         <p className="mt-1.5 text-[14px] leading-[1.43] text-[#262626] whitespace-pre-wrap">
@@ -169,6 +180,11 @@ function AnnotationRow({ annotation, documentId, onUpdate, onDelete }) {
           Click delete again to confirm.
         </p>
       )}
+      {deleteError && !editing && (
+        <p className="mt-1.5 text-[11px] text-[#ea580c]">
+          {deleteError}
+        </p>
+      )}
     </div>
   )
 }
@@ -179,11 +195,13 @@ function AddAnnotationForm({ documentId, onSave, onCancel }) {
   const [targetId, setTargetId] = useState("")
   const [content, setContent] = useState("")
   const [saving, setSaving] = useState(false)
+  const [createError, setCreateError] = useState(null)
 
   async function handleSubmit(e) {
     e.preventDefault()
     if (!content.trim() || saving) return
     setSaving(true)
+    setCreateError(null)
     try {
       const annotation = await createAnnotation(documentId, {
         targetType,
@@ -191,8 +209,9 @@ function AddAnnotationForm({ documentId, onSave, onCancel }) {
         content: content.trim(),
       })
       onSave(annotation)
-    } catch {
-      // error handled silently — form stays open
+    } catch (err) {
+      console.error("create annotation failed:", err)
+      setCreateError(err && err.code ? `Save failed (${err.code}), retry` : "Save failed, retry")
     } finally {
       setSaving(false)
     }
@@ -230,7 +249,7 @@ function AddAnnotationForm({ documentId, onSave, onCancel }) {
           Content
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => { setContent(e.target.value); setCreateError(null) }}
             rows={3}
             placeholder="Write your annotation..."
             className="mt-1 block w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-[14px] text-[#111827] placeholder:text-[#a3a3a3] leading-[1.43] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 resize-none"
@@ -254,6 +273,11 @@ function AddAnnotationForm({ documentId, onSave, onCancel }) {
           Cancel
         </button>
       </div>
+      {createError && (
+        <p className="mt-1.5 text-[11px] text-[#ea580c]">
+          {createError}
+        </p>
+      )}
     </form>
   )
 }
@@ -263,7 +287,7 @@ export default function AnnotationPanel({ documentId }) {
   const [open, setOpen] = useState(true)
   const [annotations, setAnnotations] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [loadError, setLoadError] = useState(null)
   const [showForm, setShowForm] = useState(false)
 
   const fetchAnnotations = useCallback(async () => {
@@ -271,7 +295,8 @@ export default function AnnotationPanel({ documentId }) {
       const data = await listAnnotations(documentId)
       setAnnotations(data.annotations || [])
     } catch (err) {
-      setError(err.message || "Failed to load annotations")
+      console.error("load annotations failed:", err)
+      setLoadError("Couldn't load annotations")
     } finally {
       setLoading(false)
     }
@@ -331,21 +356,28 @@ export default function AnnotationPanel({ documentId }) {
           )}
 
           {/* Error state */}
-          {!loading && error && (
-            <p className="py-4 text-center text-[12px] text-[#ea580c]">
-              {error}
-            </p>
+          {!loading && loadError && (
+            <div className="rounded-[12px] border border-[#e5e5e5] bg-[#f5f5f5] p-5 text-center">
+              <p className="text-[12px] text-[#737373]">Couldn't load annotations</p>
+              <button
+                type="button"
+                onClick={() => { setLoadError(null); setLoading(true); fetchAnnotations() }}
+                className="mt-2.5 inline-flex items-center rounded-[8px] border border-[#e5e5e5] bg-white px-3 py-1.5 text-[13px] font-medium text-[#525252] hover:text-[#0a0a0a] transition-colors cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
           )}
 
           {/* Empty state */}
-          {!loading && !error && annotations.length === 0 && !showForm && (
+          {!loading && !loadError && annotations.length === 0 && !showForm && (
             <p className="py-4 text-center text-[13px] text-[#737373]">
               No annotations yet
             </p>
           )}
 
           {/* Annotation list */}
-          {!loading && !error && annotations.length > 0 && (
+          {!loading && !loadError && annotations.length > 0 && (
             <div className="flex flex-col gap-2">
               {annotations.map((a) => (
                 <AnnotationRow

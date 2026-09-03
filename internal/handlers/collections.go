@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -97,17 +98,40 @@ func (h *CollectionHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"collections": collections})
 }
 
+// Get returns collection detail with documents for authenticated owner.
 func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
 	id := chi.URLParam(r, "id")
 
-	col, err := services.GetCollection(h.db, id)
+	col, err := services.GetCollection(h.db, id, userID)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "not_found")
+		if errors.Is(err, services.ErrForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
+		slog.Error("get collection failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
 
-	docs, err := services.ListCollectionDocuments(h.db, id)
+	docs, err := services.ListCollectionDocuments(h.db, id, userID)
 	if err != nil {
+		if errors.Is(err, services.ErrForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
 		slog.Error("list collection documents failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
@@ -134,7 +158,13 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Rename changes collection name after verifying ownership.
 func (h *CollectionHandler) Rename(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
 	id := chi.URLParam(r, "id")
 
 	var req createCollectionRequest
@@ -147,7 +177,15 @@ func (h *CollectionHandler) Rename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := services.RenameCollection(h.db, id, req.Name); err != nil {
+	if err := services.RenameCollection(h.db, id, userID, req.Name); err != nil {
+		if errors.Is(err, services.ErrForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
 		slog.Error("rename collection failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
@@ -156,10 +194,24 @@ func (h *CollectionHandler) Rename(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"name": req.Name})
 }
 
+// Delete removes collection owned by authenticated user.
 func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
 	id := chi.URLParam(r, "id")
 
-	if err := services.DeleteCollection(h.db, id); err != nil {
+	if err := services.DeleteCollection(h.db, id, userID); err != nil {
+		if errors.Is(err, services.ErrForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
 		slog.Error("delete collection failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
@@ -168,7 +220,13 @@ func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
+// AddDocument adds document to collection owned by authenticated user.
 func (h *CollectionHandler) AddDocument(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
 	id := chi.URLParam(r, "id")
 
 	var req addDocumentRequest
@@ -181,7 +239,15 @@ func (h *CollectionHandler) AddDocument(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := services.AddDocumentToCollection(h.db, id, req.DocumentID); err != nil {
+	if err := services.AddDocumentToCollection(h.db, id, userID, req.DocumentID); err != nil {
+		if errors.Is(err, services.ErrForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
 		slog.Error("add document to collection failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
@@ -190,11 +256,25 @@ func (h *CollectionHandler) AddDocument(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "added"})
 }
 
+// RemoveDocument removes document from collection owned by authenticated user.
 func (h *CollectionHandler) RemoveDocument(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
 	id := chi.URLParam(r, "id")
 	docID := chi.URLParam(r, "docId")
 
-	if err := services.RemoveDocumentFromCollection(h.db, id, docID); err != nil {
+	if err := services.RemoveDocumentFromCollection(h.db, id, userID, docID); err != nil {
+		if errors.Is(err, services.ErrForbidden) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
 		slog.Error("remove document from collection failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
