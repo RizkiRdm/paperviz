@@ -53,3 +53,16 @@ func rateLimitDocumentCreate(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// rateLimitAuth limits auth requests to 5 per 60s per IP, burst 3.
+func rateLimitAuth(next http.Handler) http.Handler {
+	limiter := newIPRateLimiter(rate.Every(12_000_000_000), 3)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := clientIP(r)
+		if !limiter.getLimiter(ip).Allow() {
+			writeError(w, http.StatusTooManyRequests, "rate_limited")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}

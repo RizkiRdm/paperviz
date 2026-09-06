@@ -137,8 +137,8 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 
 	authHandler := NewAuthHandler(db)
 	r.Route("/api/auth", func(r chi.Router) {
-		r.Post("/signup", authHandler.Signup)
-		r.Post("/login", authHandler.Login)
+		r.With(rateLimitAuth).Post("/signup", authHandler.Signup)
+		r.With(rateLimitAuth).Post("/login", authHandler.Login)
 		r.Post("/logout", authHandler.Logout)
 		r.Get("/me", authHandler.Me)
 	})
