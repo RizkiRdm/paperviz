@@ -1,3 +1,6 @@
+> ARCHIVED 2026-09-04 — superseded by docs/PROJECT_STATE.md. Do not use
+> this file to determine current project state.
+
 # Project Progress
 
 ## Current

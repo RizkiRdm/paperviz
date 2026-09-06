@@ -1,3 +1,6 @@
+> ARCHIVED 2026-09-04 — superseded by docs/PRD.md. Do not use
+> this file as canonical product requirements.
+
 # Product Requirements Memory
 
 Canonical specification: [`PRD.md`](./PRD.md). Do not duplicate product requirements here.
