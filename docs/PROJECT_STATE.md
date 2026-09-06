@@ -23,10 +23,10 @@
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Phase 12 Cleanup (unused-export audit or tooltip/a11y polish — pick one)
+- **Working on:** Phase 12 Cleanup (unused-export audit or tooltip/a11y polish)
 - **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** unused-export audit (grep exported symbols with zero callers) OR tooltip/a11y polish pass — whichever scoped chunk fits the session
+- **Next action if resuming:** unused-export audit (grep exported symbols with zero callers) OR tooltip/a11y polish pass
 
 ---
 
@@ -67,6 +67,7 @@ something that should stay frozen.)*
 - Chunk 12.1 silent-error hardening (frontend-only, no backend change) — done 2026-09-04 (`frontend/src/components/annotation-panel.jsx` — row saveError/deleteError + loadError/createError Retry; `frontend/src/components/chart-card.jsx` — shareError + Retry; `frontend/src/components/collections-panel.jsx` — loadError/actionError + Retry; zero empty catch; inputs preserved on failure; DESIGN.md tokens only; grep catch audit: remaining bare catches only with handling bodies — clipboard fallback select + cancelled-guarded error; go test 328 passed 7 pkgs)
 - Chunk 12.1 dead-code slice (`textChartElem` purge) — done 2026-09-04 (`internal/services/charts.go` 86-95 deleted, `internal/services/charts_test.go` `TestChartValuesInStruct` retargeted to `chapterChartJSON` with `has_chart` wrap; `chartValues` + `UnmarshalJSON` untouched/live; `GenerateChapterChart`/`tryExtractChartData` unchanged; grep `textChartElem` zero in `internal/`; `gofmt` clean; `go vet` clean; `go test` 328 passed 7 pkgs)
 - Chunk 12.1 ponytail slice (`comparison.go` ceiling comments) — done 2026-09-04 (`internal/services/comparison.go` ~136/163/189/221/252: fixed-8-dimensions; single-prompt join; first-2-papers stance; joined-evidence prompt; exact-overlap keywords; each `// ponytail: ... — ceiling: ... ; upgrade: ...`; YAGNI kept: buildComparisonDimensions, synthesizeDimensions, identifyAgreementsAndDisagreements, findCommonKeywords+stopWords, ExtractPaperSummary/ComparePapers/CompareEvidence; zero logic change, no dead lines; grep ponytail 5 hits; `gofmt` clean; `go vet` clean; `go test` 328 passed 7 pkgs)
+- Auth rate limiting (TASK-1) — done 2026-09-04 (`internal/handlers/ratelimit.go` — `rateLimitAuth` middleware, 5 req/60s/burst 3; `internal/handlers/router.go` — `/signup` and `/login` wrapped; 331 tests passing)
 - Verification-polish chunk — done 2026-09-04 (`frontend/src/pages/result-page.jsx` ~313-328 badge gating + ~364-394 banner detail/claims opener/compare; `frontend/src/components/status-banners.jsx` 29+/12− hardened panel + badge; `internal/services/intake.go` ~154-172 claims fan-out tx; `save_pipeline_result_test.go` 3 new test cases; behavior: verification_failed now shows real `mismatch_detail` + claims opener + Compare-with-Original; Verified badge disabled when no claim_diff + aria-expanded on opener; ClaimComparisonPanel try/catch + empty state + count badge; pipeline writes one claims row per `OriginalClaims` in the same tx; `go test` 331 passed 7 pkgs; `npm run build` clean; screenshots snap-16/17 confirmed)
 
 ---
