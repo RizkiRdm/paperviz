@@ -16,7 +16,7 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-05 — TASK-2 chart missing value fix merged (exclude undefined/null instead of silent zero-fill), 331 tests passing
+**Last updated:** 2026-09-06 — TASK-3 docs consolidation done (archived stale progress.md, current_task.md, prd.md pointer stub; PRD.md is canonical)
 
 ---
 
@@ -69,6 +69,7 @@ something that should stay frozen.)*
 - Chunk 12.1 ponytail slice (`comparison.go` ceiling comments) — done 2026-09-04 (`internal/services/comparison.go` ~136/163/189/221/252: fixed-8-dimensions; single-prompt join; first-2-papers stance; joined-evidence prompt; exact-overlap keywords; each `// ponytail: ... — ceiling: ... ; upgrade: ...`; YAGNI kept: buildComparisonDimensions, synthesizeDimensions, identifyAgreementsAndDisagreements, findCommonKeywords+stopWords, ExtractPaperSummary/ComparePapers/CompareEvidence; zero logic change, no dead lines; grep ponytail 5 hits; `gofmt` clean; `go vet` clean; `go test` 328 passed 7 pkgs)
 - Auth rate limiting (TASK-1) — done 2026-09-04 (`internal/handlers/ratelimit.go` — `rateLimitAuth` middleware, 5 req/60s/burst 3; `internal/handlers/router.go` — `/signup` and `/login` wrapped; 331 tests passing)
 - Chart missing value fix (TASK-2) — done 2026-09-05 (`frontend/src/components/data-chart.jsx` — replaced `?? 0` silent zero-fill with `.filter()` exclude undefined/null; missing values now dropped from chart render instead of rendered as zero; explanatory comment added; `npm run build` clean)
+- Docs consolidation (TASK-3) — done 2026-09-06 (`docs/archive/progress.md`, `docs/archive/current_task.md`, `docs/archive/prd.md` — archived stale files with superseded notices; PRD.md confirmed canonical via diff; zero dangling refs)
 - Verification-polish chunk — done 2026-09-04 (`frontend/src/pages/result-page.jsx` ~313-328 badge gating + ~364-394 banner detail/claims opener/compare; `frontend/src/components/status-banners.jsx` 29+/12− hardened panel + badge; `internal/services/intake.go` ~154-172 claims fan-out tx; `save_pipeline_result_test.go` 3 new test cases; behavior: verification_failed now shows real `mismatch_detail` + claims opener + Compare-with-Original; Verified badge disabled when no claim_diff + aria-expanded on opener; ClaimComparisonPanel try/catch + empty state + count badge; pipeline writes one claims row per `OriginalClaims` in the same tx; `go test` 331 passed 7 pkgs; `npm run build` clean; screenshots snap-16/17 confirmed)
 
 ---
