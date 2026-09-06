@@ -63,6 +63,7 @@ When schema changes (new column/table):
 8. D2: Export endpoint excludes `OriginalText` and `SimplifiedText` — copyright compliance. Only structured metadata and user annotations are exported.
 9. D3: Collections enforce per-user ownership — service Get/Rename/Delete/Add/Remove/ListDocuments take userID, ErrForbidden on mismatch; handler maps forbidden→403. Closes IDOR, mirrors D1.
 10. E1: Added auth rate limiting on `POST /api/auth/signup` and `POST /api/auth/login` (5 req/60s, burst 3) via `rateLimitAuth` middleware reusing existing `ipRateLimiter` struct.
+11. F1: Fixed silent zero-fill in chart rendering (`frontend/src/components/data-chart.jsx`) — missing values (undefined/null) now excluded from chart data instead of defaulted to 0; prevents misleading visualization where missing data points appear as real zeros.
 
 ---
 
