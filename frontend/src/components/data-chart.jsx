@@ -19,10 +19,11 @@ export default function DataChart({ chartData, title }) {
   if (!recharts) return <p className="text-xs text-[#737373]">Loading chart component…</p>
 
   const type = chartData.chart_type || "bar"
-  const rows = (chartData.labels || []).map((label, i) => ({
-    name: label,
-    value: chartData.values?.[i] ?? 0,
-  }))
+  // Missing values are dropped, not defaulted to 0 — a missing data point
+  // and a real zero must not look the same on the chart.
+  const rows = (chartData.labels || [])
+    .map((label, i) => ({ name: label, value: chartData.values?.[i] }))
+    .filter((row) => row.value !== undefined && row.value !== null)
 
   const gridAndAxes = (
     <>
