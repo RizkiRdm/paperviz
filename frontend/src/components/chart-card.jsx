@@ -111,6 +111,10 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
   const isImageFallback = chart.source_method === "image_fallback"
   const isOmitted = chart.source_method === "omitted"
 
+  // Derive grounding status from source method — never invent trust.
+  const groundingStatus = isOmitted ? "unsupported" : isDataExtracted ? "verified" : "partial"
+  const evidenceCount = evidence.length
+
   async function handleShare() {
     if (sharing) return
     setSharing(true)
@@ -167,7 +171,27 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
         </div>
 
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                  groundingStatus === "verified"
+                    ? "bg-[#f0fdf4] text-[#166534]"
+                    : groundingStatus === "partial"
+                      ? "bg-[#fef3c7] text-[#92400e]"
+                      : "bg-[#fef2f2] text-[#991b1b]"
+                }`}>
+                  {groundingStatus === "verified" ? "Verified" : groundingStatus === "partial" ? "Partial" : "Unsupported"}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {groundingStatus === "verified"
+                  ? "Data grounded in source evidence"
+                  : groundingStatus === "partial"
+                    ? "Partially grounded — some values interpreted from image"
+                    : "Not grounded — chart data could not be extracted from source"}
+              </TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="inline-flex items-center rounded-full bg-[#dbeaff] px-2.5 py-0.5 text-[11px] font-medium text-[#2563eb]">
@@ -187,6 +211,10 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
               </button>
             )}
           </div>
+          <div className="mt-1.5 flex items-center gap-2 text-[10px] text-[#737373]">
+            <span>{isDataExtracted ? "Text extraction" : isImageFallback ? "Image capture" : "Omitted"}</span>
+            {evidenceCount > 0 && <span>· {evidenceCount} source {evidenceCount === 1 ? "reference" : "references"}</span>}
+          </div>
           {shareError && (
             <p className="mt-1 text-[11px] text-[#ea580c]">
               {shareError}{" "}
@@ -200,17 +228,24 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
             </p>
           )}
           <div className="mt-3">
-            {isDataExtracted && (
-              <Suspense
-                fallback={<p className="text-xs text-[#737373]">Loading interactive chart…</p>}
-              >
-                <LazyDataChart chartData={chart.chart_data} />
-              </Suspense>
+            {isOmitted && (
+              <p className="text-xs italic leading-relaxed text-[#737373]">
+                {chart.annotation || "This chart could not be reconstructed from the source document."}
+              </p>
             )}
             {isImageFallback && chart.annotation && (
               <p className="text-xs leading-relaxed text-[#171717]">{chart.annotation}</p>
             )}
-            {isOmitted && <p className="text-xs italic leading-relaxed text-[#737373]">{chart.annotation}</p>}
+            {isDataExtracted && (
+              <Suspense
+                fallback={<p className="text-xs text-[#737373]">Loading interactive chart…</p>}
+              >
+                <LazyDataChart
+                  chartData={chart.chart_data}
+                  provenance={{ grounding_status: groundingStatus, source_page: pageNumber }}
+                />
+              </Suspense>
+            )}
           </div>
         </div>
       </div>

@@ -3,7 +3,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 
 const CHART_COLORS = ["#2563eb", "#16a34a", "#ea580c", "#7c3aed", "#0a0a0a", "#737373"]
 
-export default function DataChart({ chartData, title }) {
+export default function DataChart({ chartData, title, provenance }) {
   const [recharts, setRecharts] = useState(null)
   const [loadFailed, setLoadFailed] = useState(false)
 
@@ -18,11 +18,21 @@ export default function DataChart({ chartData, title }) {
   if (loadFailed) return <p className="text-xs text-[#dc2626]">Chart could not be loaded.</p>
   if (!recharts) return <p className="text-xs text-[#737373]">Loading chart component…</p>
 
+  // Validate chartData structure — malformed specs must not render.
+  const labels = chartData.labels
+  const values = chartData.values
+  if (!Array.isArray(labels) || !Array.isArray(values) || labels.length === 0 || values.length === 0) {
+    return <p className="text-xs text-[#dc2626]">Chart data is missing labels or values.</p>
+  }
+  if (labels.length !== values.length) {
+    return <p className="text-xs text-[#dc2626]">Chart data labels and values have mismatched lengths.</p>
+  }
+
   const type = chartData.chart_type || "bar"
   // Missing values are dropped, not defaulted to 0 — a missing data point
   // and a real zero must not look the same on the chart.
-  const rows = (chartData.labels || [])
-    .map((label, i) => ({ name: label, value: chartData.values?.[i] }))
+  const rows = labels
+    .map((label, i) => ({ name: label, value: values[i] }))
     .filter((row) => row.value !== undefined && row.value !== null)
 
   const gridAndAxes = (
@@ -138,11 +148,36 @@ export default function DataChart({ chartData, title }) {
     }
   }
 
+  const groundingStatus = provenance?.grounding_status
+  const sourcePage = provenance?.source_page
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-[#0a0a0a]">{chartData.title || title}</h3>
         <div className="flex items-center gap-2">
+          {groundingStatus && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  groundingStatus === "verified"
+                    ? "bg-[#f0fdf4] text-[#166534]"
+                    : groundingStatus === "partial"
+                      ? "bg-[#fef3c7] text-[#92400e]"
+                      : "bg-[#fef2f2] text-[#991b1b]"
+                }`}>
+                  {groundingStatus === "verified" ? "Verified" : groundingStatus === "partial" ? "Partial" : "Unsupported"}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {groundingStatus === "verified"
+                  ? "Data grounded in source evidence"
+                  : groundingStatus === "partial"
+                    ? "Partially grounded — some values may be interpreted"
+                    : "Not fully grounded in source evidence"}
+              </TooltipContent>
+            </Tooltip>
+          )}
           {chartData.confidence && chartData.confidence !== "high" && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -182,6 +217,9 @@ export default function DataChart({ chartData, title }) {
             ? `${chartData.y_axis} by ${chartData.x_axis}`
             : chartData.y_axis || chartData.x_axis}
         </p>
+      )}
+      {sourcePage > 0 && (
+        <p className="mt-1 text-[10px] text-[#737373] text-center">Source: page {sourcePage}</p>
       )}
       {chartData.key_takeaway && (
         <div className="mt-3 rounded-lg bg-[#f0fdf4] border border-[#bbf7d0] px-3 py-2">

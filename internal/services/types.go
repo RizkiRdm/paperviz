@@ -1,6 +1,10 @@
 package services
 
-import "errors"
+import (
+	"errors"
+
+	"paperviz/internal/models"
+)
 
 // ErrNoTextLayer and ErrInvalidReadingLevel are sentinel errors surfaced to
 // handlers, which map them to snake_case error codes without leaking
@@ -35,7 +39,8 @@ type Chart struct {
 	SourceText   string // original page text backing this chart; empty when none available
 	PageNumber   int
 	DisplayOrder int
-	ChapterIndex int // index in chapters array; -1 if not linked to a chapter
+	ChapterIndex int                    // index in chapters array; -1 if not linked to a chapter
+	Provenance   models.ChartProvenance // traces chart values back to paper source
 }
 
 // Chapter is one detected section of the paper, used to drive per-chapter

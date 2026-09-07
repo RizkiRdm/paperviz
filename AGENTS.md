@@ -56,7 +56,7 @@ When schema changes (new column/table):
 5. B2: Merged claim extraction from 2→1 Gemini call using `dualClaimExtractionPrompt` in `verification.go`. DiffClaims now 2 calls (down from 3).
 6. C1-C3: Replaced full-text-scan chart pipeline with chapter-based approach:
    - New `internal/services/chapters.go`: `DetectChapters()` splits simplified text into ≤10 chapters
-   - New `GenerateChapterChart()` in `charts.go`: one Gemini call per chapter, chart type varies (bar/line/pie/scatter)
+   - New `GenerateChapterCharts()` in `charts.go`: evidence→datasets→LLM plan, multiple charts per chapter
    - Old `ExtractChartsFromText`, `fullTextChartPrompt` removed. `textChartElem` purged 2026-09-04 (12.1 dead-code slice; C-series cleanup closed).
    - Image fallback path (`ReVisualizeCharts`) unchanged.
 7. D1: Annotations enforce per-user ownership — service layer checks `userID` matches before update/delete. 403 returned on ownership mismatch.
@@ -64,6 +64,18 @@ When schema changes (new column/table):
 9. D3: Collections enforce per-user ownership — service Get/Rename/Delete/Add/Remove/ListDocuments take userID, ErrForbidden on mismatch; handler maps forbidden→403. Closes IDOR, mirrors D1.
 10. E1: Added auth rate limiting on `POST /api/auth/signup` and `POST /api/auth/login` (5 req/60s, burst 3) via `rateLimitAuth` middleware reusing existing `ipRateLimiter` struct.
 11. F1: Fixed silent zero-fill in chart rendering (`frontend/src/components/data-chart.jsx`) — missing values (undefined/null) now excluded from chart data instead of defaulted to 0; prevents misleading visualization where missing data points appear as real zeros.
+12. G1: Chart engine rework (C2-C17) — evidence extraction pipeline replaces LLM value generation:
+    - `internal/models/evidence.go`: NumericEvidence + EvidenceSource types
+    - `internal/models/dataset.go`: CandidateDataset + DatasetPoint (group by metric+unit)
+    - `internal/models/chart_spec.go`: ChartSpec + BarData/LineData/ScatterData/PieData + ChartProvenance
+    - `internal/services/evidence_extract.go`: ExtractNumericEvidence (5 regex patterns, deterministic metric detection)
+    - `internal/services/table_extract.go`: ExtractTableData (pipe/tab-separated tables)
+    - `internal/services/dataset_build.go`: BuildCandidateDatasets (evidence → chart-ready datasets)
+    - `internal/services/grounding.go`: ValidateGrounding (10 deterministic rules, unsupported → DO NOT RENDER)
+    - `internal/services/charts.go`: GenerateChapterCharts (evidence→datasets→LLM plan, multi-chart per chapter)
+    - Failure categories: EXTRACTION_ERROR, DATASET_ERROR, CHART_SELECTION_ERROR, GROUNDING_ERROR, SCHEMA_ERROR, RENDER_ERROR
+    - Frontend: grounding status badge, provenance display, validation on render
+    - Core principle: AI may transform evidence, but must never manufacture evidence
 
 ---
 

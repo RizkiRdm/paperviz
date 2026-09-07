@@ -1,0 +1,57 @@
+{
+  "stage": "interview",
+  "title": "PaperViz Chart Engine Rework (C2-C17)",
+  "goalSlug": "chart-engine-rework",
+  "questions": [
+    {
+      "id": "scope",
+      "prompt": "Which chart engine chunks should be in scope?",
+      "description": "The task file lists C2-C17. C1 (audit) is already done per the audit index.",
+      "answerMode": "multi",
+      "recommendedAnswer": "C2 through C17, excluding C1 which is already complete.",
+      "options": [
+        { "id": "c2-c17", "label": "C2-C17 (all remaining)" },
+        { "id": "c2-c8", "label": "C2-C8 (core evidence + grounding)" },
+        { "id": "c2-c12", "label": "C2-C12 (core + provenance)" }
+      ],
+      "required": true
+    },
+    {
+      "id": "execution-strategy",
+      "prompt": "How should chunks be executed?",
+      "description": "Chunks have dependencies (C2→C3→C5→C6→C7→C8). Some can parallelize (C3+C4, C9+C10, C11+C12).",
+      "answerMode": "single",
+      "recommendedAnswer": "Follow the dependency graph: sequential where required, parallel where safe.",
+      "options": [
+        { "id": "sequential", "label": "Strict sequential (C2→C3→...→C17)" },
+        { "id": "parallel-where-safe", "label": "Parallel where dependency graph allows (Recommended)" },
+        { "id": "batch", "label": "Batch into phases (evidence, grounding, frontend)" }
+      ],
+      "required": true
+    },
+    {
+      "id": "testing-strategy",
+      "prompt": "Should each chunk have tests before moving to the next?",
+      "description": "AGENTS.md requires table-driven tests for every service function.",
+      "answerMode": "single",
+      "recommendedAnswer": "Yes, each chunk must pass tests before the next chunk starts.",
+      "options": [
+        { "id": "yes-chunk-tests", "label": "Yes, chunk-by-chunk testing (Recommended)" },
+        { "id": "integration-only", "label": "Integration tests at C15 only" }
+      ],
+      "required": true
+    },
+    {
+      "id": "commit-strategy",
+      "prompt": "Should each chunk be committed separately?",
+      "description": "AGENTS.md says every task must commit and push.",
+      "answerMode": "single",
+      "recommendedAnswer": "Yes, one commit per chunk with clear message.",
+      "options": [
+        { "id": "one-per-chunk", "label": "One commit per chunk (Recommended)" },
+        { "id": "batch-commit", "label": "Batch commits per phase" }
+      ],
+      "required": true
+    }
+  ]
+}

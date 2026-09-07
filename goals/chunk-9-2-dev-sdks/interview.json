@@ -1,0 +1,106 @@
+{
+  "stage": "interview",
+  "title": "Chunk 9.2 — Developer SDKs (Python, TypeScript, CLI)",
+  "goalSlug": "chunk-9-2-dev-sdks",
+  "questions": [
+    {
+      "id": "sdk-priority",
+      "prompt": "Which SDK to build first? Research users are primary audience.",
+      "description": "Python is recommended for research users. TypeScript for frontend integrations. CLI for power users.",
+      "answerMode": "single",
+      "recommendedAnswer": "Python first, then TypeScript, then CLI",
+      "options": [
+        { "id": "python-first", "label": "Python first, then TypeScript, then CLI" },
+        { "id": "typescript-first", "label": "TypeScript first, then Python, then CLI" },
+        { "id": "all-parallel", "label": "All three in parallel" },
+        { "id": "cli-first", "label": "CLI first, then Python, then TypeScript" }
+      ],
+      "required": true
+    },
+    {
+      "id": "auth-model",
+      "prompt": "How should SDKs handle authentication? Current API uses session cookies (httpOnly).",
+      "description": "The API currently uses session cookies via browser. For SDKs, we need to support API key or token-based auth. No API key infrastructure exists yet.",
+      "answerMode": "multi-custom",
+      "recommendedAnswer": "Add API key auth to backend, then SDKs use API key header. Cookie auth for browser-based TypeScript SDK.",
+      "options": [
+        { "id": "api-key", "label": "Add API key auth to backend, SDKs use Authorization header" },
+        { "id": "session-cookie", "label": "SDKs handle session cookies (complex, browser-like)" },
+        { "id": "bearer-token", "label": "Add bearer token endpoint, exchange cookie for token" },
+        { "id": "mcp-pattern", "label": "Follow MCP pattern: PAPERVIZ_API_KEY env var (already implemented for MCP)" }
+      ],
+      "required": true
+    },
+    {
+      "id": "codegen-vs-handwritten",
+      "prompt": "Generate SDKs from OpenAPI spec or hand-write?",
+      "description": "OpenAPI spec at docs/openapi.yaml has 34 endpoints, 31 schemas. Codegen (openapi-generator, oapi-codegen) can produce clients. Hand-written allows better ergonomics, error handling, retry logic.",
+      "answerMode": "single",
+      "recommendedAnswer": "Codegen from OpenAPI for core client, hand-written wrapper for ergonomics (retry, polling, types)",
+      "options": [
+        { "id": "codegen-core", "label": "Codegen from OpenAPI for core client, hand-written wrapper for ergonomics" },
+        { "id": "handwritten", "label": "Fully hand-written for maximum control and ergonomics" },
+        { "id": "codegen-only", "label": "Codegen only, minimal customization" }
+      ],
+      "required": true
+    },
+    {
+      "id": "python-packaging",
+      "prompt": "Python SDK distribution: PyPI package name, versioning, dependencies?",
+      "description": "Needs a unique PyPI name. Dependencies: httpx/requests, pydantic for types. Version tied to API version.",
+      "answerMode": "text",
+      "recommendedAnswer": "Package name: paperviz (check PyPI availability). Use httpx + pydantic. Semver matching API. MIT license.",
+      "required": true
+    },
+    {
+      "id": "typescript-packaging",
+      "prompt": "TypeScript SDK distribution: npm package name, ESM/CJS, React hooks?",
+      "description": "Frontend already has api.js. TypeScript SDK could replace it or be separate. Should export types from OpenAPI.",
+      "answerMode": "text",
+      "recommendedAnswer": "Package name: @paperviz/sdk or paperviz-sdk. ESM + CJS dual. Export TypeScript types from OpenAPI. Optional React hooks for polling.",
+      "required": true
+    },
+    {
+      "id": "cli-features",
+      "prompt": "CLI commands needed? Built with which framework?",
+      "description": "CLI should wrap SDK. Commands: upload (PDF/text), poll status, get results, share, list, compare, import (DOI/URL). Framework: Cobra (Go) or Click (Python).",
+      "answerMode": "multi-custom",
+      "recommendedAnswer": "Cobra (Go) for single binary. Commands: upload, status, get, share, list, compare, import-doi, import-url, collections. Config file for API key + base URL.",
+      "options": [
+        { "id": "cobra-go", "label": "Cobra (Go) - single binary, matches backend stack" },
+        { "id": "click-python", "label": "Click (Python) - uses Python SDK" },
+        { "id": "oclif-ts", "label": "oclif (TypeScript) - uses TypeScript SDK" }
+      ],
+      "required": true
+    },
+    {
+      "id": "error-handling",
+      "prompt": "Error handling strategy across SDKs?",
+      "description": "API returns snake_case error codes. SDKs should map to typed exceptions/errors with retries for rate limits (429) and transient errors (5xx).",
+      "answerMode": "text",
+      "recommendedAnswer": "Typed exception hierarchy per SDK. Automatic retry with exponential backoff for 429/5xx. Configurable retry policy. Error codes as constants/enums.",
+      "required": true
+    },
+    {
+      "id": "polling-helpers",
+      "prompt": "Include polling helpers for async document processing?",
+      "description": "Document creation returns 201 with status=processing. Callers must poll GET /api/documents/{id} every 2+ seconds until complete. SDK should provide convenience method.",
+      "answerMode": "single",
+      "recommendedAnswer": "Yes - built-in waitForCompletion(pollInterval, timeout) with callbacks for progress",
+      "options": [
+        { "id": "yes-builtin", "label": "Yes - built-in waitForCompletion with progress callbacks" },
+        { "id": "yes-simple", "label": "Yes - simple poll loop, no callbacks" },
+        { "id": "no-manual", "label": "No - users call getDocument manually" }
+      ],
+      "required": true
+    },
+    {
+      "id": "testing-strategy",
+      "prompt": "How to test SDKs? Mock server? Integration tests against real API?",
+      "description": "Need unit tests for each SDK method, integration tests against test instance. Can use Prism (OpenAPI mock) or recorded responses.",
+      "answerMode": "text",
+      "recommendedAnswer": "Unit tests with mocked HTTP. Integration tests against local dev server. Generated contract tests from OpenAPI.",
+      "required": true
+    }
+  ]
+}

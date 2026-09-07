@@ -99,8 +99,9 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	// Stage 3: Chart re-visualization.
 	//
 	// Primary path: detect chapters/sections from simplified text, then
-	// generate at most one chart per chapter. This produces charts tied to
-	// the paper's actual structure rather than a flat scan for any number.
+	// generate zero or more charts per chapter based on how many datasets
+	// each chapter contains. This produces charts tied to the paper's
+	// actual structure rather than a flat scan for any number.
 	//
 	// Supplemental path: for PDFs that DO have embedded chart images,
 	// run per-image data extraction on top of the chapter charts.
@@ -116,14 +117,12 @@ func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in Pipeline
 	} else if len(chapters) == 0 {
 		slog.Info("pipeline: no chapters detected, skipping chart generation", "stage", "chapters")
 	} else {
-		for i, chapter := range chapters {
-			chart, ok, degraded := GenerateChapterChart(ctx, gemini, chapter, i)
+		for _, chapter := range chapters {
+			chapterCharts, degraded := GenerateChapterCharts(ctx, gemini, chapter, len(charts))
 			if degraded {
 				chartDegraded = true
 			}
-			if ok {
-				charts = append(charts, chart)
-			}
+			charts = append(charts, chapterCharts...)
 		}
 		slog.Info("pipeline: chapter-based chart generation complete",
 			"stage", "chart",

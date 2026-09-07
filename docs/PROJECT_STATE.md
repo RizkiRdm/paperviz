@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-06 — TASK-3 docs consolidation done (archived stale progress.md, current_task.md, prd.md pointer stub; PRD.md is canonical)
+**Last updated:** 2026-09-08 — Chart engine rework C2-C17 done (evidence extraction → candidate datasets → LLM plan → grounding validator → provenance)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Phase 12 Cleanup (unused-export audit or tooltip/a11y polish)
-- **Active task file:** none
+- **Working on:** Chart engine rework complete (C2-C17)
+- **Active task file:** `docs/Task Agent/paperviz-chart-agent-task-chunks.md`
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** unused-export audit (grep exported symbols with zero callers) OR tooltip/a11y polish pass
+- **Next action if resuming:** chart re-visualization frontend polish OR new feature work
 
 ---
 
@@ -70,6 +70,7 @@ something that should stay frozen.)*
 - Auth rate limiting (TASK-1) — done 2026-09-04 (`internal/handlers/ratelimit.go` — `rateLimitAuth` middleware, 5 req/60s/burst 3; `internal/handlers/router.go` — `/signup` and `/login` wrapped; 331 tests passing)
 - Chart missing value fix (TASK-2) — done 2026-09-05 (`frontend/src/components/data-chart.jsx` — replaced `?? 0` silent zero-fill with `.filter()` exclude undefined/null; missing values now dropped from chart render instead of rendered as zero; explanatory comment added; `npm run build` clean)
 - Docs consolidation (TASK-3) — done 2026-09-06 (`docs/archive/progress.md`, `docs/archive/current_task.md`, `docs/archive/prd.md` — archived stale files with superseded notices; PRD.md confirmed canonical via diff; zero dangling refs)
+- Chart engine rework (C2-C17) — done 2026-09-08 (`internal/models/evidence.go` — NumericEvidence + EvidenceSource types; `internal/models/dataset.go` — CandidateDataset + DatasetPoint; `internal/models/chart_spec.go` — ChartSpec + BarData/LineData/ScatterData/PieData + ChartProvenance; `internal/services/evidence_extract.go` — ExtractNumericEvidence (5 regex patterns); `internal/services/table_extract.go` — ExtractTableData; `internal/services/dataset_build.go` — BuildCandidateDatasets; `internal/services/grounding.go` — ValidateGrounding (10 rules); `internal/services/charts.go` — GenerateChapterCharts (evidence→datasets→LLM plan, multi-chart per chapter); `internal/services/chart_regression_test.go` — 8 regression cases; `internal/services/chart_validation_test.go` — 5 real-paper validation cases; `frontend/src/components/data-chart.jsx` — grounding status badge + validation; `frontend/src/components/chart-card.jsx` — provenance display + unsupported state; 421 tests passing across 6 packages; `npm run build` clean)
 - Verification-polish chunk — done 2026-09-04 (`frontend/src/pages/result-page.jsx` ~313-328 badge gating + ~364-394 banner detail/claims opener/compare; `frontend/src/components/status-banners.jsx` 29+/12− hardened panel + badge; `internal/services/intake.go` ~154-172 claims fan-out tx; `save_pipeline_result_test.go` 3 new test cases; behavior: verification_failed now shows real `mismatch_detail` + claims opener + Compare-with-Original; Verified badge disabled when no claim_diff + aria-expanded on opener; ClaimComparisonPanel try/catch + empty state + count badge; pipeline writes one claims row per `OriginalClaims` in the same tx; `go test` 331 passed 7 pkgs; `npm run build` clean; screenshots snap-16/17 confirmed)
 
 ---
@@ -122,6 +123,12 @@ something you already rejected for a clear reason.)*
 | 2026-09-04 | Test-only shims live in _test.go or retarget to live types, never in production files | Dead-shim purge rule; `textChartElem` removed from `charts.go`, test retargeted to `chapterChartJSON` |
 | 2026-09-04 | Ponytail comment standard: `// ponytail: <simplification> — ceiling: <limit> ; upgrade: <path>` | Comments only, never logic with the marking; records simplification ceiling + upgrade path without changing behavior |
 | 2026-09-04 | mismatch_detail is evidence, not decoration | Always surface to user on verification_failed — pipeline populates claims table from verification output (YAGNI, no separate LLM extraction step) |
+| 2026-09-08 | Chart evidence pipeline: extract→dataset→plan→render | AI interprets but never invents numeric data — evidence extraction before LLM chart planning |
+| 2026-09-08 | LLM plans charts, never generates values | Values come exclusively from candidate datasets built from extracted evidence |
+| 2026-09-08 | Grounding validator is deterministic gatekeeper | 10-rule validator, unsupported → DO NOT RENDER, no LLM override |
+| 2026-09-08 | One chapter can produce 0..N charts | Dataset is unit of visualization, not chapter |
+| 2026-09-08 | Scatter requires numeric X/Y | No categorical labels as X-axis for scatter charts |
+| 2026-09-08 | Pie only for parts-of-whole | Reject pie when data doesn't represent a whole |
 
 ---
 
@@ -186,7 +193,18 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Collections backend: `internal/services/collections.go`, `internal/handlers/collections.go`
 - Collections frontend: `frontend/src/lib/api.js` (listCollections, createCollection, getCollection, addDocumentToCollection, removeDocumentFromCollection), `frontend/src/components/collections-panel.jsx`
 - Export collections join: `internal/services/export.go` (research context joins collections)
-- Charts service: `internal/services/charts.go` (`GenerateChapterChart`, `tryExtractChartData`; `textChartElem` purged 2026-09-04, live type `chapterChartJSON`)
+- Charts service: `internal/services/charts.go` (`GenerateChapterCharts` — evidence→datasets→LLM plan; `tryExtractChartData` — image fallback path; `ReVisualizeCharts` — image re-visualization; failure categories `EXTRACTION_ERROR`/`DATASET_ERROR`/`CHART_SELECTION_ERROR`/`GROUNDING_ERROR`/`SCHEMA_ERROR`/`RENDER_ERROR`)
+- Chart evidence models: `internal/models/evidence.go` (NumericEvidence, EvidenceSource)
+- Chart dataset models: `internal/models/dataset.go` (CandidateDataset, DatasetPoint + Labels()/Values() methods)
+- Chart spec models: `internal/models/chart_spec.go` (ChartSpec, BarData, LineData, ScatterData, PieData, ChartProvenance)
+- Evidence extraction: `internal/services/evidence_extract.go` (ExtractNumericEvidence — 5 regex patterns)
+- Table extraction: `internal/services/table_extract.go` (ExtractTableData)
+- Dataset builder: `internal/services/dataset_build.go` (BuildCandidateDatasets — group by metric+unit)
+- Grounding validator: `internal/services/grounding.go` (ValidateGrounding — 10 deterministic rules)
+- Chart failure categories: `internal/services/charts.go` (ChartFailureCategory type + logChartFailure helper)
+- Chart regression tests: `internal/services/chart_regression_test.go` (8 cases)
+- Chart validation tests: `internal/services/chart_validation_test.go` (5 real-paper cases)
+- Chart evidence tests: `internal/services/charts_evidence_test.go` (multi-dataset, provenance)
 - Comparison service: `internal/services/comparison.go` (ponytail ceiling comments 2026-09-04, 5 hits, zero logic change)
 - Verification UI: `frontend/src/pages/result-page.jsx` (~313-328 badge gating, ~364-394 banner detail + claims opener + compare)
 - Verification banners: `frontend/src/components/status-banners.jsx` (hardened panel + disabled badge)

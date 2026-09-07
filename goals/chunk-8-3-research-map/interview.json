@@ -1,0 +1,75 @@
+{
+  "stage": "interview",
+  "title": "Chunk 8.3 — Cross-Paper Research Map",
+  "goalSlug": "chunk-8-3-research-map",
+  "questions": [
+    {
+      "id": "relationship-types",
+      "prompt": "What relationship types should be supported in the Research Map?",
+      "description": "The roadmap mentions: supporting papers, contradictory papers, similar methodologies, different datasets, different findings.",
+      "answerMode": "multi",
+      "recommendedAnswer": "supporting, contradicting, similar_methodology, different_dataset, different_findings, extends",
+      "options": [
+        { "id": "supporting", "label": "Supporting" },
+        { "id": "contradicting", "label": "Contradicting" },
+        { "id": "similar_methodology", "label": "Similar Methodology" },
+        { "id": "different_dataset", "label": "Different Dataset" },
+        { "id": "different_findings", "label": "Different Findings" },
+        { "id": "extends", "label": "Extends" }
+      ],
+      "required": true
+    },
+    {
+      "id": "creation-method",
+      "prompt": "How should paper relationships be created?",
+      "description": "The POST /api/papers/{id}/relationships endpoint already exists. Should relationships be created manually by users, or should the system auto-detect them from citations/abstracts?",
+      "answerMode": "single",
+      "recommendedAnswer": "Manual creation only for MVP. Auto-detection can be added later.",
+      "options": [
+        { "id": "manual", "label": "Manual (user creates)" },
+        { "id": "auto", "label": "Auto-detect from citations" },
+        { "id": "both", "label": "Both manual + auto" }
+      ],
+      "required": true
+    },
+    {
+      "id": "frontend-style",
+      "prompt": "What frontend visualization style for the Research Map?",
+      "description": "How should related papers be displayed on the result page?",
+      "answerMode": "single",
+      "recommendedAnswer": "Card-based list grouped by relationship type, matching existing UI patterns (result-page.jsx).",
+      "options": [
+        { "id": "cards", "label": "Card list (Recommended)" },
+        { "id": "graph", "label": "Interactive graph" },
+        { "id": "table", "label": "Table view" }
+      ],
+      "required": true
+    },
+    {
+      "id": "location",
+      "prompt": "Where should the Research Map appear in the UI?",
+      "answerMode": "single",
+      "recommendedAnswer": "New tab/section on the result page, accessible via a button in the action bar.",
+      "options": [
+        { "id": "result-tab", "label": "Result page tab (Recommended)" },
+        { "id": "sidebar", "label": "Sidebar panel" },
+        { "id": "separate-page", "label": "Separate page" }
+      ],
+      "required": true
+    },
+    {
+      "id": "related-paper-metadata",
+      "prompt": "What metadata should be shown for each related paper?",
+      "answerMode": "multi",
+      "recommendedAnswer": "Title, relationship type, evidence text, link to view. Status if available.",
+      "options": [
+        { "id": "title", "label": "Title" },
+        { "id": "relationship-type", "label": "Relationship Type" },
+        { "id": "evidence-text", "label": "Evidence Text" },
+        { "id": "view-link", "label": "Link to View" },
+        { "id": "status", "label": "Processing Status" }
+      ],
+      "required": true
+    }
+  ]
+}

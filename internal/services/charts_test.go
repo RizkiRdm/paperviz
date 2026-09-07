@@ -119,13 +119,10 @@ func TestChartValuesRoundtrip(t *testing.T) {
 
 // TestChartValuesInStruct verifies string-values tolerance via live chapter type.
 func TestChartValuesInStruct(t *testing.T) {
-	input := `{"has_chart":true,"chart_type":"bar","labels":["A","B"],"values":"72, 89","title":"test"}`
-	var elem chapterChartJSON
+	input := `{"labels":["A","B"],"values":"72, 89","title":"test"}`
+	var elem chartDataJSON
 	if err := json.Unmarshal([]byte(input), &elem); err != nil {
 		t.Fatal(err)
-	}
-	if elem.ChartType != "bar" {
-		t.Errorf("chart_type = %q, want bar", elem.ChartType)
 	}
 	if !reflect.DeepEqual([]float64(elem.Values), []float64{72, 89}) {
 		t.Errorf("values = %v, want [72 89]", elem.Values)
