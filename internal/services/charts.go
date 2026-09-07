@@ -9,7 +9,32 @@ import (
 	"strings"
 
 	"paperviz/internal/external"
+	"paperviz/internal/models"
 )
+
+// ChartFailureCategory classifies chart processing errors for diagnostics.
+type ChartFailureCategory string
+
+const (
+	FailureExtractionError     ChartFailureCategory = "EXTRACTION_ERROR"      // evidence/table extraction failed
+	FailureDatasetError        ChartFailureCategory = "DATASET_ERROR"         // no candidate datasets built
+	FailureChartSelectionError ChartFailureCategory = "CHART_SELECTION_ERROR" // LLM plan failed or invalid
+	FailureGroundingError      ChartFailureCategory = "GROUNDING_ERROR"       // validation rejected chart
+	FailureSchemaError         ChartFailureCategory = "SCHEMA_ERROR"          // JSON marshal/unmarshal failed
+	FailureRenderError         ChartFailureCategory = "RENDER_ERROR"          // chart rendering failed
+)
+
+// logChartFailure emits a structured slog.Error with diagnostic fields for chart failures.
+func logChartFailure(ctx context.Context, category ChartFailureCategory, stage, chapter, datasetID string, err error, fallbackUsed bool) {
+	slog.ErrorContext(ctx, "chart failure",
+		"error_category", string(category),
+		"stage", stage,
+		"chapter", chapter,
+		"dataset_id", datasetID,
+		"safe_error_message", err.Error(),
+		"fallback_used", fallbackUsed,
+	)
+}
 
 // chartValues is a lenient JSON unmarshaler for number arrays. Gemini
 // flash-lite sometimes returns `"values":"72, 89"` (string) instead of
@@ -197,102 +222,201 @@ func annotateImage(ctx context.Context, client *external.GeminiClient, text stri
 	return client.Generate(ctx, prompt, false, 0)
 }
 
-const chapterChartPrompt = `You are deciding whether this chapter of a paper contains data worth
-visualizing as a chart, and if so, producing that chart.
+const chapterChartPlanPrompt = `You are deciding whether this chapter of a paper contains data worth
+visualizing as a chart. Candidate datasets extracted from the chapter text
+are provided below as JSON. Choose the BEST dataset (or none) and specify
+how to visualize it.
 
 Chapter title: %s
 Chapter summary: %s
 Chapter text:
 %s
 
-First, decide: does this chapter contain a SPECIFIC, meaningful set of
-numbers worth a reader seeing as a chart (comparisons, trends over time,
-proportions, before/after results, multiple measured values)? A chapter
-that only mentions numbers in passing, with no real comparison or pattern,
-does NOT qualify — do not force a chart out of weak material.
+Candidate datasets:
+%s
 
-If it does NOT qualify, respond with ONLY:
-{"has_chart": false}
+Rules:
+- If none of the datasets are meaningful for visualization, set has_chart false.
+- Pick the dataset_id of the best dataset if has_chart is true.
+- Choose chart_type that fits the data shape:
+  "bar" for categorical comparison, "line" for trend over time,
+  "pie" for parts-of-a-whole, "scatter" for two-variable relationship.
+- Provide title, x_label, y_label, and a one-sentence takeaway.
+- Do NOT invent or modify numeric values — the values come from the dataset.
 
-If it DOES qualify, choose the chart_type that best fits the shape of the
-data, using this rule:
-- "bar": comparing distinct discrete categories or groups against each other
-- "line": a trend over time, steps, or an ordered sequence
-- "pie": parts of a whole that sum to ~100%% or a fixed total
-- "scatter": relationship between two independent numeric variables
-
-Then provide:
-- x_axis: label for the horizontal axis (e.g. "Model", "Time (months)", "Treatment Group")
-- y_axis: label for the vertical axis (e.g. "Accuracy (%%)", "Revenue ($M)", "Sample Size")
-- key_takeaway: ONE sentence stating the most important finding this chart reveals
-- limitations: ONE sentence noting what the chart does NOT show or what caveats apply
-- confidence: "high" if the data is clearly stated and unambiguous,
-  "medium" if some interpretation was needed,
-  "low" if the numbers are vague, incomplete, or you are uncertain about the extraction
-
-Respond with ONLY JSON in this exact shape:
+Respond with ONLY JSON:
 {
   "has_chart": true,
-  "chart_type": "bar" | "line" | "pie" | "scatter",
-  "title": "short descriptive title tied to this chapter",
-  "labels": ["label1", "label2", ...],
-  "values": [number1, number2, ...],
-  "x_axis": "horizontal axis label",
-  "y_axis": "vertical axis label",
-  "key_takeaway": "one sentence — most important finding",
-  "limitations": "one sentence — what the chart does NOT show",
-  "confidence": "high" | "medium" | "low"
+  "dataset_id": "ds_accuracy__",
+  "chart_type": "bar",
+  "title": "short descriptive title",
+  "x_label": "horizontal axis label",
+  "y_label": "vertical axis label",
+  "takeaway": "one sentence — key finding"
 }
+
+If no chart is warranted:
+{"has_chart": false}
 
 Do not return any explanatory text outside of this JSON.`
 
-type chapterChartJSON struct {
-	HasChart    bool        `json:"has_chart"`
-	ChartType   string      `json:"chart_type"`
-	Title       string      `json:"title"`
-	Labels      []string    `json:"labels"`
-	Values      chartValues `json:"values"`
-	XAxis       string      `json:"x_axis,omitempty"`
-	YAxis       string      `json:"y_axis,omitempty"`
-	KeyTakeaway string      `json:"key_takeaway,omitempty"`
-	Limitations string      `json:"limitations,omitempty"`
-	Confidence  string      `json:"confidence,omitempty"`
+// chapterChartPlan is the LLM's chart planning response (no numeric values).
+type chapterChartPlan struct {
+	HasChart  bool   `json:"has_chart"`
+	DatasetID string `json:"dataset_id"`
+	ChartType string `json:"chart_type"`
+	Title     string `json:"title"`
+	XLabel    string `json:"x_label,omitempty"`
+	YLabel    string `json:"y_label,omitempty"`
+	Takeaway  string `json:"takeaway,omitempty"`
 }
 
-func GenerateChapterChart(ctx context.Context, client *external.GeminiClient, chapter Chapter, displayOrder int) (chart Chart, ok bool, degraded bool) {
-	prompt := fmt.Sprintf(chapterChartPrompt, chapter.Title, chapter.Summary, chapter.Excerpt)
-	parsed, err := external.ExtractJSON[chapterChartJSON](ctx, client, prompt, 0)
-	if err != nil {
-		slog.Error("chapter chart generation failed", "stage", "chart", "chapter", chapter.Title, "error", err)
-		return Chart{}, false, true
+// perDatasetChartPlanPrompt asks the LLM to evaluate a single candidate
+// dataset in the context of its chapter and decide whether it warrants a chart.
+const perDatasetChartPrompt = `You are deciding whether ONE specific dataset from a paper chapter is worth
+visualizing as a chart. Evaluate this dataset in the context of the chapter.
+
+Chapter title: %s
+Chapter summary: %s
+
+Dataset to evaluate:
+%s
+
+Rules:
+- If the dataset has fewer than 2 data points, set has_chart false.
+- If the values are trivial, repetitive, or not meaningful for visualization, set has_chart false.
+- If the dataset IS worth charting, set has_chart true and choose chart_type:
+  "bar" for categorical comparison, "line" for trend over time,
+  "pie" for parts-of-a-whole, "scatter" for two-variable relationship.
+- Provide a short descriptive title, x_label, y_label, and a one-sentence takeaway.
+- Do NOT invent or modify numeric values — the values come from the dataset.
+
+Respond with ONLY JSON:
+{
+  "has_chart": true,
+  "chart_type": "bar",
+  "title": "short descriptive title",
+  "x_label": "horizontal axis label",
+  "y_label": "vertical axis label",
+  "takeaway": "one sentence — key finding"
+}
+
+If no chart is warranted:
+{"has_chart": false}
+
+Do not return any explanatory text outside of this JSON.`
+
+// perDatasetPlan is the LLM's per-dataset chart planning response.
+type perDatasetPlan struct {
+	HasChart  bool   `json:"has_chart"`
+	ChartType string `json:"chart_type"`
+	Title     string `json:"title"`
+	XLabel    string `json:"x_label,omitempty"`
+	YLabel    string `json:"y_label,omitempty"`
+	Takeaway  string `json:"takeaway,omitempty"`
+}
+
+// GenerateChapterCharts extracts numeric evidence from a chapter, builds
+// candidate datasets, then asks the LLM to evaluate each dataset for charting.
+func GenerateChapterCharts(ctx context.Context, client *external.GeminiClient, chapter Chapter, displayOrder int) (charts []Chart, degraded bool) {
+	evidence := ExtractNumericEvidence(chapter.Excerpt, 1)
+	datasets := BuildCandidateDatasets(evidence)
+
+	if len(datasets) == 0 {
+		slog.Info("chapter chart: no evidence extracted", "stage", "chart", "chapter", chapter.Title)
+		return nil, false
 	}
 
-	if !parsed.HasChart || len(parsed.Labels) == 0 || len(parsed.Values) == 0 {
-		slog.Info("chapter chart: no chart warranted", "stage", "chart", "chapter", chapter.Title)
-		return Chart{}, false, false
+	if client == nil {
+		slog.Warn("chapter chart: nil Gemini client, skipping", "stage", "chart", "chapter", chapter.Title)
+		return nil, true
 	}
 
 	validTypes := map[string]bool{"bar": true, "line": true, "pie": true, "scatter": true}
-	if !validTypes[parsed.ChartType] {
-		parsed.ChartType = "bar"
+	nextOrder := displayOrder
+
+	for _, ds := range datasets {
+		datasetJSON, err := json.MarshalIndent(ds, "", "  ")
+		if err != nil {
+			logChartFailure(ctx, FailureSchemaError, "dataset_marshal", chapter.Title, ds.ID, err, true)
+			degraded = true
+			continue
+		}
+
+		prompt := fmt.Sprintf(perDatasetChartPrompt, chapter.Title, chapter.Summary, string(datasetJSON))
+		plan, err := external.ExtractJSON[perDatasetPlan](ctx, client, prompt, 0)
+		if err != nil {
+			logChartFailure(ctx, FailureChartSelectionError, "chart_plan", chapter.Title, ds.ID, err, true)
+			degraded = true
+			continue
+		}
+
+		if !plan.HasChart {
+			slog.Info("chapter chart: no chart warranted for dataset", "stage", "chart", "chapter", chapter.Title, "dataset_id", ds.ID)
+			continue
+		}
+
+		if !validTypes[plan.ChartType] {
+			plan.ChartType = "bar"
+		}
+
+		chartData := chartDataJSON{
+			Labels: ds.Labels(),
+			Values: ds.Values(),
+			Title:  plan.Title,
+		}
+		dataRaw, err := json.Marshal(chartData)
+		if err != nil {
+			logChartFailure(ctx, FailureSchemaError, "chart_data_marshal", chapter.Title, ds.ID, err, true)
+			degraded = true
+			continue
+		}
+
+		slog.Info("chapter chart generated",
+			"stage", "chart",
+			"chapter", chapter.Title,
+			"chart_type", plan.ChartType,
+			"dataset_id", ds.ID,
+		)
+
+		provenance := models.ChartProvenance{
+			EvidenceIDs:     evidenceIDsFromDataset(ds),
+			DatasetID:       ds.ID,
+			SourceMethod:    "text_evidence",
+			GroundingStatus: "verified",
+		}
+
+		charts = append(charts, Chart{
+			SourceMethod: chartSourceDataExtracted,
+			ChartData:    string(dataRaw),
+			Annotation:   fmt.Sprintf("From chapter: %s", chapter.Title),
+			DisplayOrder: nextOrder,
+			ChapterIndex: nextOrder,
+			Provenance:   provenance,
+		})
+		nextOrder++
 	}
 
-	dataRaw, err := json.Marshal(parsed)
-	if err != nil {
-		return Chart{}, false, true
+	return charts, degraded
+}
+
+// findDatasetByID returns the dataset matching the given ID, or nil.
+func findDatasetByID(datasets []models.CandidateDataset, id string) *models.CandidateDataset {
+	for i := range datasets {
+		if datasets[i].ID == id {
+			return &datasets[i]
+		}
 	}
+	return nil
+}
 
-	slog.Info("chapter chart generated",
-		"stage", "chart",
-		"chapter", chapter.Title,
-		"chart_type", parsed.ChartType,
-	)
-
-	return Chart{
-		SourceMethod: chartSourceDataExtracted,
-		ChartData:    string(dataRaw),
-		Annotation:   fmt.Sprintf("From chapter: %s", chapter.Title),
-		DisplayOrder: displayOrder,
-		ChapterIndex: displayOrder,
-	}, true, false
+// evidenceIDsFromDataset extracts non-empty EvidenceID strings from dataset points.
+func evidenceIDsFromDataset(ds models.CandidateDataset) []string {
+	var ids []string
+	for _, p := range ds.Points {
+		if p.EvidenceID != "" {
+			ids = append(ids, p.EvidenceID)
+		}
+	}
+	return ids
 }
