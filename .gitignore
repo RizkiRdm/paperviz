@@ -32,6 +32,18 @@ graphify-out/
 .omo/
 .opencode/
 .playwright-mcp/
+.playwright-cli/
+
+# AI agent planning/memory (not project source)
+memory/
+goals/
+
+# E2E test artifacts
+e2e/node_modules/
+e2e/tests/e2e-results/
+
+# Generated reports
+report/
 
 # Air live-reload artifacts
 tmp/

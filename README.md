@@ -4,10 +4,26 @@ Upload a PDF. Get a plain-language summary with re-visualized charts.
 
 ---
 
+## Screenshots
+
+| Landing | Login | Signup |
+|:---:|:---:|:---:|
+| ![Landing](assets/01-landing-page.png) | ![Login](assets/02-login-page.png) | ![Signup](assets/03-signup-page.png) |
+
+| Pricing | Compare | Dashboard |
+|:---:|:---:|:---:|
+| ![Pricing](assets/04-pricing-page.png) | ![Compare](assets/05-compare-page.png) | ![Dashboard](assets/06-dashboard-redirect.png) |
+
+| 404 | Navigation |
+|:---:|:---:|
+| ![404](assets/07-404-page.png) | ![Nav](assets/12-nav-dashboard-login.png) |
+
+---
+
 ## Quick Start
 
 ```bash
-# Prerequisites: Go 1.25+, Node.js 18+, npm 9+
+# Prerequisites: Go 1.22+, Node.js 18+, npm 9+
 # Get a Gemini API key: https://aistudio.google.com/apikey
 
 # 1. Configure
@@ -34,24 +50,7 @@ make build    # builds frontend + Go binary
 make run      # runs ./server with .env vars
 ```
 
-Or manually:
-
-```bash
-cd frontend && npm run build && cd ..
-CGO_ENABLED=0 go build -o server ./cmd/server
-export $(grep -v '^#' .env | xargs) && ./server
-```
-
 Single binary serves API + built frontend on port 8080 (set via `PORT` in `.env`).
-
-## Run with Podman
-
-```bash
-make container IMAGE=paperviz TAG=latest            # build image
-make container-run IMAGE=paperviz GEMINI_API_KEY=... # run container
-```
-
-Volume `paperviz-data` persists the SQLite database across restarts.
 
 ## How It Works
 
@@ -61,33 +60,22 @@ Volume `paperviz-data` persists the SQLite database across restarts.
 4. Simplified text is split into chapters; charts are re-generated per chapter (or re-rendered from captured images)
 5. Shareable link expires after 7 days of inactivity
 
-Processing runs in the background — the result page polls until it completes, so a large paper (with rate-limit retries) can take a few minutes. The page shows a "still working" note past ~2 minutes instead of giving up.
-
 ## Tech Stack
 
-- **Backend:** Go 1.25+, chi router, modernc.org/sqlite (pure Go, no CGO)
-- **Frontend:** React 19, Vite 8, Tailwind CSS v4, Recharts
-- **LLM:** Google Gemini API (direct HTTP client, no SDK) — single-slot serialization + exponential-backoff retries to stay inside free-tier rate limits
+- **Backend:** Go 1.22+, chi router, modernc.org/sqlite (pure Go, no CGO)
+- **Frontend:** React 18, Vite, Tailwind CSS, Recharts
+- **LLM:** Google Gemini API (direct HTTP, no SDK)
 - **PDF:** pdfcpu + ledongthuc/pdf (in-memory, no disk writes)
 
 ## Deployment
 
-PaperViz is a **single Go binary + SQLite** — no Docker required, but container-friendly.
-
-### Netlify
-
-**Not suitable** for the backend. Netlify hosts static sites and serverless functions, but PaperViz runs a long-lived Go server with persistent SQLite and background goroutines. The frontend (`frontend/dist`) *could* be deployed to Netlify, but the backend must run elsewhere.
-
-### Recommended platforms
-
-Any service that runs Docker containers or Go binaries:
+Single Go binary + SQLite. No Docker required, but container-friendly.
 
 | Platform | Notes |
 |---|---|
 | **Railway** / **Fly.io** | Container-native, easy DB volume setup |
 | **Render** | Deploy from Git, supports Go natively |
-| **Heroku** | Use Container Registry + podman push |
-| **VPS** (DigitalOcean, Linux, etc.) | Run the binary or container directly |
+| **VPS** (DigitalOcean, etc.) | Run the binary directly |
 
 All require `GEMINI_API_KEY` set as an environment variable.
 
@@ -96,10 +84,10 @@ All require `GEMINI_API_KEY` set as an environment variable.
 | File | What it covers |
 |---|---|
 | `INSTALLATION_AND_SETUP.md` | Detailed setup, caveats, project structure |
-| `ARCHITECTURE.md` | Design decisions, layers, data flow |
-| `PRD.md` | Product requirements, acceptance scenarios |
+| `docs/architecture.md` | Design decisions, layers, data flow |
+| `docs/PRD.md` | Product requirements, acceptance scenarios |
 | `DESIGN.md` | Design system, tokens, components |
-| `PLAN.md` | Phase tracking, implementation checklist |
+| `docs/PLAN.md` | Phase tracking, implementation checklist |
 | `AGENTS.md` | Agent rules, known issues |
 
 ## License
