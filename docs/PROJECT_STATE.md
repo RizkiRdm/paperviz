@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-08 — Chart engine rework C2-C17 done (evidence extraction → candidate datasets → LLM plan → grounding validator → provenance)
+**Last updated:** 2026-09-08 — E2E testing complete (12 pages tested, 12 screenshots, security review, report generated)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Chart engine rework complete (C2-C17)
-- **Active task file:** `docs/Task Agent/paperviz-chart-agent-task-chunks.md`
+- **Working on:** none — awaiting next task
+- **Active task file:** none
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** chart re-visualization frontend polish OR new feature work
+- **Next action if resuming:** ready for new work
 
 ---
 
@@ -209,3 +209,7 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Verification UI: `frontend/src/pages/result-page.jsx` (~313-328 badge gating, ~364-394 banner detail + claims opener + compare)
 - Verification banners: `frontend/src/components/status-banners.jsx` (hardened panel + disabled badge)
 - Claims fan-out from verification: `internal/services/intake.go` (~154-172, writes one claims row per OriginalClaims in pipeline tx)
+- E2E test config: `e2e/playwright.config.ts`
+- E2E test specs: `e2e/tests/e2e/*.spec.ts` (landing, login, signup, dashboard, result, pricing, compare, share, explain, not-found, navigation, api)
+- E2E screenshots: `assets/*.png` (12 screenshots)
+- E2E test report: `report/E2E_TEST_REPORT.md`
