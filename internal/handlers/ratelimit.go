@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"golang.org/x/time/rate"
 )
@@ -11,6 +12,7 @@ import (
 type ipRateLimiter struct {
 	mu       sync.Mutex
 	limiters map[string]*rate.Limiter
+	created  map[string]time.Time
 	r        rate.Limit
 	burst    int
 }
@@ -18,18 +20,38 @@ type ipRateLimiter struct {
 func newIPRateLimiter(r rate.Limit, burst int) *ipRateLimiter {
 	return &ipRateLimiter{
 		limiters: make(map[string]*rate.Limiter),
+		created:  make(map[string]time.Time),
 		r:        r,
 		burst:    burst,
+	}
+}
+
+func (l *ipRateLimiter) purgeOldEntries() {
+	now := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for ip, created := range l.created {
+		if now.Sub(created) > 5*time.Minute {
+			delete(l.limiters, ip)
+			delete(l.created, ip)
+		}
 	}
 }
 
 func (l *ipRateLimiter) getLimiter(ip string) *rate.Limiter {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if _, ok := l.created[ip]; !ok || time.Since(l.created[ip]) > 5*time.Minute {
+		lim := rate.NewLimiter(l.r, l.burst)
+		l.limiters[ip] = lim
+		l.created[ip] = time.Now()
+		return lim
+	}
 	lim, ok := l.limiters[ip]
 	if !ok {
 		lim = rate.NewLimiter(l.r, l.burst)
 		l.limiters[ip] = lim
+		l.created[ip] = time.Now()
 	}
 	return lim
 }

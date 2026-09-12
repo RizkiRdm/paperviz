@@ -136,12 +136,27 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	r.Get("/api/usage", usageHandler.GetUsage)
 
 	authHandler := NewAuthHandler(db)
+	apiKeyHandler := NewApiKeyHandler(db)
+	billingHandler := NewBillingHandler(db)
+	accountHandler := NewAccountHandler(db)
 	r.Route("/api/auth", func(r chi.Router) {
 		r.With(rateLimitAuth).Post("/signup", authHandler.Signup)
 		r.With(rateLimitAuth).Post("/login", authHandler.Login)
 		r.Post("/logout", authHandler.Logout)
-		r.Get("/me", authHandler.Me)
+		r.With(rateLimitAuth).Get("/me", authHandler.Me)
+		r.Get("/google/login", authHandler.GoogleLogin)
+		r.Get("/google/callback", authHandler.GoogleCallback)
+		r.With(authMiddleware.RequireAuth).Get("/apikey", apiKeyHandler.GetApiKey)
+		r.With(authMiddleware.RequireAuth).Post("/apikey/regenerate", apiKeyHandler.RegenerateApiKey)
 	})
+
+	r.Route("/api/billing", func(r chi.Router) {
+		r.With(authMiddleware.RequireAuth).Post("/checkout", billingHandler.CreateCheckoutSession)
+		r.With(authMiddleware.RequireAuth).Post("/portal", billingHandler.CreatePortalSession)
+		r.Post("/webhook", billingHandler.HandleWebhook)
+	})
+
+	r.With(authMiddleware.RequireAuth).Get("/api/account/summary", accountHandler.GetSummary)
 
 	collectionHandler := NewCollectionHandler(db)
 	r.Route("/api/collections", func(r chi.Router) {

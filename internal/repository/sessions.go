@@ -63,3 +63,11 @@ func (r *SessionRepo) DeleteExpired() (int64, error) {
 	}
 	return res.RowsAffected()
 }
+
+func (r *SessionRepo) DeleteByUserID(userID string) error {
+	_, err := r.db.Exec(`DELETE FROM sessions WHERE user_id = ?`, userID)
+	if err != nil {
+		return fmt.Errorf("delete sessions for user %s: %w", userID, err)
+	}
+	return nil
+}

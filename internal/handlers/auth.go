@@ -143,11 +143,17 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create session
+	// Create new session first
 	if err := h.createSessionAndSetCookie(w, user.ID); err != nil {
 		slog.Error("create session failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
+	}
+
+	// Delete all existing sessions for this user (session invalidation on login)
+	if err := repository.NewSessionRepo(h.db).DeleteByUserID(user.ID); err != nil {
+		slog.Error("delete old sessions failed", "error", err)
+		// Non-fatal: new session is already set on the cookie
 	}
 
 	writeJSON(w, http.StatusOK, userResponse{ID: user.ID, Email: user.Email})
@@ -254,9 +260,8 @@ func isValidEmail(email string) bool {
 	return strings.Contains(domain, ".")
 }
 
-// hasMinComplexity checks password has uppercase, lowercase, digit.
 func hasMinComplexity(password string) bool {
-	var hasUpper, hasLower, hasDigit bool
+	var hasUpper, hasLower, hasDigit, hasSpecial bool
 	for _, c := range password {
 		switch {
 		case unicode.IsUpper(c):
@@ -265,9 +270,11 @@ func hasMinComplexity(password string) bool {
 			hasLower = true
 		case unicode.IsDigit(c):
 			hasDigit = true
+		case !unicode.IsLetter(c) && !unicode.IsDigit(c) && !unicode.IsSpace(c):
+			hasSpecial = true
 		}
 	}
-	return hasUpper && hasLower && hasDigit
+	return hasUpper && hasLower && hasDigit && hasSpecial
 }
 
 // googleOAuthConfig returns the Google OAuth2 configuration from environment.
