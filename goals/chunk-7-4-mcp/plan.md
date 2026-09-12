@@ -14,11 +14,13 @@
 1. `analyze_paper` — Upload and analyze a paper (wraps POST /api/documents)
 2. `get_summary` — Get simplified text for a paper
 3. `get_figures` — Get charts/figures for a paper
-4. `get_tables` — Get tables (placeholder, not yet implemented)
-5. `get_claims` — Get claim verification data
-6. `get_evidence` — Get evidence references
-7. `compare_papers` — Compare 2-10 papers
-8. `search_papers` — Search papers (only if capability exists)
+4. `get_claims` — Get claim verification data
+5. `get_evidence` — Get evidence references
+6. `compare_papers` — Compare 2-10 papers
+
+### Tools Not Implemented (by design)
+- `get_tables` — No product reason yet; tables extracted on-demand per paper
+- `search_papers` — No per-user library exposed to MCP; stateless by design
 
 ## Architecture
 - MCP server uses stdio transport (standard for MCP)

@@ -22,10 +22,10 @@ func NewUsageHandler(ts *services.TierService) *UsageHandler {
 
 // usageResponse is the wire shape for GET /api/usage.
 type usageResponse struct {
-	Tier      string `json:"tier"`
-	PapersUsed int   `json:"papers_used"`
-	Limit     int    `json:"limit"`
-	ResetDate string `json:"reset_date"`
+	Tier       string `json:"tier"`
+	PapersUsed int    `json:"papers_used"`
+	Limit      int    `json:"limit"`
+	ResetDate  string `json:"reset_date"`
 }
 
 // GetUsage handles GET /api/usage, returning current tier and paper usage stats.

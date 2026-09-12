@@ -9,16 +9,16 @@ import (
 
 // ResearchExport assembles all research data for a document into a single exportable struct.
 type ResearchExport struct {
-	Document       ExportDocument                `json:"document"`
-	Claims         []repository.Claim            `json:"claims"`
-	Evidence       []repository.Evidence         `json:"evidence"`
-	Tables         []repository.PaperTable       `json:"tables"`
-	Methods        []repository.Method           `json:"methods"`
-	Results        []repository.Result           `json:"results"`
-	Citations      []repository.Citation         `json:"citations"`
-	Relationships  []repository.PaperRelationship `json:"relationships"`
-	Annotations    []repository.Annotation       `json:"annotations"`
-	Collections    []ExportCollection            `json:"collections"`
+	Document      ExportDocument                 `json:"document"`
+	Claims        []repository.Claim             `json:"claims"`
+	Evidence      []repository.Evidence          `json:"evidence"`
+	Tables        []repository.PaperTable        `json:"tables"`
+	Methods       []repository.Method            `json:"methods"`
+	Results       []repository.Result            `json:"results"`
+	Citations     []repository.Citation          `json:"citations"`
+	Relationships []repository.PaperRelationship `json:"relationships"`
+	Annotations   []repository.Annotation        `json:"annotations"`
+	Collections   []ExportCollection             `json:"collections"`
 }
 
 // ExportDocument holds document metadata without text content for copyright compliance.

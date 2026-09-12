@@ -13,6 +13,13 @@
 | `get_evidence` | `GET /api/documents/:id` | ✅ Full | Same evidence references |
 | `compare_papers` | `POST /api/documents/compare` | ✅ Full | Same comparison output |
 
+### Tools Not Implemented (by design)
+
+| Tool | Status | Rationale |
+|------|--------|-----------|
+| `get_tables` | Not implemented | No product reason yet; tables extracted on-demand per paper |
+| `search_papers` | Not implemented | No per-user library exposed to MCP; stateless by design |
+
 ## Operations Intentionally Unavailable to Agents
 
 | REST Endpoint | Why Unavailable | Rationale |

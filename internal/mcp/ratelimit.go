@@ -15,8 +15,8 @@ type keyLimiters struct {
 
 // RateLimiter manages per-key, per-operation rate limiting.
 type RateLimiter struct {
-	mu    sync.Mutex
-	keys  map[string]*keyLimiters
+	mu   sync.Mutex
+	keys map[string]*keyLimiters
 }
 
 // NewRateLimiter creates a RateLimiter with default limits.
@@ -36,8 +36,8 @@ func (rl *RateLimiter) getOrCreate(apiKey string) *keyLimiters {
 	if !ok {
 		k = &keyLimiters{
 			analyze: rate.NewLimiter(rate.Every(60/5*60/1000*1000*1000000000/1000000000), 5), // ~5/min burst
-			read:    rate.NewLimiter(rate.Every(2), 30),                                     // 30/min burst
-			compare: rate.NewLimiter(rate.Every(30), 2),                                     // 2/min burst
+			read:    rate.NewLimiter(rate.Every(2), 30),                                      // 30/min burst
+			compare: rate.NewLimiter(rate.Every(30), 2),                                      // 2/min burst
 		}
 		k.analyze = rate.NewLimiter(rate.Limit(5.0/60.0), 5)
 		k.read = rate.NewLimiter(rate.Limit(30.0/60.0), 30)

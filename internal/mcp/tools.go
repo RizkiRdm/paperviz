@@ -151,11 +151,11 @@ type ComparePapersInput struct {
 
 // CompareResult is the output of the compare_papers tool.
 type CompareResult struct {
-	Papers         []services.PaperSummary    `json:"papers" jsonschema:"description=Individual paper summaries"`
+	Papers         []services.PaperSummary        `json:"papers" jsonschema:"description=Individual paper summaries"`
 	Dimensions     []services.ComparisonDimension `json:"dimensions" jsonschema:"description=Side-by-side comparison dimensions"`
-	Agreement      []string                   `json:"agreement" jsonschema:"description=Areas where papers agree"`
-	Disagreement   []string                   `json:"disagreement" jsonschema:"description=Areas where papers disagree"`
-	EvidenceClaims []services.EvidenceClaim   `json:"evidence_claims" jsonschema:"description=Cross-paper claims with per-paper stance"`
+	Agreement      []string                       `json:"agreement" jsonschema:"description=Areas where papers agree"`
+	Disagreement   []string                       `json:"disagreement" jsonschema:"description=Areas where papers disagree"`
+	EvidenceClaims []services.EvidenceClaim       `json:"evidence_claims" jsonschema:"description=Cross-paper claims with per-paper stance"`
 }
 
 // --- Tool handlers ---

@@ -211,20 +211,20 @@ const (
 
 // PaperRelationshipType enum values.
 const (
-	PaperRelationshipSupporting          = "supporting"
-	PaperRelationshipContradicting       = "contradicting"
-	PaperRelationshipCiting              = "citing"
-	PaperRelationshipSimilarMethodology  = "similar_methodology"
-	PaperRelationshipDifferentFindings   = "different_findings"
+	PaperRelationshipSupporting         = "supporting"
+	PaperRelationshipContradicting      = "contradicting"
+	PaperRelationshipCiting             = "citing"
+	PaperRelationshipSimilarMethodology = "similar_methodology"
+	PaperRelationshipDifferentFindings  = "different_findings"
 )
 
 // ClaimType enum values.
 const (
-	ClaimTypeHypothesis  = "hypothesis"
-	ClaimTypeFinding     = "finding"
-	ClaimTypeConclusion  = "conclusion"
-	ClaimTypeMethod      = "method"
-	ClaimTypeLimitation  = "limitation"
+	ClaimTypeHypothesis = "hypothesis"
+	ClaimTypeFinding    = "finding"
+	ClaimTypeConclusion = "conclusion"
+	ClaimTypeMethod     = "method"
+	ClaimTypeLimitation = "limitation"
 )
 
 // Confidence enum values.
@@ -236,12 +236,12 @@ const (
 
 // MethodType enum values.
 const (
-	MethodTypeExperimental   = "experimental"
-	MethodTypeSurvey         = "survey"
-	MethodTypeQualitative    = "qualitative"
-	MethodTypeQuantitative   = "quantitative"
-	MethodTypeComputational  = "computational"
-	MethodTypeOther          = "other"
+	MethodTypeExperimental  = "experimental"
+	MethodTypeSurvey        = "survey"
+	MethodTypeQualitative   = "qualitative"
+	MethodTypeQuantitative  = "quantitative"
+	MethodTypeComputational = "computational"
+	MethodTypeOther         = "other"
 )
 
 // ResultType enum values.

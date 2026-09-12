@@ -1080,9 +1080,9 @@ func (h *DocumentHandler) CreatePaperRelationship(w http.ResponseWriter, r *http
 }
 
 type researchMapResponse struct {
-	DocumentID    string                                 `json:"document_id"`
+	DocumentID    string                                   `json:"document_id"`
 	Relationships map[string][]researchMapRelationshipItem `json:"relationships"`
-	TotalCount    int                                    `json:"total_count"`
+	TotalCount    int                                      `json:"total_count"`
 }
 
 type researchMapRelationshipItem struct {

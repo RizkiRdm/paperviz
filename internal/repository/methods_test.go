@@ -21,7 +21,7 @@ func TestMethodRepo_Insert(t *testing.T) {
 		m := Method{
 			ID: "m-1", PaperID: docID, MethodName: "Randomized controlled trial",
 			Description: strPtr("Double-blind study with n=200"),
-			MethodType: MethodTypeExperimental, SourcePage: intPtr(5),
+			MethodType:  MethodTypeExperimental, SourcePage: intPtr(5),
 			SourceText: strPtr("We conducted a randomized controlled trial"),
 		}
 		if err := methodRepo.Insert(m); err != nil {
@@ -118,7 +118,7 @@ func TestMethodRepo_GetByID(t *testing.T) {
 	m := Method{
 		ID: "m-g", PaperID: docID, MethodName: "Computational model",
 		Description: strPtr("Neural network architecture"),
-		MethodType: MethodTypeComputational, SourcePage: intPtr(12),
+		MethodType:  MethodTypeComputational, SourcePage: intPtr(12),
 		SourceText: strPtr("We trained a neural network on the dataset"),
 	}
 	if err := methodRepo.Insert(m); err != nil {

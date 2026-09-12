@@ -21,9 +21,9 @@ type ResearchMapRelationship struct {
 
 // ResearchMapResult groups all relationships for a document by type.
 type ResearchMapResult struct {
-	DocumentID    string                              `json:"document_id"`
+	DocumentID    string                               `json:"document_id"`
 	Relationships map[string][]ResearchMapRelationship `json:"relationships"`
-	TotalCount    int                                 `json:"total_count"`
+	TotalCount    int                                  `json:"total_count"`
 }
 
 // allRelationshipTypes is the ordered list of relationship type keys for the response.

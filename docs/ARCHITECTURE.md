@@ -1,271 +1,115 @@
-# Blueprint Document
-Blueprint Version: 1.0
-Project Name: PaperViz
-Architecture Style: Monolith, single binary
-System Scope: PDF/text ingestion, LLM-based simplification, chart re-visualization, ephemeral link publishing
+# ARCHITECTURE.md — PaperViz (Agent-First)
+
+> **Supersedes** the original `docs/ARCHITECTURE.md` blueprint (no-auth ephemeral MVP, no mention of auth/MCP/OAuth) and the stale addendum in `docs/architecture.md`. That addendum file should be deleted once this doc is adopted — keeping a changelog-style architecture-addendum file alongside a canonical one is exactly the kind of doc-drift source this rewrite exists to close off.
+> **Last verified against code:** commit `68d213b`, 2026-09-12. Go backend could not be compiled in the audit sandbox (no access to the Go module proxy to fetch the pinned `go 1.25.0` toolchain) — findings below marked `[STATIC]` are confirmed via source cross-reference, not a compiler run. Re-verify with a real `go build ./...` before treating them as fully closed.
+
+Blueprint Version: 2.0
+Architecture Style: Monolith, single binary — **unchanged from v1.0, still the right call, do not split this into microservices for the pivot.**
+System Scope: PDF/text ingestion, LLM-based simplification, chart re-visualization + grounding, structured research object extraction, **MCP server as primary agent interface**, human auth/billing/manual-upload as a thin secondary surface.
 
 ---
 
 ## 1. Context Lock
 
-- Runtime: Go 1.25+ (backend), Node 24+ (frontend build only, not runtime)
-- Database: SQLite via `modernc.org/sqlite` (no CGO)
-- ORM: NOT_ALLOWED. Raw SQL with `database/sql` REQUIRED.
-- Router: `chi`
-- Frontend: React + Vite + Tailwind CSS + shadcn/ui, single-page app, static build served by Go binary
-- Charting: Recharts (frontend only)
-- LLM Provider: Google Gemini API, direct HTTP integration. NOT_ALLOWED to route through any internal gateway in MVP.
-- PDF text/image extraction: Go-native library (e.g. `ledongthuc/pdf` or `pdfcpu`) for text; `pdfcpu` or equivalent for image extraction. EXACT_VERSION to be pinned in `go.mod` at implementation time — no floating versions.
-- Allowed Libraries: `chi`, `modernc.org/sqlite`, one PDF text-extraction library, one PDF image-extraction library, standard library `net/http`, `encoding/json`.
-- Forbidden Libraries: any ORM (gorm, ent, sqlx-as-ORM-substitute), any CGO-dependent SQLite driver, any microservice/RPC framework (gRPC NOT_ALLOWED for MVP — single binary only).
-- Dependency Direction: `handlers → services → repository → database`. STRICT. No layer MUST import a layer below violating this direction. Repository MUST NOT import services or handlers.
+- Runtime: Go (pinned `go 1.25.0` in `go.mod`), Node 24+ (frontend build only).
+- Database: SQLite via `modernc.org/sqlite` (no CGO).
+- ORM: NOT_ALLOWED. Raw SQL with `database/sql`.
+- Router: `chi`.
+- Frontend: React 19 + Vite + Tailwind CSS v4 + shadcn/ui, SPA, static build served by the Go binary.
+- Charting: Recharts (frontend only).
+- LLM Provider: Google Gemini API, direct HTTP integration. Still NOT_ALLOWED to route through an internal gateway.
+- Agent Interface: MCP over stdio (`internal/mcp`, `cmd/mcp`) — **this is now a first-class runtime target, not an optional add-on.** It must build and run correctly on every change to the shared service layer, same bar as the REST server.
+- Auth: email/password (`[SHIPPED]`) + Google OAuth (`[BROKEN — see §7]`) + session cookies. `golang.org/x/oauth2` is an approved dependency for this.
+- Dependency Direction: `handlers → services → repository → database`, `handlers/mcp → services` for the agent path. STRICT, unchanged. Repository MUST NOT import services or handlers.
 
 ---
 
 ## 2. Architectural Boundaries
 
-- Layers: `handlers` (HTTP request/response only), `services` (business logic: simplification orchestration, verification, chart pipeline), `repository` (SQLite access), `external` (Gemini API client, PDF extraction wrappers).
-- Allowed Call Flow: `handlers → services`, `services → repository`, `services → external`.
-- Forbidden Call Flow: `handlers → repository` (MUST go through services). `repository → external` (PROHIBITED — repository is data-only). `external → repository` (PROHIBITED).
-- Cross-layer Rules: Services MUST NOT contain `net/http` types (no `http.Request`/`http.ResponseWriter` leakage below handlers). Repository MUST NOT contain business logic (no conditional branching on document content — only CRUD operations parameterized by caller).
+Unchanged from v1.0, and still correctly enforced in the code I read: `handlers` (HTTP request/response only), `services` (business logic), `repository` (SQLite access), `external` (Gemini client, PDF extraction), plus `mcp` (stdio tool adapters — reads from the same `services` layer, does not duplicate business logic; verified against `docs/mcp-parity.md`'s stated architecture rule and the actual `internal/mcp/tools.go` wiring).
+
+**Addition for the agent-first pivot:** the MCP layer must be treated as a peer of the HTTP layer, not a lesser one. Any new service-layer capability that's meant to be agent-reachable needs an MCP tool added in the *same* change, not "later" — `AGENTS.md`'s own rule against shipping an MCP tool without demand signal is about *new speculative* tools, not about keeping existing capability in parity as REST evolves.
 
 ---
 
 ## 3. Data Model Contract
 
-- Normalization Level: 3NF.
-- Table Definitions:
+Base tables (documents, charts, claim_diffs) unchanged from v1.0. Since then, 16 migrations have added: users/sessions (002), chapters (003), chapter-linked charts (004), evidence (005), document title (006), saved papers (007), research collections (008), share tokens (009), document share (010), share referrals (011), usage analytics (012), usage tiers (013), structured research objects (014), evidence graph (015), annotations (016).
 
+**Known gap, confirmed via migration + code cross-reference `[STATIC]`:** `internal/handlers/auth.go`'s `GoogleCallback` constructs a `repository.User{OAuthProvider: ..., OAuthID: ...}` literal and calls `userRepo.UpsertByOAuth(...)`. Neither the `oauth_provider`/`oauth_id` columns (no migration adds them) nor the struct fields/method (`internal/repository/users.go` only defines `ID, Email, PasswordHash, CreatedAt` with `Insert`/`GetByEmail`/`GetByID`) exist. **This is a build-breaking gap, not a schema nice-to-have — nothing OAuth-related can be exercised until it's closed.**
+
+**Required next migration (017), not yet written:**
 ```sql
-CREATE TABLE documents (
-    id TEXT PRIMARY KEY,           -- nanoid, non-guessable
-    created_at INTEGER NOT NULL,   -- unix timestamp
-    last_accessed_at INTEGER NOT NULL,
-    status TEXT NOT NULL,          -- 'processing' | 'complete' | 'failed' | 'verification_failed'
-    source_type TEXT NOT NULL,     -- 'pdf' | 'pasted_text'
-    reading_level TEXT NOT NULL,   -- 'simplified' | 'eli5'
-    original_text TEXT NOT NULL,
-    simplified_text TEXT,
-    error_message TEXT
-);
-
-CREATE TABLE charts (
-    id TEXT PRIMARY KEY,
-    document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    source_method TEXT NOT NULL,   -- 'data_extracted' | 'image_fallback' | 'omitted'
-    chart_data TEXT,               -- JSON, null if image_fallback or omitted
-    image_blob BLOB,               -- null if data_extracted
-    annotation TEXT,               -- plain-language explanation
-    page_number INTEGER,
-    display_order INTEGER NOT NULL
-);
-
-CREATE TABLE claim_diffs (
-    id TEXT PRIMARY KEY,
-    document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    original_claims TEXT NOT NULL,   -- JSON array
-    simplified_claims TEXT NOT NULL, -- JSON array
-    mismatch_detected INTEGER NOT NULL, -- 0 or 1
-    mismatch_detail TEXT
-);
+-- 017_oauth.sql — add OAuth identity columns to users
+ALTER TABLE users ADD COLUMN oauth_provider TEXT;
+ALTER TABLE users ADD COLUMN oauth_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL;
 ```
+Decide at the same time whether `password_hash NOT NULL` stays as-is (OAuth-only users get an empty-string placeholder — verify the login path can never authenticate against that placeholder) or whether it becomes nullable with an explicit `auth_method` column. The latter is architecturally cleaner and is the recommended path; document the decision in `docs/decisions.md` either way, don't leave it implicit.
 
-- Index Policy: `documents.last_accessed_at` MUST be indexed (used by expiry sweep). `charts.document_id` and `claim_diffs.document_id` MUST be indexed (foreign key lookups).
-- Constraint Policy: `documents.status` MUST be constrained via `CHECK` to the 4 listed enum values. `charts.source_method` MUST be constrained via `CHECK` to the 3 listed enum values.
-- Denormalization Policy: PROHIBITED for MVP. No denormalized read-optimized tables — volume does not justify it.
+**API key storage for `/agents` prefill — not designed yet.** `AGENTS.md` currently claims an `api_key` column was added; it was not (grep-confirmed against every migration file). This needs an actual data-model decision (new column on `users`, or a separate `api_keys` table if you want rotation/revocation later) before Chunk 11.3 can be built for real.
 
 ---
 
 ## 4. Execution Constraints
 
-- Async Policy: Document processing (extraction → simplification → verification → chart pipeline) MUST run as a single synchronous request-scoped goroutine chain per document, NOT a background job queue. Justification: solo-dev low-volume MVP; a job queue is premature infrastructure. Client polls a status endpoint.
-- Transaction Policy: Each document's full write (document row + chart rows + claim_diff row) MUST occur within a single SQLite transaction. Partial writes on failure are PROHIBITED — failed jobs MUST roll back to a clean `failed` status row only.
-- Logging Policy: Structured JSON logging REQUIRED for all external API calls (Gemini, PDF extraction) including latency and success/failure. STRICT: no logging of full document text content (privacy/log-volume hygiene) — log document ID and byte length only.
-- Error Handling Policy: All external calls (Gemini API, PDF parsing) MUST have explicit timeout (MAX_LIMIT: 30s per Gemini call, 10s per PDF parse operation). Retry policy: Gemini calls retry MAX_LIMIT 1 time on failure. PDF parse failures MUST NOT retry (deterministic failure, retry is wasted work).
-- Validation Policy: Uploaded PDF MUST be validated for: file size (MAX_LIMIT 20MB), MIME type (`application/pdf` only), presence of extractable text layer (reject before any LLM call if absent).
+Unchanged in principle from v1.0 (single synchronous request-scoped processing chain, transactional writes, structured logging, explicit timeouts) — these were good decisions for the original low-traffic human-upload model and remain good decisions in isolation. What needs updating is the concurrency ceiling, because the *traffic shape* changed.
+
+### 4a. Concurrency — the agent-first risk `[STATIC, confirmed via source]`
+
+- `internal/external/gemini.go:33,69` — `sem: make(chan struct{}, 1)`. One in-flight Gemini call for the *entire process*, all callers (REST and MCP) share it.
+- `internal/repository/db.go:24` — `db.SetMaxOpenConns(1)`.
+
+Under the pre-pivot model (occasional human upload), this was a reasonable simplification — nobody was going to notice serialized calls when traffic was sparse. Under the agent-first model, this is now the top architectural risk: **an agent calling multiple MCP tools in sequence on one paper, or looping `compare_papers` across several, will queue behind a single global lock the entire time.** This will read as "PaperViz is slow" to exactly the audience the pivot is trying to win.
+
+**Required before any real agent-traffic push (i.e., before Chunk 11.8 distribution):**
+- Raise the Gemini semaphore to a small bounded pool (start at 4, tune against your actual Gemini quota tier — don't guess, benchmark).
+- Split SQLite access: keep a single writer connection (correct SQLite practice, don't change this part), but allow a small reader pool since WAL mode is already enabled (`journal_mode=WAL`, confirmed in `repository/db.go`).
+- Add TTL/eviction to the IP rate limiter map (`internal/handlers/ratelimit.go`) — unrelated to the above two, but same "traffic shape changed" root cause: an unbounded per-IP map was fine for sporadic traffic, less fine under sustained agent call volume.
+
+### 4b. Everything else in this section — unchanged
+Transaction policy, logging policy (no full document text in logs), retry policy (1 retry on Gemini failure, no retry on PDF parse failure), validation policy (20MB PDF cap, MIME check, text-layer check) all remain correct and were spot-verified as still present in code. No changes recommended here.
 
 ---
 
 ## 5. Integration Contracts
 
-- Module Rules: `services/pipeline.go` MUST orchestrate the full flow (extract → simplify → verify → chart) as an explicit sequential function. STRICT: no hidden side effects in extraction/simplification functions — each MUST be a pure function of (input) → (output, error).
-- File Rules: Uploaded PDFs MUST NOT be persisted to disk beyond request lifetime. Extraction happens in-memory; only extracted text/data is persisted to SQLite. PROHIBITED: writing uploaded PDF bytes to any file path.
-- External Service Rules: Gemini API key MUST be loaded from environment variable only. PROHIBITED: hardcoded keys, keys in config files committed to repo.
-- Security Rules: Document IDs MUST be generated via cryptographically random nanoid (MIN 12 characters). Sequential/incrementing IDs are PROHIBITED (enumeration risk). No authentication layer exists — MUST NOT be added speculatively; access control is link-possession-only by design.
+### 5a. REST — unchanged in shape, see `docs/openapi.yaml` for the full contract (not reproduced here to avoid a second copy going stale — this doc references it, doesn't duplicate it).
+
+### 5b. MCP — the primary integration contract for the pivot
+
+- 6 tools currently registered (`internal/mcp/tools.go`): `analyze_paper`, `get_summary`, `get_figures`, `get_claims`, `get_evidence`, `compare_papers`.
+- Parity map lives in `docs/mcp-parity.md` — **treat that file as living documentation that must be re-verified against `internal/mcp/tools.go` on every MCP-affecting change**, per its own stated rule (`grep -c "Name:" internal/mcp/tools.go` should match the parity table's row count — this is already listed as a verification command in `AGENTS.md`, keep running it).
+- Deliberately **not** exposed to MCP: list/save/rename/delete a document, share/unshare, visibility toggle, referral tracking. These are human-preference operations, not research operations — this boundary is correct and should hold as the product evolves. Don't add a "convenience" MCP tool for these without a real demand signal and a documented decision, per `AGENTS.md`'s existing rule.
+- MCP input is **text-only**, no PDF upload path — intentional, agents paste text rather than handle binary uploads. Documented in `docs/mcp-parity.md`, confirmed correct.
+
+### 5c. `/agents` page contract — not yet built
+
+The install page needs to produce, per connected client, a config block with the person's API key pre-filled from their session. **This requires the API-key data model decision from §3 to exist first** — there is currently no way to fetch "this signed-in user's API key" because there is no API key at all. Sequence: §3 data model decision → key issuance endpoint → `/agents` page consumes it. Don't build the page UI against a mocked key and leave the real wiring for later; that's exactly the pattern that produced the current OAuth situation (handler code written against a data model that was never actually created).
 
 ---
 
-## 6. Verification Rules
+## 6. Non-Goals (unchanged, still enforced)
 
-**Acceptance Scenarios:**
-1. Valid text-based PDF uploaded → document processed → share link returned → link resolves to rendered simplified text + charts (if any extracted).
-2. Pasted text input (no PDF) → same pipeline, `source_type = 'pasted_text'`, chart pipeline skipped (no table/figure data available from plain text — chart pipeline REQUIRES source PDF).
-3. Claim-diff check detects no mismatch → document status `complete`.
-4. Claim-diff check detects mismatch → document status `verification_failed`, result page shows explicit warning banner, does NOT silently serve unverified simplified text as if verified.
-5. Link accessed after 7 days of inactivity → 404, resource treated as deleted.
-
-**Failure Scenarios:**
-1. PDF has no text layer (scanned image) → reject at upload, explicit error, no LLM call made.
-2. Gemini API call times out after retry → document status `failed`, error_message populated, partial data NOT published.
-3. Chart data-extraction fails for a given chart → fallback to image extraction for that specific chart only; other charts in the same document proceed independently.
-4. Both chart extraction methods fail for a given chart → chart entry with `source_method = 'omitted'`, inline note shown, rest of document unaffected.
-
-**Non-goals (architectural):**
-- No job queue / worker pool. No message broker. No microservices.
-- No user authentication subsystem.
-- No horizontal scaling design — single instance is the design target.
-- No caching layer (Redis/Valkey) — SQLite read latency is sufficient at target volume.
-
-**Out-of-Scope:**
-- Interactive chart rendering (client-side parameter manipulation) — explicitly excluded from this blueprint; would require a computable-model extraction subsystem not designed here.
-- OCR for scanned PDFs.
-- Multi-tenant data isolation (no tenants exist in this design).
+- No ORM, no job queue/message broker, no microservice split.
+- No OCR for scanned PDFs.
+- No routing LLM calls through a gateway other than direct Gemini API.
+- No persisting uploaded PDF bytes to disk.
+- No new MCP tool or SEO/marketing route without a demand signal first (`AGENTS.md` rule, carried forward — this repo has a documented pattern of shipping ahead of validation; the discipline to *not* do that is itself part of the architecture).
 
 ---
 
-## A. Architecture Diagram
+## 7. Current Known-Broken State (read this before starting any new chunk)
 
-```mermaid
-graph TD
-    Client[React SPA] -->|POST /documents| Handler[HTTP Handlers]
-    Client -->|GET /documents/:id| Handler
-    Handler --> PipelineSvc[Pipeline Service]
-    PipelineSvc --> ExtractSvc[Extraction Service]
-    PipelineSvc --> SimplifySvc[Simplification Service]
-    PipelineSvc --> VerifySvc[Claim-Diff Verification Service]
-    PipelineSvc --> ChartSvc[Chart Re-visualization Service]
-    ExtractSvc --> PDFLib[PDF Extraction Library]
-    SimplifySvc --> Gemini[Gemini API Client]
-    VerifySvc --> Gemini
-    ChartSvc --> Gemini
-    ChartSvc --> PDFLib
-    PipelineSvc --> Repo[Repository Layer]
-    Repo --> SQLite[(SQLite)]
-    ExpirySweep[Expiry Sweep - startup + interval] --> Repo
-```
+This section exists because the previous architecture doc had no mechanism for flagging "code exists but doesn't work," and that gap let `AGENTS.md` assert the OAuth foundation was "restored" when it in fact does not compile. Keep this section current — update it the moment a listed item is actually fixed and verified, and delete the entry rather than letting it go stale.
 
----
-
-## B. Component Responsibility Matrix
-
-| Component | Responsibility | Scenario Supported |
+| Component | State | Evidence |
 |---|---|---|
-| HTTP Handlers | Parse request, validate input shape, call Pipeline Service, serialize response | Acceptance 1, 2 |
-| Pipeline Service | Orchestrate extract→simplify→verify→chart sequentially, manage transaction | Acceptance 1–4 |
-| Extraction Service | Extract text + tabular data + chart images from PDF | Acceptance 1, Failure 1 |
-| Simplification Service | Call Gemini to rewrite text at target reading level | Acceptance 1, 2 |
-| Claim-Diff Verification Service | Extract claims from original + simplified text, compare, flag mismatch | Acceptance 3, 4 |
-| Chart Re-visualization Service | Attempt data-based chart reconstruction, fall back to image+annotation | Failure 3, 4 |
-| Repository Layer | CRUD for documents/charts/claim_diffs, expiry queries | All scenarios (persistence) |
-| Expiry Sweep | Periodic deletion of documents past 7-day inactivity | Acceptance 5 |
+| Frontend build (`npx vite build`) | **Fails** | `App.jsx` imports `@/pages/account-page` and `@/pages/agents-page`, neither file exists in the repo. |
+| `internal/handlers` package (backend) | **Does not compile** `[STATIC]` | `GoogleCallback` references `repository.User.OAuthProvider`/`.OAuthID` and `UserRepo.UpsertByOAuth`, none of which exist in `internal/repository/users.go`. |
+| Google OAuth routes | **Not registered** | `GoogleLogin`/`GoogleCallback` defined but absent from `internal/handlers/router.go`. |
+| `/agents` page | **0% implemented** | No file. |
+| `/account` page | **0% implemented** | No file. |
+| CI | **Does not exist** | No `.github/workflows` directory. This is why the above went uncaught. |
 
----
-
-## C. Data Contracts
-
-**Entities**: `Document` (1) — (0..N) `Chart`; `Document` (1) — (1) `ClaimDiff`.
-**Ownership boundary**: `Document` is the aggregate root. `Chart` and `ClaimDiff` rows are deleted via `ON DELETE CASCADE` when their parent `Document` is deleted — no orphaned rows permitted.
-**Required fields**: see Section 3 table definitions — all `NOT NULL` columns are required at write time; no nullable-by-default columns beyond those explicitly marked nullable (`simplified_text`, `error_message`, `chart_data`, `image_blob`, `annotation`, `page_number`).
-
----
-
-## D. End-to-End Dry Run
-
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant H as Handler
-    participant P as Pipeline Service
-    participant E as Extraction Service
-    participant S as Simplification Service
-    participant V as Verify Service
-    participant Ch as Chart Service
-    participant R as Repository
-
-    C->>H: POST /documents (PDF upload)
-    H->>P: ProcessDocument(file)
-    P->>E: ExtractText(file)
-    E-->>P: text, tables, chart_images
-    P->>S: Simplify(text, level)
-    S-->>P: simplified_text
-    P->>V: DiffClaims(text, simplified_text)
-    V-->>P: mismatch_detected (bool)
-    alt mismatch_detected == true
-        P->>R: Save(status=verification_failed)
-        P-->>H: verification_failed result
-    else no mismatch
-        P->>Ch: ReVisualize(tables, chart_images)
-        Ch-->>P: charts[]
-        P->>R: Save(status=complete, all data) [transaction]
-        P-->>H: share link id
-    end
-    H-->>C: 201 {document_id}
-```
-
----
-
-## E. Internal Contracts
-
-**API Contract — Create Document**
-```json
-POST /api/documents
-Content-Type: multipart/form-data
-{
-  "file": "<binary, optional>",
-  "text": "<string, optional — exactly one of file/text REQUIRED>",
-  "reading_level": "simplified | eli5"
-}
-
-201 Response:
-{ "document_id": "V1StGXR8_Z5jdHi6B", "status": "processing" }
-
-4xx Response:
-{ "error": "no_text_layer | invalid_reading_level | file_too_large | missing_input" }
-```
-
-**API Contract — Get Document**
-```json
-GET /api/documents/:id
-
-200 Response:
-{
-  "id": "V1StGXR8_Z5jdHi6B",
-  "status": "complete | processing | failed | verification_failed",
-  "reading_level": "simplified",
-  "simplified_text": "...",
-  "original_text": "...",
-  "charts": [
-    { "id": "...", "source_method": "data_extracted", "chart_data": {...}, "annotation": "...", "image_url": "/api/documents/:id/charts/:chartId/image" }
-  ],
-  "error_message": null,
-  "evidence": [
-    { "id": "...", "page": 3, "figure_id": "...", "source_text": "...", "source_reference": "Figure on page 3" }
-  ]
-}
-
-404: document not found or expired.
-```
-
-`evidence` carries original-provenance rows for image-origin charts only (captured from the PDF's page text). Chapter-derived charts have no original page mapping and produce no evidence row.
-
-**API Contract — Get Chart Image**
-```json
-GET /api/documents/:id/charts/:chartId/image
-
-200 Response:
-Raw image bytes, Content-Type: image/png | image/jpeg | image/gif | image/webp
-
-404: chart not found, image not available for that document, or document expired.
-```
-
-**API Contract — Get Document (cont.)** This endpoint serves the ORIGINAL figure captured from the PDF. Lookup is scoped to the parent document (`WHERE id = ? AND document_id = ?`) so a bare chart ID cannot read another document's figure. Only charts with `source_method: "image_fallback"` carry an `image_url`.
-
-**Error Contract**: All error responses use `{ "error": "<snake_case_code>" }`. STRICT: no raw error strings/stack traces exposed to client.
-
-**Retry/Timeout Policy**: See Section 4, Error Handling Policy. Client polling interval for `processing` status: REQUIRED minimum 2s between polls (frontend-enforced).
-
-**Logging Contract**: Every pipeline stage MUST log `{stage, document_id, duration_ms, success}` as structured JSON to stdout.
-
-**Testing Contract**: Every service function MUST have a table-driven unit test covering at minimum: 1 success case, 1 error case. Pipeline-level integration test REQUIRED covering all 4 acceptance scenarios in Section 6.
-
-**Versioning Contract**: API is unversioned for MVP (`/api/documents`, not `/api/v1/documents`) — single client, no external consumers, versioning is premature.
+**Do not start Chunk 11.2 (Stripe) or continue Chunk 11.3/11.4 polish until every row in this table is cleared.** The dependency ordering in the original pivot plan (11.1 before 11.2/11.3) was correct — it just hasn't actually been satisfied yet, despite `AGENTS.md` describing 11.1 as done.
