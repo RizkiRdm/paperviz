@@ -1,10 +1,12 @@
-# AGENTS.md — PaperViz 
-## Quick Rules 
+# AGENTS.md — PaperViz
+
+## Quick Rules
 - MUST follow ARCHITECTURE.md layer boundaries (`handlers → services → repository/external`) without exception.
-- MUST NOT introduce an ORM, job queue, message broker, or microservice split — see ARCHITECTURE.md Non-goals.- MUST NOT persist uploaded PDF bytes to disk.
+- MUST NOT introduce an ORM, job queue, message broker, or microservice split — see ARCHITECTURE.md Non-goals.
+- MUST NOT persist uploaded PDF bytes to disk.
 - MUST NOT route LLM calls through any gateway other than direct Gemini API for MVP.
 - MUST run tests before marking any task complete.
-- MUST only inspect files directly related to task given. Do not scan the entier repository, Do not read file in `@.gitignore`. Do not inspect unrelated documents.
+- MUST only inspect files directly related to task given. Do not scan the entire repository, do not read files in `@.gitignore`, do not inspect unrelated documents.
 
 ## Design System Rules
 For any task that modifies or generates UI, styling, layout, or components:
@@ -12,11 +14,18 @@ For any task that modifies or generates UI, styling, layout, or components:
 2. Treat it as the absolute source of truth.
 3. Do not invent any colors, spacing, or fonts outside of these rules.
 
-## Project Context 
-PaperViz converts academic papers (PDF/pasted text) into simplified-language versions plus re-visualized charts, served at ephemeral (7-day) no-auth share links. Target user: undergraduate students. Full context in PRD.md. Solo-dev project with ~1hr/day human oversight — agent autonomy within a phase is expected, but cross-phase scope changes require explicit human sign-off. --- ## Tech Stack - Backend: Go 1.22+, `chi` router, `modernc.org/sqlite` (no CGO), raw `database/sql`.- Frontend: React 18 + Vite + Tailwind CSS + shadcn/ui, Recharts for chart rendering.- LLM: Google Gemini API, direct HTTP integration.- PDF processing: Go-native text/image extraction libraries (pinned exact versions in `go.mod`).- No Docker/orchestration requirement for MVP — single binary + SQLite file.
+## Project Context
+PaperViz converts academic papers (PDF/pasted text) into simplified-language versions plus re-visualized charts, served at ephemeral (7-day) no-auth share links. Target user: undergraduate students. Full context in PRD.md. Solo-dev project with ~1hr/day human oversight — agent autonomy within a phase is expected, but cross-phase scope changes require explicit human sign-off.
+
+## Tech Stack
+- Backend: Go 1.22+, `chi` router, `modernc.org/sqlite` (no CGO), raw `database/sql`.
+- Frontend: React 18 + Vite + Tailwind CSS + shadcn/ui, Recharts for chart rendering.
+- LLM: Google Gemini API, direct HTTP integration.
+- PDF processing: Go-native text/image extraction libraries (pinned exact versions in `go.mod`).
+- No Docker/orchestration requirement for MVP — single binary + SQLite file.
+- Agent access: `internal/mcp` (stdio MCP server, `cmd/mcp`), stateless, text-only input, read-only research data — separate interface, same service layer as REST. See `docs/mcp-parity.md`.
 
 ## graphify
-
 Code graph at `graphify-out/`. Query before grep/read.
 
 Rules:
@@ -27,20 +36,25 @@ Rules:
 - After code changes, run `graphify update .`
 
 ## Known Issues
-
 - **Silent catches banned in frontend (12.1 precedent).** Every `catch` MUST handle: user-facing inline error + Retry, dev `console.error`, preserve inputs; `research-map.jsx` block is canonical standard.
 - **Ponytail full-mode convention (12.1 precedent).** Ceiling comments only, format `// ponytail: <simplification> — ceiling: <limit> ; upgrade: <path>`; never logic with the marking; `comparison.go` 5 hits is canonical example.
 - **Chart image_fallback has no image-serving endpoint.** `charts` table stores `image_blob BLOB` but `GET /api/documents/:id` response has no image field. Frontend shows annotation only. Fix requires new endpoint or base64-inline decision. Not blocking — satisfies PLAN.md Phase 4 "done means" (demonstrated capture). Revisit before chart re-visualization ships fully.
-
 - **WAL mode required after DB reset.** Enabled via PRAGMA journal_mode=WAL + synchronous=NORMAL in `repository/db.go`. DB file must be deleted when schema changes (single flat migration). Already gitignored.
-
 - **B3 (single-call verification) skipped** — requires live API key + real-document regression testing against B2 before shipping. Plan still describes it as optional.
-
 - **Annotations require authentication.** Unauthenticated users cannot create/edit/delete annotations. Export endpoint also requires auth. Design decision: annotations are per-user research context, not collaborative.
 - **Verification is not decoration (12.1 precedent).** `mismatch_detail` is evidence, not UI polish — always surface to user when status is `verification_failed`; pipeline populates claims table from verification output in the same tx, no separate LLM extraction step.
+- **Google OAuth requires callback URL in Google Cloud Console.** After deploying, add `https://your-domain.com/api/auth/google/callback` to authorized redirect URIs.
+- **Stripe webhook requires endpoint configuration.** After deploying, add `https://your-domain.com/api/billing/webhook` to Stripe webhook endpoints.
+- **API key column added to users table.** Existing users will get API key on first request to `/api/auth/apikey`.
+- **Signup page restored.** Chunk 11.5 deleted it but login still linked to /signup. Restored with email+password + Google OAuth.
+
+## Agent-First Pivot (Chunk 11)
+- **Agent-first direction locked.** PaperViz becomes agent-first, Context7-style. Human touches the product for 3 things only — auth, billing, and an optional manual-upload escape hatch. The MCP server is the actual product surface.
+- **OAuth is foundation.** 11.1 must ship before 11.2 (Stripe needs real user_id) and 11.3 (/agents needs session for key prefill).
+- **Page cuts complete.** Removed `/dashboard`, `/pricing`, `/compare`, `/compare-research-papers`, `/research-paper-summarizer`, `/figure-explanation`, `/explain/:slug`. Kept `/`, `/agents`, `/login`, `/signup`, `/account`, `/upload`.
+- **Landing page minimal.** Single above-the-fold section with 2 CTAs: "Add to Claude Code" and "Sign in".
 
 ## DB Reset Protocol
-
 When schema changes (new column/table):
 1. `kill` server process
 2. `rm paperviz.db paperviz.db-wal paperviz.db-shm paperviz.db-journal` (all present)
@@ -48,7 +62,6 @@ When schema changes (new column/table):
 4. Data ephemeral (7-day expiry). No migration runner yet.
 
 ## Security & Hardening (Round 2 — applied July 2026)
-
 1. A1: Removed `slog.Info("gemini debug", ...)` from `gemini.go:174` — was leaking model name + URL on every call.
 2. A2: Added IP-based rate limiting on `POST /api/documents` (1 req/30s, burst 2) via `golang.org/x/time/rate`. New file `internal/handlers/ratelimit.go`. Only POST wrapped, GET unrestricted.
 3. A3: Added `slog.Warn` logs on PDF extraction timeout branches in `pdf.go` — makes leaked goroutines observable in logs.
@@ -76,26 +89,40 @@ When schema changes (new column/table):
     - Failure categories: EXTRACTION_ERROR, DATASET_ERROR, CHART_SELECTION_ERROR, GROUNDING_ERROR, SCHEMA_ERROR, RENDER_ERROR
     - Frontend: grounding status badge, provenance display, validation on render
     - Core principle: AI may transform evidence, but must never manufacture evidence
+13. H1: OAuth state parameter was hardcoded string — CSRF vulnerability. Fixed: random nonce generated via crypto/rand, stored in httpOnly cookie (10min TTL), validated in callback. (`internal/handlers/auth.go` GoogleLogin + GoogleCallback)
+14. H2: hasMinComplexity function existed but was never called — weak passwords allowed. Fixed: added check after length validation, returns password_too_weak. (`internal/handlers/auth.go` Signup)
+15. H3: Logout cookie missing Secure flag — cookie mismatch on HTTPS. Fixed: added Secure: true. (`internal/handlers/auth.go` Logout)
 
 ---
 
-## Coding Conventions 
-- MUST use One line comment in every function made.
-- MUST follow standard Go formatting (`gofmt`) 
-— non-negotiable, run before every commit.
-- MUST use explicit error returns (`if err != nil`) 
-— no panics for expected error paths (validation failures, API timeouts). Panics reserved for truly unrecoverable states (e.g., failed DB connection at startup).
-- MUST NOT use global mutable state for request-scoped data (document ID, request context) 
-— pass explicitly.
-- Service functions MUST be pure with respect to side effects where possible: `func Simplify(text string, level string) (string, error)` 
-— no hidden reads from global config inside business logic functions; pass config explicitly.
-- Naming: Go idiomatic (`CamelCase` exported, `camelCase` unexported). No Hungarian notation, no abbreviation-heavy naming.- Logging: structured JSON via standard library or a single chosen logging lib — MUST NOT log full document text content (see ARCHITECTURE.md Logging Policy).
+## Coding Conventions
+- MUST use one line comment in every function made.
+- MUST follow standard Go formatting (`gofmt`) — non-negotiable, run before every commit.
+- MUST use explicit error returns (`if err != nil`) — no panics for expected error paths (validation failures, API timeouts). Panics reserved for truly unrecoverable states (e.g., failed DB connection at startup).
+- MUST NOT use global mutable state for request-scoped data (document ID, request context) — pass explicitly.
+- Service functions MUST be pure with respect to side effects where possible: `func Simplify(text string, level string) (string, error)` — no hidden reads from global config inside business logic functions; pass config explicitly.
+- Naming: Go idiomatic (`CamelCase` exported, `camelCase` unexported). No Hungarian notation, no abbreviation-heavy naming.
+- Logging: structured, via standard library `log/slog` — MUST NOT log full document text content (see ARCHITECTURE.md Logging Policy).
 
-## Testing Rules 
+## Testing Rules
 - Every service function MUST have a table-driven unit test: minimum 1 success case, 1 error case.
 - Pipeline integration test REQUIRED covering all 4 Acceptance Scenarios and 4 Failure Scenarios listed in ARCHITECTURE.md Section 6.
 - MUST run `go test ./...` before considering any task in PLAN.md complete.
-- Claim-diff verification MUST be tested against the Phase 0 corrupted-passage case (PLAN.md) to confirm it actually catches injected errors — a verification system that never fails its own test is not proven. 
+- Claim-diff verification MUST be tested against the Phase 0 corrupted-passage case (PLAN.md) to confirm it actually catches injected errors — a verification system that never fails its own test is not proven.
 
 ## Git Rules
-- every task do MUST commit and push to remote repository.
+- Every task do MUST commit and push to remote repository.
+
+## Agent-Integration Rules (discovered 2026-09-09, Chunk 10 audit)
+- [DO] Treat MCP as an additive interface layer only. It shares the service layer with REST (`docs/mcp-parity.md` architecture rule) — it does not replace or gate the consumer web app.
+- [DO] Keep MCP tools stateless and read-only for research data (`analyze_paper`, `get_summary`, `get_figures`, `get_claims`, `get_evidence`, `compare_papers`). No auth, no user-library access by design.
+- [DON'T] Expose user-owned operations (list, save, rename, delete, share, referral) through MCP. These stay REST-only, human-only — this was a deliberate decision, not an oversight (`docs/mcp-parity.md`).
+- [DON'T] Add a new MCP tool or a new SEO/marketing route without a demand signal first (see Chunk 10.5/10.6 checkpoints). This repo has a documented pattern of shipping ahead of validation — don't repeat it here.
+- [DO] Keep `docs/mcp-parity.md` and `goals/chunk-7-4-mcp/plan.md` in sync with `internal/mcp/tools.go`. Docs listing unimplemented tools is worse than no docs — it misleads the next agent session.
+- [DO] Prefer one canonical route per feature. `/compare` and `/compare-research-papers` rendering the same component was route debt, not intentional design — don't introduce a second copy again.
+
+## Verification Commands
+- `go build ./cmd/mcp` — MCP server compiles
+- `go test ./...` — backend test suite
+- `gofmt -l .` — formatting check, must return empty
+- `grep -c "Name:" internal/mcp/tools.go` — actual MCP tool count, cross-check against `docs/mcp-parity.md` table row count

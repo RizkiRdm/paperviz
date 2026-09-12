@@ -16,14 +16,14 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-08 — E2E testing complete (12 pages tested, 12 screenshots, security review, report generated)
+**Last updated:** 2026-09-12 — Auth security hardening (signup restore, OAuth CSRF, password complexity)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** none — awaiting next task
+- **Working on:** none — auth security complete
 - **Active task file:** none
 - **Blocked on / pending decision:** none
 - **Next action if resuming:** ready for new work
@@ -72,6 +72,14 @@ something that should stay frozen.)*
 - Docs consolidation (TASK-3) — done 2026-09-06 (`docs/archive/progress.md`, `docs/archive/current_task.md`, `docs/archive/prd.md` — archived stale files with superseded notices; PRD.md confirmed canonical via diff; zero dangling refs)
 - Chart engine rework (C2-C17) — done 2026-09-08 (`internal/models/evidence.go` — NumericEvidence + EvidenceSource types; `internal/models/dataset.go` — CandidateDataset + DatasetPoint; `internal/models/chart_spec.go` — ChartSpec + BarData/LineData/ScatterData/PieData + ChartProvenance; `internal/services/evidence_extract.go` — ExtractNumericEvidence (5 regex patterns); `internal/services/table_extract.go` — ExtractTableData; `internal/services/dataset_build.go` — BuildCandidateDatasets; `internal/services/grounding.go` — ValidateGrounding (10 rules); `internal/services/charts.go` — GenerateChapterCharts (evidence→datasets→LLM plan, multi-chart per chapter); `internal/services/chart_regression_test.go` — 8 regression cases; `internal/services/chart_validation_test.go` — 5 real-paper validation cases; `frontend/src/components/data-chart.jsx` — grounding status badge + validation; `frontend/src/components/chart-card.jsx` — provenance display + unsupported state; 421 tests passing across 6 packages; `npm run build` clean)
 - Verification-polish chunk — done 2026-09-04 (`frontend/src/pages/result-page.jsx` ~313-328 badge gating + ~364-394 banner detail/claims opener/compare; `frontend/src/components/status-banners.jsx` 29+/12− hardened panel + badge; `internal/services/intake.go` ~154-172 claims fan-out tx; `save_pipeline_result_test.go` 3 new test cases; behavior: verification_failed now shows real `mismatch_detail` + claims opener + Compare-with-Original; Verified badge disabled when no claim_diff + aria-expanded on opener; ClaimComparisonPanel try/catch + empty state + count badge; pipeline writes one claims row per `OriginalClaims` in the same tx; `go test` 331 passed 7 pkgs; `npm run build` clean; screenshots snap-16/17 confirmed)
+- Chunk 11.1 Google OAuth — done 2026-09-10 (`internal/handlers/auth.go` — GoogleLogin + GoogleCallback handlers; `internal/repository/users.go` — UpsertByOAuth + GetByOAuth methods; `migrations/017_oauth_columns.sql` — oauth_provider, oauth_id columns; `frontend/src/pages/login-page.jsx` — "Continue with Google" button; `.env.example` — GOOGLE_CLIENT_ID/SECRET/REDIRECT_URL; 422 tests passing)
+- Chunk 11.2 Stripe Billing — done 2026-09-10 (`internal/handlers/billing.go` — CreateCheckoutSession, CreatePortalSession, HandleWebhook; `migrations/019_billing_columns.sql` — stripe_customer_id, subscription_tier, subscription_status; `.env.example` — STRIPE_SECRET_KEY/WEBHOOK_SECRET/PRICE_PRO/RESEARCH; `github.com/stripe/stripe-go/v79` added)
+- Chunk 11.3 /agents Page — done 2026-09-10 (`frontend/src/pages/agents-page.jsx` — PNP install page with Claude Code/Desktop/Cursor/ChatGPT tabs; `internal/handlers/apikey.go` — GetApiKey + RegenerateApiKey; `migrations/018_api_key_column.sql` — api_key column; route `/agents` added)
+- Chunk 11.4 /account Page — done 2026-09-10 (`frontend/src/pages/account-page.jsx` — API key, usage, subscription management; `internal/handlers/account.go` — GetSummary endpoint; route `/account` added, `/dashboard` removed)
+- Chunk 11.5 Page Cuts — done 2026-09-10 (Removed: `/dashboard`, `/signup`, `/pricing`, `/compare`, `/compare-research-papers`, `/research-paper-summarizer`, `/figure-explanation`, `/explain/:slug`; Kept: `/`, `/agents`, `/login`, `/account`, `/upload`, share pages; deleted: signup-page.jsx, dashboard-page.jsx, compare-page.jsx, pricing-page.jsx, explain-page.jsx)
+- Chunk 11.6 Landing Page Rebuild — done 2026-09-10 (`frontend/src/pages/upload-page.jsx` — minimal 1-line pitch + 2 CTAs: "Add to Claude Code" + "Sign in")
+- Chunk 11.7 MCP Doc Drift Fix — done 2026-09-10 (`docs/mcp-parity.md` — struck get_tables/search_papers; `goals/chunk-7-4-mcp/plan.md` — marked tools as not implemented)
+- Auth security hardening — done 2026-09-12 (`frontend/src/pages/signup-page.jsx` — restored signup page with email+password + Google OAuth; `frontend/src/App.jsx` — added /signup route; `frontend/src/pages/login-page.jsx` — fixed redirect /dashboard→/account; `internal/handlers/auth.go` — OAuth state CSRF protection (random nonce + cookie validation), hasMinComplexity check enabled, logout cookie Secure flag; 422 tests passing)
 
 ---
 
@@ -213,3 +221,14 @@ just a fast map: "if I need to change X, which file do I open".)*
 - E2E test specs: `e2e/tests/e2e/*.spec.ts` (landing, login, signup, dashboard, result, pricing, compare, share, explain, not-found, navigation, api)
 - E2E screenshots: `assets/*.png` (12 screenshots)
 - E2E test report: `report/E2E_TEST_REPORT.md`
+- OAuth handlers: `internal/handlers/auth.go` (GoogleLogin, GoogleCallback)
+- OAuth repository: `internal/repository/users.go` (UpsertByOAuth, GetByOAuth)
+- OAuth migration: `migrations/017_oauth_columns.sql`
+- API key handler: `internal/handlers/apikey.go` (GetApiKey, RegenerateApiKey)
+- API key migration: `migrations/018_api_key_column.sql`
+- Billing handler: `internal/handlers/billing.go` (CreateCheckoutSession, CreatePortalSession, HandleWebhook)
+- Billing migration: `migrations/019_billing_columns.sql`
+- Account handler: `internal/handlers/account.go` (GetSummary)
+- Agents page: `frontend/src/pages/agents-page.jsx`
+- Account page: `frontend/src/pages/account-page.jsx`
+- Landing page: `frontend/src/pages/upload-page.jsx` (minimal 2-CTA version)

@@ -1,16 +1,22 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 	"unicode"
 
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 
 	"paperviz/internal/repository"
 )
@@ -58,6 +64,11 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 
 	if len(req.Password) < 8 {
 		writeError(w, http.StatusBadRequest, "password_too_short")
+		return
+	}
+
+	if !hasMinComplexity(req.Password) {
+		writeError(w, http.StatusBadRequest, "password_too_weak")
 		return
 	}
 
@@ -183,6 +194,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -256,4 +268,157 @@ func hasMinComplexity(password string) bool {
 		}
 	}
 	return hasUpper && hasLower && hasDigit
+}
+
+// googleOAuthConfig returns the Google OAuth2 configuration from environment.
+func googleOAuthConfig() *oauth2.Config {
+	return &oauth2.Config{
+		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		RedirectURL:  os.Getenv("GOOGLE_REDIRECT_URL"),
+		Scopes:       []string{"openid", "email", "profile"},
+		Endpoint:     google.Endpoint,
+	}
+}
+
+// GoogleLogin handles GET /api/auth/google/login. Redirects to Google consent screen.
+func (h *AuthHandler) GoogleLogin(w http.ResponseWriter, r *http.Request) {
+	config := googleOAuthConfig()
+	if config.ClientID == "" {
+		writeError(w, http.StatusServiceUnavailable, "google_oauth_not_configured")
+		return
+	}
+
+	state, err := generateSessionToken()
+	if err != nil {
+		slog.Error("generate oauth state failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		Path:     "/",
+		MaxAge:   600,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	http.Redirect(w, r, config.AuthCodeURL(state), http.StatusTemporaryRedirect)
+}
+
+// googleUserInfo is the shape of Google's userinfo response.
+type googleUserInfo struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
+
+// GoogleCallback handles GET /api/auth/google/callback. Exchanges code and creates session.
+func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
+	stateCookie, err := r.Cookie("oauth_state")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "missing_oauth_state")
+		return
+	}
+
+	queryState := r.URL.Query().Get("state")
+	if queryState == "" || queryState != stateCookie.Value {
+		writeError(w, http.StatusBadRequest, "invalid_oauth_state")
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "oauth_state",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		writeError(w, http.StatusBadRequest, "missing_code")
+		return
+	}
+
+	config := googleOAuthConfig()
+	if config.ClientID == "" {
+		writeError(w, http.StatusServiceUnavailable, "google_oauth_not_configured")
+		return
+	}
+
+	token, err := config.Exchange(context.Background(), code)
+	if err != nil {
+		slog.Error("google token exchange failed", "error", err)
+		writeError(w, http.StatusUnauthorized, "oauth_exchange_failed")
+		return
+	}
+
+	client := config.Client(context.Background(), token)
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	if err != nil {
+		slog.Error("google userinfo fetch failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		slog.Error("google userinfo read failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	var userInfo googleUserInfo
+	if err := json.Unmarshal(body, &userInfo); err != nil {
+		slog.Error("google userinfo parse failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	if userInfo.Email == "" {
+		writeError(w, http.StatusUnauthorized, "google_no_email")
+		return
+	}
+
+	userRepo := repository.NewUserRepo(h.db)
+	userID, err := repository.NewID()
+	if err != nil {
+		slog.Error("generate user id failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	if err := userRepo.UpsertByOAuth(repository.User{
+		ID:            userID,
+		Email:         strings.ToLower(userInfo.Email),
+		OAuthProvider: "google",
+		OAuthID:       userInfo.ID,
+		CreatedAt:     time.Now().Unix(),
+	}); err != nil {
+		slog.Error("upsert oauth user failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	existingUser, err := userRepo.GetByEmail(strings.ToLower(userInfo.Email))
+	if err != nil {
+		slog.Error("get user after upsert failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	if err := h.createSessionAndSetCookie(w, existingUser.ID); err != nil {
+		slog.Error("create session failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	http.Redirect(w, r, "/account", http.StatusTemporaryRedirect)
 }
