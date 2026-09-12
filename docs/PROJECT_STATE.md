@@ -16,7 +16,7 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-12 — Auth security hardening (signup restore, OAuth CSRF, password complexity)
+**Last updated:** 2026-09-12 — Docs maintenance: SECURITY/RELIABILITY/DATA_PIPELINE/OBSERVABILITY aligned with auth hardening + ADR-001
 
 ---
 
@@ -80,6 +80,7 @@ something that should stay frozen.)*
 - Chunk 11.6 Landing Page Rebuild — done 2026-09-10 (`frontend/src/pages/upload-page.jsx` — minimal 1-line pitch + 2 CTAs: "Add to Claude Code" + "Sign in")
 - Chunk 11.7 MCP Doc Drift Fix — done 2026-09-10 (`docs/mcp-parity.md` — struck get_tables/search_papers; `goals/chunk-7-4-mcp/plan.md` — marked tools as not implemented)
 - Auth security hardening — done 2026-09-12 (`frontend/src/pages/signup-page.jsx` — restored signup page with email+password + Google OAuth; `frontend/src/App.jsx` — added /signup route; `frontend/src/pages/login-page.jsx` — fixed redirect /dashboard→/account; `internal/handlers/auth.go` — OAuth state CSRF protection (random nonce + cookie validation), hasMinComplexity check enabled, logout cookie Secure flag; 422 tests passing)
+- Docs maintenance — done 2026-09-12 (`docs/SECURITY.md` — auth/session/rate-limit/SSRF filed from code; `docs/RELIABILITY.md` — rate-limit TTL, timeouts, failure modes; `docs/DATA_PIPELINE.md` — evidence→dataset→grounding 10 rules; `docs/OBSERVABILITY.md` — slog RequestID, stage logs, gaps; `docs/ENGINEERING_LOG.md` — 2026-09-12 auth hardening entry; `docs/DECISIONS/ADR-001-auth-session-hardening.md`)
 
 ---
 
@@ -137,6 +138,7 @@ something you already rejected for a clear reason.)*
 | 2026-09-08 | One chapter can produce 0..N charts | Dataset is unit of visualization, not chapter |
 | 2026-09-08 | Scatter requires numeric X/Y | No categorical labels as X-axis for scatter charts |
 | 2026-09-08 | Pie only for parts-of-whole | Reject pie when data doesn't represent a whole |
+| 2026-09-12 | Auth session: single-session on login + strict complexity (upper/lower/digit/special) + rate-limiter TTL 5m | Closes fixation/CSRF, bounds memory without new dep; single-session breaks multi-device (see ADR-001) |
 
 ---
 
@@ -232,3 +234,9 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Agents page: `frontend/src/pages/agents-page.jsx`
 - Account page: `frontend/src/pages/account-page.jsx`
 - Landing page: `frontend/src/pages/upload-page.jsx` (minimal 2-CTA version)
+- Security posture: `docs/SECURITY.md` (auth/session/rate-limit/SSRF, 16 sections from code)
+- Reliability mechanisms: `docs/RELIABILITY.md` (timeouts/retries/idempotency)
+- Data pipeline: `docs/DATA_PIPELINE.md` (evidence 5 patterns → dataset metric||unit → grounding 10 rules)
+- Observability: `docs/OBSERVABILITY.md` (slog RequestID, stage logs)
+- Engineering log: `docs/ENGINEERING_LOG.md` (2026-09-12 auth hardening)
+- Decision ADR-001: `docs/DECISIONS/ADR-001-auth-session-hardening.md` (single-session + special-char)
