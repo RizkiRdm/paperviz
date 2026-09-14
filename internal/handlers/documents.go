@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"paperviz/internal/app/documents"
 	"paperviz/internal/external"
 	"paperviz/internal/repository"
 	"paperviz/internal/services"
@@ -216,8 +217,8 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // Get handles GET /api/documents/:id.
 func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	docRepo := repository.NewDocumentRepo(h.db)
-	doc, err := docRepo.Get(id)
+	svc := documents.New(h.db, h.gemini)
+	rm, err := svc.GetReadModel(id)
 	if errors.Is(err, repository.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
@@ -227,17 +228,11 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
-	if err := docRepo.TouchLastAccessed(id, time.Now().Unix()); err != nil {
-		slog.Error("touch last_accessed_at failed", "document_id", id, "error", err)
-	}
-	chartRepo := repository.NewChartRepo(h.db)
-	charts, _ := chartRepo.ListByDocument(id)
-	chapterRepo := repository.NewChapterRepo(h.db)
-	chapters, _ := chapterRepo.ListByDocument(id)
-	claimDiffRepo := repository.NewClaimDiffRepo(h.db)
-	claimDiff, _ := claimDiffRepo.GetByDocument(id)
-	evidenceRepo := repository.NewEvidenceRepo(h.db)
-	evidence, _ := evidenceRepo.ListByPaper(id)
+	doc := rm.Document
+	charts := rm.Charts
+	chapters := rm.Chapters
+	claimDiff := rm.ClaimDiff
+	evidence := rm.Evidence
 	type chartResp struct {
 		ID           string  `json:"id"`
 		DocumentID   string  `json:"document_id"`

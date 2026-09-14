@@ -22,9 +22,9 @@ type IntakeResult struct {
 	PDFBytes     []byte
 }
 
-// ValidateAndInsert validates the input (PDF file or pasted text), extracts text,
-// generates a unique ID, and inserts the initial document row with status 'processing'.
-// This is synchronous (Acceptance Scenario 1 & Failure Scenario 1).
+// ValidateAndInsert is stage ingestion→extraction: validates input, extracts
+// PDF text once (no dup parse; pipeline reuses OriginalText for pages/charts
+// without re-extracting flattened text), generates ID, inserts processing row.
 func ValidateAndInsert(db *sql.DB, readingLevel string, hasFile bool, pdfBytes []byte, pastedText string, userID *string) (IntakeResult, string, error) {
 	var originalText, sourceType string
 
@@ -104,6 +104,7 @@ func RunPipelineAndPersist(db *sql.DB, gemini *external.GeminiClient, documentID
 	_ = docRepo.SetProcessingTime(documentID, elapsed)
 }
 
+// savePipelineResult persists pipeline output in single transaction (persistence stage).
 func savePipelineResult(db *sql.DB, documentID string, output PipelineOutput) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -248,6 +249,7 @@ func savePipelineResult(db *sql.DB, documentID string, output PipelineOutput) er
 	return tx.Commit()
 }
 
+// deriveTitle returns first non-empty line as title (truncated at 200 chars).
 func deriveTitle(text string) string {
 	for _, line := range strings.Split(text, "\n") {
 		line = strings.TrimSpace(line)
