@@ -48,3 +48,19 @@ All MCP responses preserve these research semantics (matching REST):
 > Business logic and research semantics live in the core/application layer, not separately inside the web UI, API, or MCP adapter.
 
 Both REST and MCP handlers read from the same repository layer and return the same underlying data structures. No duplicated business logic.
+
+## P35 Dependency Direction (Verified 2026-09-15)
+
+**Allowed:** `MCP → Data/Tools → Repo/Infra`
+
+```
+internal/mcp/tools.go imports:
+  paperviz/internal/repository   ← data layer (Repo)
+  paperviz/internal/services     ← app services (Tools)
+```
+
+**Forbidden (verified zero hits):**
+- `MCP → Handler → Repo` — `internal/mcp` does NOT import `internal/handlers`
+- `MCP → Gemini → result` — tool handlers never call `GeminiClient`; the field exists on `MCPServer` struct for future use but is never invoked in any tool path
+
+**Evidence:** `grep -r "handlers" internal/mcp/` returns only comment strings ("tool handlers"), zero import paths. `grep -r "gemini\|Gemini" internal/mcp/tools.go` returns only comments (lines 19, 23, 59), zero function calls.
