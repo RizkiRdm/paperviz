@@ -37,6 +37,19 @@ type ExportCollection struct {
 	Name string `json:"name"`
 }
 
+// ExportService provides research-context export via injected DB.
+type ExportService struct {
+	db *sql.DB
+}
+
+// NewExportService creates ExportService with explicit DB dependency.
+func NewExportService(db *sql.DB) *ExportService { return &ExportService{db: db} }
+
+// Export delegates to ExportResearchContext with owned DB.
+func (s *ExportService) Export(documentID string) (*ResearchExport, error) {
+	return ExportResearchContext(s.db, documentID)
+}
+
 // ExportResearchContext assembles all research data for a document into a single JSON-serializable struct.
 func ExportResearchContext(db *sql.DB, documentID string) (*ResearchExport, error) {
 	// Fetch the document; return error if not found.

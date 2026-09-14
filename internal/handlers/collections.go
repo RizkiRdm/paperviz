@@ -1,16 +1,17 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 
-	"paperviz/internal/repository"
 	"paperviz/internal/services"
 )
 
@@ -44,6 +45,35 @@ type addDocumentRequest struct {
 	DocumentID string `json:"document_id"`
 }
 
+// collectionIDAlphabet avoids ambiguous chars per ARCHITECTURE.md Section 5.
+const collectionIDAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+// newCollectionID generates cryptographically random ID without importing repository.
+func newCollectionID() (string, error) {
+	const length = 16
+	buf := make([]byte, length)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	id := make([]byte, length)
+	for i, b := range buf {
+		id[i] = collectionIDAlphabet[int(b)%len(collectionIDAlphabet)]
+	}
+	return string(id), nil
+}
+
+// isNotFound checks for repository not-found without importing repository package.
+func isNotFound(err error) bool {
+	if errors.Is(err, sql.ErrNoRows) {
+		return true
+	}
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "not found")
+}
+
+// Create handles POST /api/collections — creates collection for authenticated user.
 func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req createCollectionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -61,7 +91,7 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id, err := repository.NewID()
+	id, err := newCollectionID()
 	if err != nil {
 		slog.Error("generate collection id failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -81,6 +111,7 @@ func (h *CollectionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// List handles GET /api/collections — returns collections for authenticated user.
 func (h *CollectionHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID := UserIDFromContext(r.Context())
 	if userID == "" {
@@ -113,7 +144,7 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, "forbidden")
 			return
 		}
-		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
@@ -128,7 +159,7 @@ func (h *CollectionHandler) Get(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, "forbidden")
 			return
 		}
-		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
@@ -182,7 +213,7 @@ func (h *CollectionHandler) Rename(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, "forbidden")
 			return
 		}
-		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
@@ -208,7 +239,7 @@ func (h *CollectionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusForbidden, "forbidden")
 			return
 		}
-		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
@@ -244,7 +275,7 @@ func (h *CollectionHandler) AddDocument(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusForbidden, "forbidden")
 			return
 		}
-		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}
@@ -271,7 +302,7 @@ func (h *CollectionHandler) RemoveDocument(w http.ResponseWriter, r *http.Reques
 			writeError(w, http.StatusForbidden, "forbidden")
 			return
 		}
-		if errors.Is(err, repository.ErrNotFound) || errors.Is(err, sql.ErrNoRows) {
+		if isNotFound(err) {
 			writeError(w, http.StatusNotFound, "not_found")
 			return
 		}

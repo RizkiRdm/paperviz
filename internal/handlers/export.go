@@ -11,21 +11,25 @@ import (
 	"paperviz/internal/services"
 )
 
-// ExportHandler handles the document research-context export endpoint.
+// exportService abstracts research-context export for transport layer.
+type exportService interface {
+	Export(documentID string) (*services.ResearchExport, error)
+}
+
+// ExportHandler handles research-context export.
 type ExportHandler struct {
-	db *sql.DB
+	svc exportService
 }
 
-// NewExportHandler creates an ExportHandler with the given database connection.
+// NewExportHandler creates ExportHandler delegating to services layer.
 func NewExportHandler(db *sql.DB) *ExportHandler {
-	return &ExportHandler{db: db}
+	return &ExportHandler{svc: services.NewExportService(db)}
 }
 
-// Export handles GET /api/documents/{id}/export, returning a downloadable JSON export of the research context.
+// Export handles GET /api/documents/{id}/export.
 func (h *ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 	documentID := chi.URLParam(r, "id")
-
-	export, err := services.ExportResearchContext(h.db, documentID)
+	export, err := h.svc.Export(documentID)
 	if err != nil {
 		if strings.Contains(err.Error(), "document not found") {
 			writeError(w, http.StatusNotFound, "not_found")
@@ -35,7 +39,6 @@ func (h *ExportHandler) Export(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
-
 	w.Header().Set("Content-Disposition", `attachment; filename="research-context-`+documentID+`.json"`)
 	writeJSON(w, http.StatusOK, export)
 }

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"paperviz/internal/external"
+	"paperviz/internal/repository"
 )
 
 // Sentinel errors for the Import Service, surfaced to handlers as
@@ -304,6 +306,35 @@ func downloadPDF(rawURL string) ([]byte, error) {
 	}
 
 	return pdfBytes, nil
+}
+
+// CreateImportedDocument inserts a DOI/URL import and starts async pipeline.
+func CreateImportedDocument(db *sql.DB, gemini *external.GeminiClient, sourceType, readingLevel, originalText, title string, userID *string) (string, error) {
+	id, err := repository.NewID()
+	if err != nil {
+		return "", fmt.Errorf("generate id: %w", err)
+	}
+	now := time.Now().Unix()
+	doc := repository.Document{
+		ID:             id,
+		CreatedAt:      now,
+		LastAccessedAt: now,
+		Status:         repository.StatusProcessing,
+		SourceType:     sourceType,
+		ReadingLevel:   readingLevel,
+		Title:          title,
+		OriginalText:   originalText,
+		UserID:         userID,
+	}
+	if err := repository.NewDocumentRepo(db).Insert(doc); err != nil {
+		return "", fmt.Errorf("insert document: %w", err)
+	}
+	go RunPipelineAndPersist(db, gemini, id, PipelineInput{
+		OriginalText: originalText,
+		SourceType:   sourceType,
+		ReadingLevel: readingLevel,
+	})
+	return id, nil
 }
 
 // isPDFContentType reports whether the Content-Type header indicates a PDF.

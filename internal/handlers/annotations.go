@@ -3,8 +3,10 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -41,6 +43,28 @@ type annotationResponse struct {
 	Content    string `json:"content"`
 	CreatedAt  int64  `json:"created_at"`
 	UpdatedAt  int64  `json:"updated_at"`
+}
+
+// isAnnotationNotFound checks not-found without importing repository.
+func isAnnotationNotFound(err error) bool {
+	if errors.Is(err, sql.ErrNoRows) {
+		return true
+	}
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "not found")
+}
+
+// isAnnotationForbidden checks ownership violation without importing repository.
+func isAnnotationForbidden(err error) bool {
+	if errors.Is(err, services.ErrForbidden) {
+		return true
+	}
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "does not own") || strings.Contains(err.Error(), "unauthorized")
 }
 
 // List returns all annotations for a document owned by the authenticated user.
@@ -144,8 +168,16 @@ func (h *AnnotationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := services.UpdateAnnotation(h.db, annotationID, userID, req.Content); err != nil {
+		if isAnnotationForbidden(err) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		if isAnnotationNotFound(err) {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
 		slog.Error("update annotation failed", "error", err)
-		writeError(w, http.StatusForbidden, "forbidden")
+		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
 
@@ -177,8 +209,16 @@ func (h *AnnotationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	annotationID := chi.URLParam(r, "annotationId")
 
 	if err := services.DeleteAnnotation(h.db, annotationID, userID); err != nil {
+		if isAnnotationForbidden(err) {
+			writeError(w, http.StatusForbidden, "forbidden")
+			return
+		}
+		if isAnnotationNotFound(err) {
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		}
 		slog.Error("delete annotation failed", "error", err)
-		writeError(w, http.StatusForbidden, "forbidden")
+		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
 
