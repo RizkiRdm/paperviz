@@ -14,19 +14,28 @@ import (
 	"paperviz/internal/services"
 )
 
+// registerTools registers exactly 5 MCP tools — the locked agent-first surface.
+// ingest_document is deterministic extraction only; no LLM is called in any tool path.
 func registerTools(server *mcp.Server, srv *MCPServer) {
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "analyze_paper",
-		Description: "Submit a paper for analysis. Accepts raw text, runs the full simplification + verification + chart pipeline, and returns the document ID once processing begins.",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args AnalyzePaperInput) (*mcp.CallToolResult, AnalysisResult, error) {
-		return handleAnalyzePaper(ctx, srv, args)
+		Name:        "ingest_document",
+		Description: "Ingest paper text via deterministic extraction only. No LLM, no summarization, no reasoning. Returns document_id for polling via get_document.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args IngestDocumentInput) (*mcp.CallToolResult, IngestDocumentResult, error) {
+		return handleIngestDocument(ctx, srv, args)
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "get_summary",
-		Description: "Retrieve the simplified text and detected chapters for an analyzed paper.",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args DocIDInput) (*mcp.CallToolResult, SummaryResult, error) {
-		return handleGetSummary(ctx, srv, args)
+		Name:        "search_documents",
+		Description: "Search ingested documents by title query. Returns matching document summaries.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args SearchDocumentsInput) (*mcp.CallToolResult, SearchDocumentsResult, error) {
+		return handleSearchDocuments(ctx, srv, args)
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "get_document",
+		Description: "Retrieve full metadata for an ingested document by its document_id.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args DocIDInput) (*mcp.CallToolResult, GetDocumentResult, error) {
+		return handleGetDocument(ctx, srv, args)
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -37,63 +46,70 @@ func registerTools(server *mcp.Server, srv *MCPServer) {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "get_claims",
-		Description: "Retrieve claim verification data comparing original vs simplified text for a paper.",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args DocIDInput) (*mcp.CallToolResult, ClaimsResult, error) {
-		return handleGetClaims(ctx, srv, args)
-	})
-
-	mcp.AddTool(server, &mcp.Tool{
 		Name:        "get_evidence",
 		Description: "Retrieve evidence references linking claims to source material for a paper.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args DocIDInput) (*mcp.CallToolResult, EvidenceResult, error) {
 		return handleGetEvidence(ctx, srv, args)
 	})
-
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "compare_papers",
-		Description: "Generate a structured comparison across 2+ analyzed papers. Returns side-by-side dimensions, agreements, disagreements, and cross-paper evidence claims.",
-	}, func(ctx context.Context, req *mcp.CallToolRequest, args ComparePapersInput) (*mcp.CallToolResult, CompareResult, error) {
-		return handleComparePapers(ctx, srv, args)
-	})
 }
 
 // --- Input/Output types ---
 
-// AnalyzePaperInput is the input for the analyze_paper tool.
-type AnalyzePaperInput struct {
-	Text         string `json:"text" jsonschema:"description=Raw paper text to analyze (paste the full text here)"`
+// IngestDocumentInput is the input for the ingest_document tool.
+type IngestDocumentInput struct {
+	Text         string `json:"text" jsonschema:"description=Paper text to ingest (paste the full text here)"`
 	ReadingLevel string `json:"reading_level,omitempty" jsonschema:"description=Target reading level: simplified (default) or eli5"`
 }
 
-// AnalysisResult is the output of the analyze_paper tool.
-type AnalysisResult struct {
-	DocumentID       string `json:"document_id" jsonschema:"description=Unique document identifier"`
-	Title            string `json:"title" jsonschema:"description=Paper title derived from first line"`
-	Status           string `json:"status" jsonschema:"description=processing status (processing, complete, failed, verification_failed)"`
-	SourceType       string `json:"source_type" jsonschema:"description=Input source type (pdf or pasted_text)"`
-	ProcessingTimeMs *int   `json:"processing_time_ms,omitempty" jsonschema:"description=Total pipeline processing time in milliseconds (null while processing)"`
-	ErrorMessage     string `json:"error_message,omitempty" jsonschema:"description=Error details if status is failed"`
+// IngestDocumentResult is the output of the ingest_document tool.
+type IngestDocumentResult struct {
+	DocumentID string         `json:"document_id" jsonschema:"description=Unique document identifier"`
+	Title      string         `json:"title" jsonschema:"description=Paper title derived from first line"`
+	Status     string         `json:"status" jsonschema:"description=Document status (processing)"`
+	SourceType string         `json:"source_type" jsonschema:"description=Input source type (pdf or pasted_text)"`
+	Metadata   IngestMetadata `json:"metadata" jsonschema:"description=Ingestion metadata"`
+}
+
+// IngestMetadata holds ingestion metadata for the ingest_document response.
+type IngestMetadata struct {
+	ReadingLevel string `json:"reading_level" jsonschema:"description=Applied reading level"`
+	CreatedAt    int64  `json:"created_at" jsonschema:"description=Unix timestamp of creation"`
+}
+
+// SearchDocumentsInput is the input for the search_documents tool.
+type SearchDocumentsInput struct {
+	Query string `json:"query" jsonschema:"description=Search query to match against document titles"`
+	Limit int    `json:"limit,omitempty" jsonschema:"description=Maximum results to return (default 10, max 50)"`
+}
+
+// SearchDocumentsResult is the output of the search_documents tool.
+type SearchDocumentsResult struct {
+	Documents []SearchDocumentInfo `json:"documents" jsonschema:"description=Matching documents"`
+}
+
+// SearchDocumentInfo holds summary info for a search result.
+type SearchDocumentInfo struct {
+	DocumentID string `json:"document_id" jsonschema:"description=Document identifier"`
+	Title      string `json:"title" jsonschema:"description=Document title"`
+	Status     string `json:"status" jsonschema:"description=Processing status"`
+	CreatedAt  int64  `json:"created_at" jsonschema:"description=Unix timestamp of creation"`
+}
+
+// GetDocumentResult is the output of the get_document tool.
+type GetDocumentResult struct {
+	DocumentID       string  `json:"document_id" jsonschema:"description=Unique document identifier"`
+	Title            string  `json:"title" jsonschema:"description=Paper title"`
+	Status           string  `json:"status" jsonschema:"description=Processing status"`
+	SourceType       string  `json:"source_type" jsonschema:"description=Input source type"`
+	ReadingLevel     string  `json:"reading_level" jsonschema:"description=Target reading level"`
+	CreatedAt        int64   `json:"created_at" jsonschema:"description=Unix timestamp of creation"`
+	ProcessingTimeMs *int    `json:"processing_time_ms,omitempty" jsonschema:"description=Processing time in milliseconds"`
+	ErrorMessage     *string `json:"error_message,omitempty" jsonschema:"description=Error details if status is failed"`
 }
 
 // DocIDInput is the common input for single-document tools.
 type DocIDInput struct {
-	DocumentID string `json:"document_id" jsonschema:"description=Document ID returned by analyze_paper"`
-}
-
-// ChapterInfo holds one detected chapter section.
-type ChapterInfo struct {
-	ID           string `json:"id" jsonschema:"description=Chapter identifier"`
-	Title        string `json:"title" jsonschema:"description=Section heading"`
-	Summary      string `json:"summary" jsonschema:"description=One-sentence section summary"`
-	Excerpt      string `json:"excerpt" jsonschema:"description=First paragraph or key text"`
-	DisplayOrder int    `json:"display_order" jsonschema:"description=Ordering within document"`
-}
-
-// SummaryResult is the output of the get_summary tool.
-type SummaryResult struct {
-	SimplifiedText string        `json:"simplified_text" jsonschema:"description=Markdown-formatted simplified version of the paper"`
-	Chapters       []ChapterInfo `json:"chapters" jsonschema:"description=Detected sections of the simplified text"`
+	DocumentID string `json:"document_id" jsonschema:"description=Document ID to query"`
 }
 
 // ChartInfo holds one re-visualized figure.
@@ -115,19 +131,6 @@ type FiguresResult struct {
 	Charts []ChartInfo `json:"charts" jsonschema:"description=Re-visualized figures from the paper"`
 }
 
-// ClaimDiffInfo holds claim verification data.
-type ClaimDiffInfo struct {
-	OriginalClaims   []string `json:"original_claims" jsonschema:"description=Claims extracted from original text"`
-	SimplifiedClaims []string `json:"simplified_claims" jsonschema:"description=Claims extracted from simplified text"`
-	MismatchDetected bool     `json:"mismatch_detected" jsonschema:"description=True if original and simplified claims differ"`
-	MismatchDetail   string   `json:"mismatch_detail,omitempty" jsonschema:"description=Details of any claim mismatch"`
-}
-
-// ClaimsResult is the output of the get_claims tool.
-type ClaimsResult struct {
-	ClaimDiff *ClaimDiffInfo `json:"claim_diff" jsonschema:"description=Claim verification data (null if not yet verified)"`
-}
-
 // EvidenceInfo holds one piece of evidence linking claims to source material.
 type EvidenceInfo struct {
 	ID              string `json:"id" jsonschema:"description=Evidence identifier"`
@@ -144,50 +147,20 @@ type EvidenceResult struct {
 	Evidence []EvidenceInfo `json:"evidence" jsonschema:"description=Evidence references for this paper"`
 }
 
-// ComparePapersInput is the input for the compare_papers tool.
-type ComparePapersInput struct {
-	DocumentIDs []string `json:"document_ids" jsonschema:"description=Array of 2+ document IDs to compare (minimum 2)"`
-}
-
-// CompareResult is the output of the compare_papers tool.
-type CompareResult struct {
-	Papers         []services.PaperSummary        `json:"papers" jsonschema:"description=Individual paper summaries"`
-	Dimensions     []services.ComparisonDimension `json:"dimensions" jsonschema:"description=Side-by-side comparison dimensions"`
-	Agreement      []string                       `json:"agreement" jsonschema:"description=Areas where papers agree"`
-	Disagreement   []string                       `json:"disagreement" jsonschema:"description=Areas where papers disagree"`
-	EvidenceClaims []services.EvidenceClaim       `json:"evidence_claims" jsonschema:"description=Cross-paper claims with per-paper stance"`
-}
-
 // --- Tool handlers ---
 
-// handleAnalyzePaper runs the full pipeline for pasted text and returns the document ID.
-func handleAnalyzePaper(ctx context.Context, srv *MCPServer, args AnalyzePaperInput) (*mcp.CallToolResult, AnalysisResult, error) {
+// handleIngestDocument performs deterministic text extraction only — no LLM, no pipeline.
+func handleIngestDocument(ctx context.Context, srv *MCPServer, args IngestDocumentInput) (*mcp.CallToolResult, IngestDocumentResult, error) {
 	if args.Text == "" {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: `{"error":"text is required"}`}},
-			IsError: true,
-		}, AnalysisResult{}, nil
+		return errResult(fmt.Errorf("text is required")), IngestDocumentResult{}, nil
 	}
 
 	if len(args.Text) > 500*1024 {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf(`{"error":"%s"}`, ErrSizeLimit.Message)}},
-			IsError: true,
-		}, AnalysisResult{}, nil
+		return errResult(ErrSizeLimit), IngestDocumentResult{}, nil
 	}
 
 	if !srv.rateLimiter.AllowAnalyze(srv.apiKey) {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf(`{"error":"%s"}`, ErrRateLimited.Message)}},
-			IsError: true,
-		}, AnalysisResult{}, nil
-	}
-
-	if !srv.jobLimiter.Acquire(srv.apiKey) {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf(`{"error":"%s"}`, ErrJobLimit.Message)}},
-			IsError: true,
-		}, AnalysisResult{}, nil
+		return errResult(ErrRateLimited), IngestDocumentResult{}, nil
 	}
 
 	readingLevel := args.ReadingLevel
@@ -195,82 +168,79 @@ func handleAnalyzePaper(ctx context.Context, srv *MCPServer, args AnalyzePaperIn
 		readingLevel = repository.ReadingLevelSimplified
 	}
 	if readingLevel != repository.ReadingLevelSimplified && readingLevel != repository.ReadingLevelELI5 {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf(`{"error":"invalid reading_level %q: must be simplified or eli5"}`, readingLevel)}},
-			IsError: true,
-		}, AnalysisResult{}, nil
+		return errResult(fmt.Errorf("invalid reading_level %q: must be simplified or eli5", readingLevel)), IngestDocumentResult{}, nil
 	}
 
 	intake, _, err := services.ValidateAndInsert(srv.db, readingLevel, false, nil, args.Text, nil)
 	if err != nil {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf(`{"error":"intake failed: %s"}`, err.Error())}},
-			IsError: true,
-		}, AnalysisResult{}, nil
+		return errResult(err), IngestDocumentResult{}, nil
 	}
 
-	startTime := time.Now()
-
-	// Run pipeline with 5-minute timeout to prevent unbounded analysis time.
-	pipelineCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-
-	go func() {
-		defer srv.jobLimiter.Release(srv.apiKey)
-		services.RunPipelineAndPersist(srv.db, srv.gemini, intake.DocumentID, services.PipelineInput{
-			OriginalText: intake.OriginalText,
-			SourceType:   intake.SourceType,
+	return nil, IngestDocumentResult{
+		DocumentID: intake.DocumentID,
+		Title:      deriveTitle(intake.OriginalText),
+		Status:     repository.StatusProcessing,
+		SourceType: intake.SourceType,
+		Metadata: IngestMetadata{
 			ReadingLevel: readingLevel,
-		})
-		_ = pipelineCtx
-	}()
-
-	elapsed := int(time.Since(startTime).Milliseconds())
-
-	return nil, AnalysisResult{
-		DocumentID:       intake.DocumentID,
-		Title:            deriveTitle(intake.OriginalText),
-		Status:           repository.StatusProcessing,
-		SourceType:       intake.SourceType,
-		ProcessingTimeMs: &elapsed,
+			CreatedAt:    time.Now().Unix(),
+		},
 	}, nil
 }
 
-// handleGetSummary returns simplified text + chapters for a document.
-func handleGetSummary(ctx context.Context, srv *MCPServer, args DocIDInput) (*mcp.CallToolResult, SummaryResult, error) {
+// handleSearchDocuments searches documents by title and returns matching summaries.
+func handleSearchDocuments(ctx context.Context, srv *MCPServer, args SearchDocumentsInput) (*mcp.CallToolResult, SearchDocumentsResult, error) {
+	if args.Query == "" {
+		return errResult(fmt.Errorf("query is required")), SearchDocumentsResult{}, nil
+	}
+
 	if !srv.rateLimiter.AllowRead(srv.apiKey) {
-		return errResult(ErrRateLimited), SummaryResult{}, nil
+		return errResult(ErrRateLimited), SearchDocumentsResult{}, nil
+	}
+
+	limit := args.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+
+	docs, err := repository.NewDocumentRepo(srv.db).SearchByTitle(args.Query, limit)
+	if err != nil {
+		return errResult(err), SearchDocumentsResult{}, nil
+	}
+
+	infos := make([]SearchDocumentInfo, 0, len(docs))
+	for _, d := range docs {
+		infos = append(infos, SearchDocumentInfo{
+			DocumentID: d.ID,
+			Title:      d.Title,
+			Status:     d.Status,
+			CreatedAt:  d.CreatedAt,
+		})
+	}
+
+	return nil, SearchDocumentsResult{Documents: infos}, nil
+}
+
+// handleGetDocument returns full metadata for a single document.
+func handleGetDocument(ctx context.Context, srv *MCPServer, args DocIDInput) (*mcp.CallToolResult, GetDocumentResult, error) {
+	if !srv.rateLimiter.AllowRead(srv.apiKey) {
+		return errResult(ErrRateLimited), GetDocumentResult{}, nil
 	}
 
 	doc, err := getDocumentOrError(srv.db, args.DocumentID)
 	if err != nil {
-		return errResult(err), SummaryResult{}, nil
+		return errResult(err), GetDocumentResult{}, nil
 	}
 
-	chapters, err := repository.NewChapterRepo(srv.db).ListByDocument(args.DocumentID)
-	if err != nil {
-		return errResult(err), SummaryResult{}, nil
-	}
-
-	chapterInfos := make([]ChapterInfo, 0, len(chapters))
-	for _, ch := range chapters {
-		chapterInfos = append(chapterInfos, ChapterInfo{
-			ID:           ch.ID,
-			Title:        ch.Title,
-			Summary:      ch.Summary,
-			Excerpt:      ch.Excerpt,
-			DisplayOrder: ch.DisplayOrder,
-		})
-	}
-
-	simplifiedText := ""
-	if doc.SimplifiedText != nil {
-		simplifiedText = *doc.SimplifiedText
-	}
-
-	return nil, SummaryResult{
-		SimplifiedText: simplifiedText,
-		Chapters:       chapterInfos,
+	return nil, GetDocumentResult{
+		DocumentID:       doc.ID,
+		Title:            doc.Title,
+		Status:           doc.Status,
+		SourceType:       doc.SourceType,
+		ReadingLevel:     doc.ReadingLevel,
+		CreatedAt:        doc.CreatedAt,
+		ProcessingTimeMs: doc.ProcessingTimeMs,
+		ErrorMessage:     doc.ErrorMessage,
 	}, nil
 }
 
@@ -319,41 +289,6 @@ func handleGetFigures(ctx context.Context, srv *MCPServer, args DocIDInput) (*mc
 	}, nil
 }
 
-// handleGetClaims returns claim verification data for a document.
-func handleGetClaims(ctx context.Context, srv *MCPServer, args DocIDInput) (*mcp.CallToolResult, ClaimsResult, error) {
-	if !srv.rateLimiter.AllowRead(srv.apiKey) {
-		return errResult(ErrRateLimited), ClaimsResult{}, nil
-	}
-
-	if _, err := getDocumentOrError(srv.db, args.DocumentID); err != nil {
-		return errResult(err), ClaimsResult{}, nil
-	}
-
-	cd, err := repository.NewClaimDiffRepo(srv.db).GetByDocument(args.DocumentID)
-	if err != nil {
-		// No claim_diff row yet — document may still be processing.
-		return nil, ClaimsResult{ClaimDiff: nil}, nil
-	}
-
-	var originalClaims, simplifiedClaims []string
-	_ = json.Unmarshal([]byte(cd.OriginalClaims), &originalClaims)
-	_ = json.Unmarshal([]byte(cd.SimplifiedClaims), &simplifiedClaims)
-
-	detail := ""
-	if cd.MismatchDetail != nil {
-		detail = *cd.MismatchDetail
-	}
-
-	return nil, ClaimsResult{
-		ClaimDiff: &ClaimDiffInfo{
-			OriginalClaims:   originalClaims,
-			SimplifiedClaims: simplifiedClaims,
-			MismatchDetected: cd.MismatchDetected,
-			MismatchDetail:   detail,
-		},
-	}, nil
-}
-
 // handleGetEvidence returns evidence references for a document.
 func handleGetEvidence(ctx context.Context, srv *MCPServer, args DocIDInput) (*mcp.CallToolResult, EvidenceResult, error) {
 	if !srv.rateLimiter.AllowRead(srv.apiKey) {
@@ -393,47 +328,6 @@ func handleGetEvidence(ctx context.Context, srv *MCPServer, args DocIDInput) (*m
 
 	return nil, EvidenceResult{
 		Evidence: infos,
-	}, nil
-}
-
-// handleComparePapers extracts paper summaries and generates a cross-paper comparison.
-func handleComparePapers(ctx context.Context, srv *MCPServer, args ComparePapersInput) (*mcp.CallToolResult, CompareResult, error) {
-	if !srv.rateLimiter.AllowCompare(srv.apiKey) {
-		return errResult(ErrRateLimited), CompareResult{}, nil
-	}
-
-	if len(args.DocumentIDs) < 2 {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: `{"error":"at least 2 document_ids required for comparison"}`}},
-			IsError: true,
-		}, CompareResult{}, nil
-	}
-
-	docRepo := repository.NewDocumentRepo(srv.db)
-	var papers []services.PaperSummary
-	for _, docID := range args.DocumentIDs {
-		doc, err := docRepo.Get(docID)
-		if err != nil {
-			return errResult(fmt.Errorf("document %s: %w", docID, err)), CompareResult{}, nil
-		}
-		summary, err := services.ExtractPaperSummary(ctx, srv.gemini, doc.ID, doc.Title, doc.OriginalText)
-		if err != nil {
-			return errResult(fmt.Errorf("extract summary for %s: %w", docID, err)), CompareResult{}, nil
-		}
-		papers = append(papers, summary)
-	}
-
-	comparison, err := services.ComparePapers(ctx, srv.gemini, papers)
-	if err != nil {
-		return errResult(err), CompareResult{}, nil
-	}
-
-	return nil, CompareResult{
-		Papers:         comparison.Papers,
-		Dimensions:     comparison.Dimensions,
-		Agreement:      comparison.Agreement,
-		Disagreement:   comparison.Disagreement,
-		EvidenceClaims: comparison.EvidenceClaims,
 	}, nil
 }
 

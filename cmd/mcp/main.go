@@ -1,5 +1,6 @@
-// Command mcp is PaperViz's MCP server entrypoint. It exposes research
-// operations (analyze, summarize, compare) as MCP tools over stdio transport.
+// Command mcp is PaperViz's MCP server entrypoint. It exposes 5 tools
+// (ingest_document, search_documents, get_document, get_figures, get_evidence)
+// over stdio transport. No LLM calls in any tool path.
 // Configuration comes from environment variables — same DB and Gemini key as
 // the main server, so both can share one database.
 package main

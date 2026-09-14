@@ -292,3 +292,32 @@ func (r *DocumentRepo) SetProcessingTime(id string, ms int) error {
 	}
 	return nil
 }
+
+// SearchByTitle returns documents whose title contains the query, ordered by recency.
+func (r *DocumentRepo) SearchByTitle(query string, limit int) ([]Document, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+	rows, err := r.db.Query(
+		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, saved, visibility, share_token, processing_time_ms
+		FROM documents WHERE title LIKE ? ORDER BY created_at DESC LIMIT ?`,
+		"%"+query+"%", limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("search documents: %w", err)
+	}
+	defer rows.Close()
+
+	var docs []Document
+	for rows.Next() {
+		var d Document
+		if err := rows.Scan(&d.ID, &d.CreatedAt, &d.LastAccessedAt, &d.Status, &d.SourceType, &d.ReadingLevel, &d.Title, &d.OriginalText, &d.SimplifiedText, &d.ErrorMessage, &d.ChartExtractionDegraded, &d.ProcessingStage, &d.UserID, &d.Saved, &d.Visibility, &d.ShareToken, &d.ProcessingTimeMs); err != nil {
+			return nil, fmt.Errorf("scan document: %w", err)
+		}
+		docs = append(docs, d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate documents: %w", err)
+	}
+	return docs, nil
+}
