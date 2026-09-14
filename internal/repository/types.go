@@ -1,25 +1,33 @@
 package repository
 
-// Document mirrors the documents table (ARCHITECTURE.md Section 3).
-type Document struct {
-	ID                      string
-	CreatedAt               int64
-	LastAccessedAt          int64
-	Status                  string // processing | complete | failed | verification_failed
-	SourceType              string // pdf | pasted_text
-	ReadingLevel            string // simplified | eli5
-	Title                   string // paper title derived from first line of text
-	OriginalText            string
-	SimplifiedText          *string
-	ErrorMessage            *string
-	ChartExtractionDegraded bool
-	ProcessingStage         *string
-	UserID                  *string // nullable — anonymous docs have NULL user_id
-	Saved                   bool
-	Visibility              string  // public | unlisted | private
-	ShareToken              *string // nullable — lazy-generated for paper share pages
-	ProcessingTimeMs        *int    // nullable — total pipeline processing time in milliseconds (Chunk 6.1)
-}
+import "paperviz/internal/models"
+
+// Domain types — thin mirrors of models for repo-layer access.
+// Canonical definitions live in internal/models.
+type Document = models.Document
+type Chapter = models.Chapter
+type Collection = models.Collection
+type ClaimDiff = models.ClaimDiff
+
+// Status enum values, per ARCHITECTURE.md Section 3 CHECK constraint.
+const (
+	StatusProcessing         = models.StatusProcessing
+	StatusComplete           = models.StatusComplete
+	StatusFailed             = models.StatusFailed
+	StatusVerificationFailed = models.StatusVerificationFailed
+)
+
+// SourceType enum values.
+const (
+	SourceTypePDF        = models.SourceTypePDF
+	SourceTypePastedText = models.SourceTypePastedText
+)
+
+// ReadingLevel enum values.
+const (
+	ReadingLevelSimplified = models.ReadingLevelSimplified
+	ReadingLevelELI5       = models.ReadingLevelELI5
+)
 
 // DocumentListItem is a lightweight row for the paper-history list.
 // Carries preview + counts instead of full text so the list stays cheap.
@@ -48,26 +56,6 @@ type Chart struct {
 	ShareToken   *string // nullable — lazy-generated for public share pages
 }
 
-// ClaimDiff mirrors the claim_diffs table.
-type ClaimDiff struct {
-	ID               string
-	DocumentID       string
-	OriginalClaims   string // JSON array
-	SimplifiedClaims string // JSON array
-	MismatchDetected bool
-	MismatchDetail   *string
-}
-
-// Chapter mirrors the chapters table.
-type Chapter struct {
-	ID           string
-	DocumentID   string
-	Title        string
-	Summary      string
-	Excerpt      string
-	DisplayOrder int
-}
-
 // Evidence mirrors the evidence table.
 type Evidence struct {
 	ID              string
@@ -80,14 +68,6 @@ type Evidence struct {
 	SourceReference string
 }
 
-// Collection mirrors the collections table.
-type Collection struct {
-	ID        string
-	UserID    string
-	Name      string
-	CreatedAt int64
-}
-
 // CollectionListItem is a lightweight row for the collections list.
 type CollectionListItem struct {
 	ID            string
@@ -95,26 +75,6 @@ type CollectionListItem struct {
 	CreatedAt     int64
 	DocumentCount int
 }
-
-// Status enum values, per ARCHITECTURE.md Section 3 CHECK constraint.
-const (
-	StatusProcessing         = "processing"
-	StatusComplete           = "complete"
-	StatusFailed             = "failed"
-	StatusVerificationFailed = "verification_failed"
-)
-
-// SourceType enum values.
-const (
-	SourceTypePDF        = "pdf"
-	SourceTypePastedText = "pasted_text"
-)
-
-// ReadingLevel enum values.
-const (
-	ReadingLevelSimplified = "simplified"
-	ReadingLevelELI5       = "eli5"
-)
 
 // Chart SourceMethod enum values.
 const (
