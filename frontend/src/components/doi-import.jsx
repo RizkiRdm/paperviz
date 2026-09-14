@@ -35,6 +35,7 @@ export function DOIImport() {
       const result = await importByDOI(trimmed)
       navigate(`/${result.document_id}`)
     } catch (err) {
+      console.error("DOI import failed", err)
       setError(
         err.code === "fetch_failed"
           ? "Could not fetch the paper by this DOI. Please check the DOI and try again."
@@ -44,10 +45,15 @@ export function DOIImport() {
     }
   }
 
+  // retry preserves input and re-runs import
+  function handleRetry() {
+    handleImport()
+  }
+
   return (
     <div className="space-y-3">
       <label htmlFor="doi-input" className="block text-xs font-medium text-[#737373] uppercase tracking-wider">
-        DOI
+        DOI — source: doi
       </label>
       <div className="flex gap-2">
         <input
@@ -77,7 +83,10 @@ export function DOIImport() {
       </div>
 
       {error && (
-        <ErrorBanner message={error} />
+        <div className="space-y-2">
+          <ErrorBanner message={error} />
+          <Button variant="outline" onClick={handleRetry} disabled={loading} className="w-full">Retry</Button>
+        </div>
       )}
     </div>
   )

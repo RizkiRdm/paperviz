@@ -1,6 +1,6 @@
 // App — top-level router for PaperViz. Replaces manual popstate/pushState
 // routing with react-router-dom now that we have >2 screens (Chunk 5).
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { UploadPage } from "@/pages/upload-page"
 import { ResultPage } from "@/pages/result-page"
 import { LoginPage } from "@/pages/login-page"
@@ -20,6 +20,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<UploadPage />} />
+          <Route path="/upload" element={<Navigate to="/" replace />} />
+          <Route path="/dashboard" element={<Navigate to="/account" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/account" element={<AccountPage />} />

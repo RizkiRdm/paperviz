@@ -1,13 +1,12 @@
 # PaperViz — robots.txt
-# Chunk 5.1 §4: Allow all public pages, block API and internal paths.
+# P03: Allow canonical public pages, block API, ephemeral share, and private pages.
 
 User-agent: *
 Allow: /
 Disallow: /api/
 Disallow: /share/
-Disallow: /dashboard
+Disallow: /account
 Disallow: /login
 Disallow: /signup
-Disallow: /compare
 
 Sitemap: https://paperviz.com/sitemap.xml

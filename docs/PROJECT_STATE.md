@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-12 — Docs maintenance: SECURITY/RELIABILITY/DATA_PIPELINE/OBSERVABILITY aligned with auth hardening + ADR-001
+**Last updated:** 2026-09-15 — Master refactor P01-P08 in progress (inventory→routing→primary UX→app service split)
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** none — auth security complete
-- **Active task file:** none
-- **Blocked on / pending decision:** none
-- **Next action if resuming:** ready for new work
+- **Working on:** PaperViz master refactor P01→P61 — Master plan at `.omo/plans/paperviz_master_refactor_plan.md`, task at `docs/Task Agent/paperviz_master_TASK.md`
+- **Active task file:** `docs/Task Agent/paperviz_master_TASK.md` (P01-P08 done, P09+ pending)
+- **Blocked on / pending decision:** none — strict top-down P01→P61; orchestrator owns dep sequencing
+- **Next action if resuming:** continue P09 kill handler→repo coupling + P10 read-model aggregation (backend wave), then P11-P14 pipeline split, then P15-P24 charts/evidence, then P25-P36 MCP lock to 5 tools. Verify each wave with `go test` + `go vet` + `gofmt -l .` before next
 
 ---
 
@@ -81,6 +81,7 @@ something that should stay frozen.)*
 - Chunk 11.7 MCP Doc Drift Fix — done 2026-09-10 (`docs/mcp-parity.md` — struck get_tables/search_papers; `goals/chunk-7-4-mcp/plan.md` — marked tools as not implemented)
 - Auth security hardening — done 2026-09-12 (`frontend/src/pages/signup-page.jsx` — restored signup page with email+password + Google OAuth; `frontend/src/App.jsx` — added /signup route; `frontend/src/pages/login-page.jsx` — fixed redirect /dashboard→/account; `internal/handlers/auth.go` — OAuth state CSRF protection (random nonce + cookie validation), hasMinComplexity check enabled, logout cookie Secure flag; 422 tests passing)
 - Docs maintenance — done 2026-09-12 (`docs/SECURITY.md` — auth/session/rate-limit/SSRF filed from code; `docs/RELIABILITY.md` — rate-limit TTL, timeouts, failure modes; `docs/DATA_PIPELINE.md` — evidence→dataset→grounding 10 rules; `docs/OBSERVABILITY.md` — slog RequestID, stage logs, gaps; `docs/ENGINEERING_LOG.md` — 2026-09-12 auth hardening entry; `docs/DECISIONS/ADR-001-auth-session-hardening.md`)
+- Master refactor wave 1 — done 2026-09-15 (P01 inventory `docs/Task Agent/P01_inventory.md` 372 lines — LOC table, god-files, handler→repo coupling, dup logic, Sleep locations, MCP 6→5 gap, dead routes; P02 canonical flow `docs/product/current-user-flow.md` 138 lines — Input→Processing→Understanding→Evidence→Figures→Source→Mgmt, screen ranking; P03 routing/IA: `frontend/src/App.jsx` /upload→/ + /dashboard→/account redirects, `frontend/src/pages/result-page.jsx` /dashboard→/account, `frontend/src/components/upgrade-cta.jsx` /pricing→/agents, `frontend/public/sitemap.xml` dedup, `frontend/public/robots.txt` cleaned, `internal/handlers/router.go` stale /explain noindex removed; P04 result-page split: `frontend/src/components/result/{result-header,understanding-section,evidence-section,figures-section,source-section,result-actions}.jsx` 6 components — result-page 743→297 LOC; P05 ingestion unify `frontend/src/pages/upload-page.jsx` 161 LOC source_type badge + inline error/Retry; P06 processing states 5 labels in result-page STAGE_LABELS; P07 app layer `internal/app/documents/{service.go,readmodel.go}` Service owning Create/Get/List; P08 start handler split `internal/handlers/documents_create.go` + fix `internal/handlers/documents.go` evidenceResponse + router Get — `go test` 422 passed, `go vet` clean, `gofmt -l .` empty)
 
 ---
 

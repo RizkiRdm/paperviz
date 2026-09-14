@@ -11,8 +11,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -26,19 +24,6 @@ import (
 	"paperviz/internal/services"
 )
 
-// maxUploadBytes is the MAX_LIMIT file size from ARCHITECTURE.md Section 4
-// Validation Policy. Applied before reading the full body into memory, so
-// an oversized upload is rejected cheaply rather than after buffering 20MB+
-// of attacker-controlled data.
-const maxUploadBytes = 20 << 20 // 20 MiB
-
-// pollMinIntervalHint documents the client-side contract from
-// ARCHITECTURE.md Section E ("Client polling interval for processing
-// status: REQUIRED minimum 2s between polls"). This is enforced by the
-// frontend, not the server — recorded here so a reader of this file knows
-// the server intentionally does not rate-limit polling itself.
-const pollMinIntervalHint = 2 * time.Second
-
 // DocumentHandler holds everything the two document endpoints need: a DB
 // handle (for opening transactions) and a Gemini client (passed down to the
 // pipeline). It has no other state — request-scoped values are never stored
@@ -51,11 +36,6 @@ type DocumentHandler struct {
 
 func NewDocumentHandler(db *sql.DB, gemini *external.GeminiClient) *DocumentHandler {
 	return &DocumentHandler{db: db, gemini: gemini}
-}
-
-type createDocumentResponse struct {
-	DocumentID string `json:"document_id"`
-	Status     string `json:"status"`
 }
 
 type listDocumentResponse struct {
@@ -87,281 +67,6 @@ type toggleSavedRequest struct {
 
 type updateTitleRequest struct {
 	Title string `json:"title"`
-}
-
-// Create handles POST /api/documents. It is intentionally synchronous up
-// through extraction — a bad upload (wrong MIME, no text layer, oversized)
-// must be rejected before we ever spend a Gemini call on it (ARCHITECTURE.md
-// Failure Scenario 1). Once extraction succeeds, the rest of the pipeline
-// (simplify/verify/chart) runs in a background goroutine so the client gets
-// its document_id immediately and polls GET for the result — this is the
-// "single synchronous request-scoped goroutine chain per document, not a
-// job queue" async policy from ARCHITECTURE.md Section 4.
-func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes+1<<20) // small slack for multipart overhead
-
-	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
-		writeError(w, http.StatusBadRequest, "file_too_large")
-		return
-	}
-
-	readingLevel := r.FormValue("reading_level")
-	if readingLevel != repository.ReadingLevelSimplified && readingLevel != repository.ReadingLevelELI5 {
-		writeError(w, http.StatusBadRequest, "invalid_reading_level")
-		return
-	}
-
-	pastedText := r.FormValue("text")
-	file, header, fileErr := r.FormFile("file")
-
-	// Exactly one of file/text is required (ARCHITECTURE.md API Contract).
-	hasFile := fileErr == nil
-	hasText := pastedText != ""
-	if hasFile == hasText {
-		writeError(w, http.StatusBadRequest, "missing_input")
-		return
-	}
-
-	var pdfBytes []byte
-
-	if hasFile {
-		defer file.Close()
-		if header.Size > maxUploadBytes {
-			writeError(w, http.StatusBadRequest, "file_too_large")
-			return
-		}
-
-		var err error
-		pdfBytes, err = io.ReadAll(file)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "file_too_large")
-			return
-		}
-
-		// Verify actual file content, not just the client-supplied
-		// Content-Type header (AGENTS.md Security Rules: "MUST NOT trust
-		// client-supplied content-type header alone; verify actual file
-		// content").
-		if !isPDFContent(pdfBytes) {
-			writeError(w, http.StatusBadRequest, "invalid_file_type")
-			return
-		}
-	}
-
-	var userID *string
-	if uid := UserIDFromContext(r.Context()); uid != "" {
-		userID = &uid
-	}
-
-	intakeResult, errCode, err := services.ValidateAndInsert(h.db, readingLevel, hasFile, pdfBytes, pastedText, userID)
-	if err != nil {
-		if errCode == "no_text_layer" {
-			writeError(w, http.StatusUnprocessableEntity, "no_text_layer")
-			return
-		}
-		slog.Error("document intake validation/insertion failed", "error", err)
-		writeError(w, http.StatusBadRequest, errCode)
-		return
-	}
-
-	// Fire the rest of the pipeline in the background. Detached from the
-	// request context (which dies when this handler returns) and given its
-	// own bounded lifetime instead, so a slow Gemini call doesn't get
-	// cancelled just because the HTTP response already went out.
-	go h.runPipelineAndSave(intakeResult.DocumentID, services.PipelineInput{
-		OriginalText: intakeResult.OriginalText,
-		SourceType:   intakeResult.SourceType,
-		ReadingLevel: readingLevel,
-		PDFBytes:     intakeResult.PDFBytes,
-	})
-
-	writeJSON(w, http.StatusCreated, createDocumentResponse{DocumentID: intakeResult.DocumentID, Status: repository.StatusProcessing})
-}
-
-// runPipelineAndSave runs the full pipeline and persists the result. Errors
-// are logged, not returned — there is no HTTP request left to answer by the
-// time this runs; the client learns the outcome via the next GET poll.
-func (h *DocumentHandler) runPipelineAndSave(documentID string, input services.PipelineInput) {
-	services.RunPipelineAndPersist(h.db, h.gemini, documentID, input)
-}
-
-// chartResponse is the wire shape for one chart in the GET response.
-// chart_data is passed through as a raw JSON object (not a Go-escaped
-// string) so the frontend can consume it directly with Recharts.
-type chartResponse struct {
-	ID           string          `json:"id"`
-	SourceMethod string          `json:"source_method"`
-	ChartData    json.RawMessage `json:"chart_data,omitempty"`
-	Annotation   *string         `json:"annotation,omitempty"`
-	PageNumber   *int            `json:"page_number,omitempty"`
-	ChapterID    *string         `json:"chapter_id,omitempty"`
-	ImageURL     *string         `json:"image_url,omitempty"`
-}
-
-// claimDiffResponse is the wire shape for claim-diff verification data.
-// OriginalClaims/SimplifiedClaims are pre-serialized JSON arrays from the
-// repository — we wrap them in json.RawMessage to avoid double-marshal.
-type claimDiffResponse struct {
-	OriginalClaims   json.RawMessage `json:"original_claims,omitempty"`
-	SimplifiedClaims json.RawMessage `json:"simplified_claims,omitempty"`
-	MismatchDetected bool            `json:"mismatch_detected"`
-	MismatchDetail   *string         `json:"mismatch_detail,omitempty"`
-}
-
-type chapterResponse struct {
-	ID           string `json:"id"`
-	Title        string `json:"title"`
-	Summary      string `json:"summary"`
-	Content      string `json:"content"`
-	DisplayOrder int    `json:"display_order"`
-}
-
-type evidenceResponse struct {
-	ID              string  `json:"id"`
-	Page            *int    `json:"page,omitempty"`
-	FigureID        *string `json:"figure_id,omitempty"`
-	TableID         *string `json:"table_id,omitempty"`
-	Section         *string `json:"section,omitempty"`
-	SourceText      string  `json:"source_text"`
-	SourceReference string  `json:"source_reference"`
-}
-
-// getDocumentResponse matches ARCHITECTURE.md Section E's Get Document
-// contract exactly.
-type getDocumentResponse struct {
-	ID                      string             `json:"id"`
-	Title                   string             `json:"title"`
-	Status                  string             `json:"status"`
-	ReadingLevel            string             `json:"reading_level"`
-	SimplifiedText          *string            `json:"simplified_text"`
-	OriginalText            string             `json:"original_text"`
-	Charts                  []chartResponse    `json:"charts"`
-	ErrorMessage            *string            `json:"error_message"`
-	ChartExtractionDegraded bool               `json:"chart_extraction_degraded"`
-	ProcessingStage         *string            `json:"processing_stage,omitempty"`
-	ClaimDiff               *claimDiffResponse `json:"claim_diff,omitempty"`
-	Chapters                []chapterResponse  `json:"chapters,omitempty"`
-	Evidence                []evidenceResponse `json:"evidence,omitempty"`
-}
-
-// Get handles GET /api/documents/:id. On every successful lookup it
-// touches last_accessed_at, extending the document's 7-day expiry window
-// (ARCHITECTURE.md Acceptance Scenario 5) — this is why a document a
-// student keeps reading never expires mid-read, only after a full week of
-// nobody opening the link.
-func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-
-	docRepo := repository.NewDocumentRepo(h.db)
-	doc, err := docRepo.Get(id)
-	if errors.Is(err, repository.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "not_found")
-		return
-	}
-	if err != nil {
-		slog.Error("get document failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	if err := docRepo.TouchLastAccessed(id, time.Now().Unix()); err != nil {
-		// Non-fatal: the read itself succeeded, only the expiry-refresh
-		// write failed. Log and continue rather than fail the whole request
-		// over a housekeeping update.
-		slog.Error("touch last_accessed_at failed", "document_id", id, "error", err)
-	}
-
-	chartRepo := repository.NewChartRepo(h.db)
-	charts, err := chartRepo.ListByDocument(id)
-	if err != nil {
-		slog.Error("list charts failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	chartResponses := make([]chartResponse, 0, len(charts))
-	for _, c := range charts {
-		cr := chartResponse{
-			ID:           c.ID,
-			SourceMethod: c.SourceMethod,
-			Annotation:   c.Annotation,
-			PageNumber:   c.PageNumber,
-			ChapterID:    c.ChapterID,
-		}
-		if c.ChartData != nil && *c.ChartData != "" {
-			cr.ChartData = json.RawMessage(*c.ChartData)
-		}
-		if len(c.ImageBlob) > 0 {
-			imageURL := fmt.Sprintf("/api/documents/%s/charts/%s/image", id, c.ID)
-			cr.ImageURL = &imageURL
-		}
-		chartResponses = append(chartResponses, cr)
-	}
-
-	claimDiffRepo := repository.NewClaimDiffRepo(h.db)
-	var claimDiffResp *claimDiffResponse
-	if cd, err := claimDiffRepo.GetByDocument(id); err == nil {
-		claimDiffResp = &claimDiffResponse{
-			OriginalClaims:   json.RawMessage(cd.OriginalClaims),
-			SimplifiedClaims: json.RawMessage(cd.SimplifiedClaims),
-			MismatchDetected: cd.MismatchDetected,
-			MismatchDetail:   cd.MismatchDetail,
-		}
-	}
-
-	chapterRepo := repository.NewChapterRepo(h.db)
-	chapters, err := chapterRepo.ListByDocument(id)
-	if err != nil {
-		slog.Error("list chapters failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-	chapterResponses := make([]chapterResponse, 0, len(chapters))
-	for _, ch := range chapters {
-		chapterResponses = append(chapterResponses, chapterResponse{
-			ID:           ch.ID,
-			Title:        ch.Title,
-			Summary:      ch.Summary,
-			Content:      ch.Excerpt,
-			DisplayOrder: ch.DisplayOrder,
-		})
-	}
-
-	evidenceRepo := repository.NewEvidenceRepo(h.db)
-	evidence, err := evidenceRepo.ListByPaper(id)
-	if err != nil {
-		slog.Error("list evidence failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-	evidenceResponses := make([]evidenceResponse, 0, len(evidence))
-	for _, e := range evidence {
-		evidenceResponses = append(evidenceResponses, evidenceResponse{
-			ID:              e.ID,
-			Page:            e.Page,
-			FigureID:        e.FigureID,
-			TableID:         e.TableID,
-			Section:         e.Section,
-			SourceText:      e.SourceText,
-			SourceReference: e.SourceReference,
-		})
-	}
-
-	writeJSON(w, http.StatusOK, getDocumentResponse{
-		ID:                      doc.ID,
-		Title:                   doc.Title,
-		Status:                  doc.Status,
-		ReadingLevel:            doc.ReadingLevel,
-		SimplifiedText:          doc.SimplifiedText,
-		OriginalText:            doc.OriginalText,
-		Charts:                  chartResponses,
-		ErrorMessage:            doc.ErrorMessage,
-		ChartExtractionDegraded: doc.ChartExtractionDegraded,
-		ProcessingStage:         doc.ProcessingStage,
-		ClaimDiff:               claimDiffResp,
-		Chapters:                chapterResponses,
-		Evidence:                evidenceResponses,
-	})
 }
 
 func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -506,6 +211,107 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// Get handles GET /api/documents/:id.
+func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	docRepo := repository.NewDocumentRepo(h.db)
+	doc, err := docRepo.Get(id)
+	if errors.Is(err, repository.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	}
+	if err != nil {
+		slog.Error("get document failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	if err := docRepo.TouchLastAccessed(id, time.Now().Unix()); err != nil {
+		slog.Error("touch last_accessed_at failed", "document_id", id, "error", err)
+	}
+	chartRepo := repository.NewChartRepo(h.db)
+	charts, _ := chartRepo.ListByDocument(id)
+	chapterRepo := repository.NewChapterRepo(h.db)
+	chapters, _ := chapterRepo.ListByDocument(id)
+	claimDiffRepo := repository.NewClaimDiffRepo(h.db)
+	claimDiff, _ := claimDiffRepo.GetByDocument(id)
+	evidenceRepo := repository.NewEvidenceRepo(h.db)
+	evidence, _ := evidenceRepo.ListByPaper(id)
+	type chartResp struct {
+		ID           string  `json:"id"`
+		DocumentID   string  `json:"document_id"`
+		SourceMethod string  `json:"source_method"`
+		ChartData    *string `json:"chart_data"`
+		Annotation   *string `json:"annotation"`
+		PageNumber   *int    `json:"page_number"`
+		DisplayOrder int     `json:"display_order"`
+		ChapterID    *string `json:"chapter_id"`
+		ImageURL     *string `json:"image_url"`
+	}
+	chartResps := make([]chartResp, 0, len(charts))
+	for _, c := range charts {
+		var imageURL *string
+		if len(c.ImageBlob) > 0 {
+			u := "/api/documents/" + doc.ID + "/charts/" + c.ID + "/image"
+			imageURL = &u
+		}
+		chartResps = append(chartResps, chartResp{
+			ID: c.ID, DocumentID: c.DocumentID, SourceMethod: c.SourceMethod,
+			ChartData: c.ChartData, Annotation: c.Annotation, PageNumber: c.PageNumber,
+			DisplayOrder: c.DisplayOrder, ChapterID: c.ChapterID, ImageURL: imageURL,
+		})
+	}
+	type chapterResp struct {
+		ID           string `json:"id"`
+		DocumentID   string `json:"document_id"`
+		Title        string `json:"title"`
+		Summary      string `json:"summary"`
+		Excerpt      string `json:"excerpt"`
+		DisplayOrder int    `json:"display_order"`
+	}
+	chapterResps := make([]chapterResp, 0, len(chapters))
+	for _, ch := range chapters {
+		chapterResps = append(chapterResps, chapterResp{
+			ID: ch.ID, DocumentID: ch.DocumentID, Title: ch.Title,
+			Summary: ch.Summary, Excerpt: ch.Excerpt, DisplayOrder: ch.DisplayOrder,
+		})
+	}
+	type claimDiffResp struct {
+		ID               string  `json:"id"`
+		DocumentID       string  `json:"document_id"`
+		OriginalClaims   string  `json:"original_claims"`
+		SimplifiedClaims string  `json:"simplified_claims"`
+		MismatchDetected bool    `json:"mismatch_detected"`
+		MismatchDetail   *string `json:"mismatch_detail"`
+	}
+	var claimDiffVal *claimDiffResp
+	if claimDiff != nil {
+		claimDiffVal = &claimDiffResp{
+			ID: claimDiff.ID, DocumentID: claimDiff.DocumentID,
+			OriginalClaims: claimDiff.OriginalClaims, SimplifiedClaims: claimDiff.SimplifiedClaims,
+			MismatchDetected: claimDiff.MismatchDetected, MismatchDetail: claimDiff.MismatchDetail,
+		}
+	}
+	evResps := make([]evidenceResponse, 0, len(evidence))
+	for _, e := range evidence {
+		evResps = append(evResps, evidenceResponse{
+			ID: e.ID, Page: e.Page, FigureID: e.FigureID, TableID: e.TableID,
+			Section: e.Section, SourceText: e.SourceText, SourceReference: e.SourceReference,
+		})
+	}
+	resp := map[string]any{
+		"id": doc.ID, "title": doc.Title, "status": doc.Status,
+		"source_type": doc.SourceType, "reading_level": doc.ReadingLevel,
+		"created_at": doc.CreatedAt, "last_accessed_at": doc.LastAccessedAt,
+		"original_text": doc.OriginalText, "simplified_text": doc.SimplifiedText,
+		"error_message": doc.ErrorMessage, "chart_extraction_degraded": doc.ChartExtractionDegraded,
+		"processing_stage": doc.ProcessingStage, "processing_time_ms": doc.ProcessingTimeMs,
+		"user_id": doc.UserID, "saved": doc.Saved, "visibility": doc.Visibility,
+		"share_token": doc.ShareToken, "charts": chartResps, "chapters": chapterResps,
+		"claim_diff": claimDiffVal, "evidence": evResps,
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // GetChartImage serves the original chart image bytes for a document's
@@ -767,6 +573,16 @@ func (h *DocumentHandler) GetCitations(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+type evidenceResponse struct {
+	ID              string  `json:"id"`
+	Page            *int    `json:"page,omitempty"`
+	FigureID        *string `json:"figure_id,omitempty"`
+	TableID         *string `json:"table_id,omitempty"`
+	Section         *string `json:"section,omitempty"`
+	SourceText      string  `json:"source_text"`
+	SourceReference string  `json:"source_reference"`
 }
 
 type claimWithEvidenceResponse struct {

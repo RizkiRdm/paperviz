@@ -13,7 +13,7 @@ export default function UpgradeCta() {
       </p>
       <div className="flex items-center justify-center gap-3">
         <Button variant="primary" asChild>
-          <Link to="/pricing">View Plans</Link>
+          <Link to="/agents">View Plans</Link>
         </Button>
       </div>
     </div>

@@ -47,6 +47,7 @@ Rules:
 - **Stripe webhook requires endpoint configuration.** After deploying, add `https://your-domain.com/api/billing/webhook` to Stripe webhook endpoints.
 - **API key column added to users table.** Existing users will get API key on first request to `/api/auth/apikey`.
 - **Signup page restored.** Chunk 11.5 deleted it but login still linked to /signup. Restored with email+password + Google OAuth.
+- **Master refactor in progress (P01-P08).** Canonical flow Input→Processing→Understanding→Evidence→Figures→Source→Mgmt locked (P02). Routing/IA cleaned: dead routes removed, /dashboard→/account redirects fixed (P03). Result page decomposed 743→297 LOC into 6 components in `frontend/src/components/result/` (P04). Ingestion unified with source_type badge + inline error Retry (P05). Processing states 5 labels (P06). App service layer `internal/app/documents/service.go` + `readmodel.go` started, handler split `documents_create.go` (P07-P08). Plan at `.omo/plans/paperviz_master_refactor_plan.md`. Next: finish handler→repo decoupling (P09) and read-model aggregation (P10) before pipeline split.
 
 ## Agent-First Pivot (Chunk 11)
 - **Agent-first direction locked.** PaperViz becomes agent-first, Context7-style. Human touches the product for 3 things only — auth, billing, and an optional manual-upload escape hatch. The MCP server is the actual product surface.
