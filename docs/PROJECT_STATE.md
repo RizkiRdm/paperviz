@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-15 — Master refactor P01-P08 in progress (inventory→routing→primary UX→app service split)
+**Last updated:** 2026-09-15 — Master refactor P01-P61 final audits complete
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** PaperViz master refactor P01→P61 — Master plan at `.omo/plans/paperviz_master_refactor_plan.md`, task at `docs/Task Agent/paperviz_master_TASK.md`
-- **Active task file:** `docs/Task Agent/paperviz_master_TASK.md` (P01-P08 done, P09+ pending)
-- **Blocked on / pending decision:** none — strict top-down P01→P61; orchestrator owns dep sequencing
-- **Next action if resuming:** continue P09 kill handler→repo coupling + P10 read-model aggregation (backend wave), then P11-P14 pipeline split, then P15-P24 charts/evidence, then P25-P36 MCP lock to 5 tools. Verify each wave with `go test` + `go vet` + `gofmt -l .` before next
+- **Working on:** PaperViz master refactor P01→P61 — Final audits P50-P61 complete. Architecture validated, file sizes documented, dependency directions verified.
+- **Active task file:** `docs/Task Agent/P54_file_audit.md` (P50-P61 comprehensive audit)
+- **Blocked on / pending decision:** none
+- **Next action if resuming:** Execute P09 (kill handler→repo coupling in documents.go, 36 instances) + P10 (read-model aggregation) to complete god-file decomposition. Then P11-P14 pipeline split, P15-P24 charts/evidence, P25-P36 MCP lock to 5 tools.
 
 ---
 
@@ -82,6 +82,7 @@ something that should stay frozen.)*
 - Auth security hardening — done 2026-09-12 (`frontend/src/pages/signup-page.jsx` — restored signup page with email+password + Google OAuth; `frontend/src/App.jsx` — added /signup route; `frontend/src/pages/login-page.jsx` — fixed redirect /dashboard→/account; `internal/handlers/auth.go` — OAuth state CSRF protection (random nonce + cookie validation), hasMinComplexity check enabled, logout cookie Secure flag; 422 tests passing)
 - Docs maintenance — done 2026-09-12 (`docs/SECURITY.md` — auth/session/rate-limit/SSRF filed from code; `docs/RELIABILITY.md` — rate-limit TTL, timeouts, failure modes; `docs/DATA_PIPELINE.md` — evidence→dataset→grounding 10 rules; `docs/OBSERVABILITY.md` — slog RequestID, stage logs, gaps; `docs/ENGINEERING_LOG.md` — 2026-09-12 auth hardening entry; `docs/DECISIONS/ADR-001-auth-session-hardening.md`)
 - Master refactor wave 1 — done 2026-09-15 (P01 inventory `docs/Task Agent/P01_inventory.md` 372 lines — LOC table, god-files, handler→repo coupling, dup logic, Sleep locations, MCP 6→5 gap, dead routes; P02 canonical flow `docs/product/current-user-flow.md` 138 lines — Input→Processing→Understanding→Evidence→Figures→Source→Mgmt, screen ranking; P03 routing/IA: `frontend/src/App.jsx` /upload→/ + /dashboard→/account redirects, `frontend/src/pages/result-page.jsx` /dashboard→/account, `frontend/src/components/upgrade-cta.jsx` /pricing→/agents, `frontend/public/sitemap.xml` dedup, `frontend/public/robots.txt` cleaned, `internal/handlers/router.go` stale /explain noindex removed; P04 result-page split: `frontend/src/components/result/{result-header,understanding-section,evidence-section,figures-section,source-section,result-actions}.jsx` 6 components — result-page 743→297 LOC; P05 ingestion unify `frontend/src/pages/upload-page.jsx` 161 LOC source_type badge + inline error/Retry; P06 processing states 5 labels in result-page STAGE_LABELS; P07 app layer `internal/app/documents/{service.go,readmodel.go}` Service owning Create/Get/List; P08 start handler split `internal/handlers/documents_create.go` + fix `internal/handlers/documents.go` evidenceResponse + router Get — `go test` 422 passed, `go vet` clean, `gofmt -l .` empty)
+- Master refactor final audits — done 2026-09-15 (P50 UX consistency verified: terminology/nav/buttons/hierarchy/loading all aligned with DESIGN.md Dub tokens; P54 file audit `docs/Task Agent/P54_file_audit.md`: 13 GO files >250 LOC flagged, documents.go 1008 LOC is critical god-file; P55 dep direction: UI→API→App→Domain→Repo correct, 36 handler→repo couplings in documents.go remain (P09 target); P56 ownership: one owner per business rule verified across 15 domains; P60 arch regression: no new god-files, no hidden LLM deps, no MCP reasoning, no scope creep; P61 simplification: all refactor additions justified, no unnecessary code. 445 tests passed, both builds clean)
 
 ---
 
