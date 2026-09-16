@@ -34,7 +34,7 @@ export function AccountPage() {
         if (keyData?.key) setApiKey(keyData.key)
         if (usageData) setUsage(usageData)
       })
-      .catch(() => {})
+      .catch((err) => { console.error("Failed to load account data", err) })
       .finally(() => setLoading(false))
   }, [navigate])
 
@@ -43,7 +43,7 @@ export function AccountPage() {
       await navigator.clipboard.writeText(apiKey)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch {}
+    } catch (err) { console.error("Copy to clipboard failed", err) }
   }
 
   async function regenerateKey() {
@@ -54,7 +54,7 @@ export function AccountPage() {
         const data = await res.json()
         setApiKey(data.key)
       }
-    } catch {}
+    } catch (err) { console.error("Failed to regenerate API key", err) }
     setRegenerating(false)
   }
 
@@ -65,7 +65,7 @@ export function AccountPage() {
         const data = await res.json()
         window.location.href = data.url
       }
-    } catch {}
+    } catch (err) { console.error("Failed to open billing portal", err) }
   }
 
   if (loading) {
@@ -105,6 +105,7 @@ export function AccountPage() {
                   </pre>
                   <button
                     onClick={copyToClipboard}
+                    aria-label={copied ? "Copied" : "Copy API key"}
                     className="absolute top-2 right-2 rounded-[6px] border border-[#e5e5e5] bg-white px-2 py-1 text-xs font-medium text-[#737373] hover:bg-[#f5f5f5] transition-colors"
                   >
                     {copied ? "Copied!" : "Copy"}
@@ -115,6 +116,7 @@ export function AccountPage() {
                   size="sm"
                   onClick={regenerateKey}
                   disabled={regenerating}
+                  aria-label="Regenerate API key"
                   className="mt-3"
                 >
                   {regenerating ? "Regenerating..." : "Regenerate Key"}
@@ -144,7 +146,7 @@ export function AccountPage() {
                   {user.subscription_status === "active" ? "Active" : "Inactive"}
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={openBilling}>
+              <Button variant="outline" size="sm" onClick={openBilling} aria-label="Manage billing in Stripe portal">
                 Manage Billing
               </Button>
             </div>

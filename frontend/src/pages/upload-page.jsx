@@ -5,6 +5,7 @@ import { UploadDropzone } from "@/components/upload-dropzone"
 import { ReadingLevelSelector } from "@/components/ui/reading-level-selector"
 import { ErrorBanner } from "@/components/ui/status-banners"
 import { createDocument, importByDOI, importByURL } from "@/lib/api"
+import { useApi } from "@/hooks/useApi"
 import { ArrowRight } from "lucide-react"
 
 // tab config drives mode switch and explicit source_type badge
@@ -23,12 +24,26 @@ export function UploadPage() {
   const [readingLevel, setReadingLevel] = useState("simplified")
   const [doi, setDoi] = useState("")
   const [url, setUrl] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
 
   // derive explicit source_type for badge and backend routing
   const activeTab = TABS.find((t) => t.id === mode)
   const sourceType = activeTab.source
+
+  // useApi wraps submit with loading/error/retry — no manual setLoading needed.
+  const { execute, loading, error, setError } = useApi(async () => {
+    if (mode === "pdf" || mode === "paste") {
+      const result = await createDocument({ file: mode === "pdf" ? file : null, text: mode === "paste" ? text : null, readingLevel })
+      navigate(`/${result.document_id}`)
+      return
+    }
+    if (mode === "doi") {
+      const result = await importByDOI(doi.trim())
+      navigate(`/${result.document_id}`)
+      return
+    }
+    const result = await importByURL(url.trim())
+    navigate(`/${result.document_id}`)
+  })
 
   // validate current mode and return terse message or null
   function validate() {
@@ -54,21 +69,8 @@ export function UploadPage() {
       setError(msg)
       return
     }
-    setError(null)
-    setLoading(true)
     try {
-      if (mode === "pdf" || mode === "paste") {
-        const result = await createDocument({ file: mode === "pdf" ? file : null, text: mode === "paste" ? text : null, readingLevel })
-        navigate(`/${result.document_id}`)
-        return
-      }
-      if (mode === "doi") {
-        const result = await importByDOI(doi.trim())
-        navigate(`/${result.document_id}`)
-        return
-      }
-      const result = await importByURL(url.trim())
-      navigate(`/${result.document_id}`)
+      await execute()
     } catch (err) {
       console.error(`ingest failed [${sourceType}]`, err)
       const code = err.code
@@ -76,7 +78,6 @@ export function UploadPage() {
       else if (code === "rate_limited") setError("Too many requests. Wait a moment and retry.")
       else if (code) setError(code.replaceAll("_", " "))
       else setError("Something went wrong. Please retry.")
-      setLoading(false)
     }
   }
 

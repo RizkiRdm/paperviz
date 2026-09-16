@@ -56,7 +56,7 @@ export function ResultPage() {
           const data = await res.json()
           setCollections(data.collections || [])
         }
-      } catch {}
+      } catch (err) { console.error("Failed to load collections", err) }
     }
     fetchCollections()
   }, [])
@@ -69,7 +69,8 @@ export function ResultPage() {
       setTextCopyError(false)
       clearTimeout(copyTimerRef.current)
       copyTimerRef.current = setTimeout(() => setTextCopied(false), COPY_FEEDBACK_MS)
-    } catch {
+    } catch (err) {
+      console.error("Copy to clipboard failed", err)
       setTextCopied(false)
       setTextCopyError(true)
     }
@@ -83,7 +84,8 @@ export function ResultPage() {
       const { share_url } = await generateDocumentShare(documentId)
       setShareUrl(window.location.origin + share_url)
       setShowShare(true)
-    } catch {
+    } catch (err) {
+      console.error("Share link creation failed", err)
       setShareError(true)
     }
   }
@@ -96,7 +98,8 @@ export function ResultPage() {
     setVisibilityError(false)
     try {
       await updateDocumentVisibility(documentId, next)
-    } catch {
+    } catch (err) {
+      console.error("Visibility update failed", err)
       setVisibility(previous)
       setVisibilityError(true)
     }
@@ -190,7 +193,7 @@ const STAGE_LABELS = { simplifying: "Reading document...", verifying: "Preparing
       if (res.ok) {
         setShowAddToCollection(false)
       }
-    } catch {}
+    } catch (err) { console.error("Failed to add to collection", err) }
   }
 
   return (

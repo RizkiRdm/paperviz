@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 
@@ -61,7 +61,7 @@ export function AgentsPage() {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
-  useState(() => {
+  useEffect(() => {
     fetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : null))
       .then((user) => {
@@ -73,7 +73,7 @@ export function AgentsPage() {
       .then((data) => {
         if (data?.key) setApiKey(data.key)
       })
-      .catch(() => { })
+      .catch((err) => { console.error("Failed to load API key", err) })
       .finally(() => setLoading(false))
   }, [])
 
@@ -85,7 +85,7 @@ export function AgentsPage() {
       await navigator.clipboard.writeText(config)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch { }
+    } catch (err) { console.error("Copy to clipboard failed", err) }
   }
 
   return (
@@ -105,10 +105,14 @@ export function AgentsPage() {
         </div>
 
         <div className="rounded-[12px] border border-[#e5e5e5] bg-white">
-          <div className="flex border-b border-[#e5e5e5]">
+          <div className="flex border-b border-[#e5e5e5]" role="tablist" aria-label="MCP client">
             {CLIENTS.map((client) => (
               <button
                 key={client.id}
+                role="tab"
+                id={`tab-${client.id}`}
+                aria-selected={activeTab === client.id}
+                aria-controls={`panel-${client.id}`}
                 onClick={() => setActiveTab(client.id)}
                 className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === client.id
                     ? "border-b-2 border-[#0a0a0a] text-[#0a0a0a]"
@@ -120,7 +124,7 @@ export function AgentsPage() {
             ))}
           </div>
 
-          <div className="p-6">
+          <div className="p-6" role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
             {loading ? (
               <div className="text-sm text-[#737373]">Loading...</div>
             ) : !apiKey ? (
