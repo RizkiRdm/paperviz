@@ -1,0 +1,14 @@
+# Frontend-only image — nginx serving static React build
+# Used for: CDN/edge serving, split deployments, frontend-only testing
+FROM node:24-alpine AS build
+WORKDIR /build
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /build/dist /usr/share/nginx/html
+COPY build/nginx-frontend.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,91 +1,76 @@
 import { test, expect } from '@playwright/test'
 
-const SCREENSHOT_DIR = '../assets'
-
 test.describe('Landing / Upload Page', () => {
   test('loads with correct title and heading', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
-    
     await expect(page).toHaveTitle(/PaperViz/)
-    await expect(page.locator('h1')).toBeVisible()
-    
-    await page.screenshot({ 
-      path: `${SCREENSHOT_DIR}/landing-page.png`,
-      fullPage: true 
-    })
+    await expect(page.locator('h1')).toContainText('Papers, in plain language')
   })
 
-  test('shows upload dropzone', async ({ page }) => {
+  test('shows two CTAs: Add to Claude Code and Sign in', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
-    
-    const dropzone = page.locator('[data-testid="upload-dropzone"], [role="button"]').first()
-    await expect(dropzone).toBeVisible()
-    
-    await page.screenshot({ 
-      path: `${SCREENSHOT_DIR}/landing-dropzone.png`,
-      fullPage: true 
-    })
+    await expect(page.locator('a[href="/agents"]')).toBeVisible()
+    await expect(page.locator('a[href="/login"]')).toBeVisible()
   })
 
-  test('shows paste text option', async ({ page }) => {
+  test('shows PDF/Paste/DOI/URL tab selector', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
-    
-    const pasteButton = page.locator('text=/paste|text/i').first()
-    await expect(pasteButton).toBeVisible()
-    
-    await page.screenshot({ 
-      path: `${SCREENSHOT_DIR}/landing-paste-option.png`,
-      fullPage: true 
-    })
+    const tablist = page.locator('[role="tablist"]')
+    await expect(tablist).toBeVisible()
+    await expect(tablist.locator('[role="tab"]')).toHaveCount(4)
+    await expect(tablist.locator('[role="tab"]').nth(0)).toHaveText('PDF')
+    await expect(tablist.locator('[role="tab"]').nth(1)).toHaveText('Paste')
+    await expect(tablist.locator('[role="tab"]').nth(2)).toHaveText('DOI')
+    await expect(tablist.locator('[role="tab"]').nth(3)).toHaveText('URL')
   })
 
-  test('navigation links are visible', async ({ page }) => {
+  test('shows source type badge', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
-    
-    const nav = page.locator('header, nav').first()
-    await expect(nav).toBeVisible()
-    
-    await page.screenshot({ 
-      path: `${SCREENSHOT_DIR}/landing-nav.png`,
-      fullPage: true 
-    })
+    await expect(page.locator('text=source: pdf')).toBeVisible()
   })
 
-  test('clicking login navigates to login page', async ({ page }) => {
+  test('switching tabs updates source badge', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
-    
-    const loginLink = page.locator('a[href="/login"], button:has-text("Log in"), button:has-text("Sign in")').first()
-    if (await loginLink.isVisible()) {
-      await loginLink.click()
-      await page.waitForLoadState('networkidle')
-      expect(page.url()).toContain('/login')
-      
-      await page.screenshot({ 
-        path: `${SCREENSHOT_DIR}/nav-to-login.png`,
-        fullPage: true 
-      })
-    }
+    await page.locator('[role="tab"]', { hasText: 'Paste' }).click()
+    await expect(page.locator('text=source: pasted_text')).toBeVisible()
+    await page.locator('[role="tab"]', { hasText: 'DOI' }).click()
+    await expect(page.locator('text=source: doi')).toBeVisible()
   })
 
-  test('clicking signup navigates to signup page', async ({ page }) => {
+  test('DOI tab shows input and Import button', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
-    
-    const signupLink = page.locator('a[href="/signup"], button:has-text("Sign up"), button:has-text("Register")').first()
-    if (await signupLink.isVisible()) {
-      await signupLink.click()
-      await page.waitForLoadState('networkidle')
-      expect(page.url()).toContain('/signup')
-      
-      await page.screenshot({ 
-        path: `${SCREENSHOT_DIR}/nav-to-signup.png`,
-        fullPage: true 
-      })
-    }
+    await page.locator('[role="tab"]', { hasText: 'DOI' }).click()
+    await expect(page.locator('#doi-input')).toBeVisible()
+    await expect(page.locator('button', { hasText: 'Import' })).toBeVisible()
+  })
+
+  test('URL tab shows input and Import button', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    await page.locator('[role="tab"]', { hasText: 'URL' }).click()
+    await expect(page.locator('#url-input')).toBeVisible()
+    await expect(page.locator('button', { hasText: 'Import' })).toBeVisible()
+  })
+
+  test('clicking Sign in navigates to /login', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    await page.locator('a[href="/login"]').click()
+    await page.waitForLoadState('networkidle')
+    expect(page.url()).toContain('/login')
+  })
+
+  test('clicking Add to Claude Code navigates to /agents', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    await page.locator('a[href="/agents"]').click()
+    await page.waitForLoadState('networkidle')
+    expect(page.url()).toContain('/agents')
   })
 })

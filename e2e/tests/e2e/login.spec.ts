@@ -1,71 +1,50 @@
 import { test, expect } from '@playwright/test'
 
-const SCREENSHOT_DIR = '../assets'
-
 test.describe('Login Page', () => {
   test('loads with login form', async ({ page }) => {
     await page.goto('/login')
     await page.waitForLoadState('networkidle')
-    
-    const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]').first()
-    const passwordInput = page.locator('input[type="password"], input[name="password"]').first()
-    const submitButton = page.locator('button[type="submit"], button:has-text("Log in"), button:has-text("Sign in")').first()
-    
-    await expect(emailInput).toBeVisible()
-    await expect(passwordInput).toBeVisible()
-    await expect(submitButton).toBeVisible()
-    
-    await page.screenshot({ 
-      path: `${SCREENSHOT_DIR}/login-page.png`,
-      fullPage: true 
-    })
+    await expect(page.locator('h1')).toContainText('Welcome back')
+    await expect(page.locator('#email')).toBeVisible()
+    await expect(page.locator('#password')).toBeVisible()
+    await expect(page.locator('button[type="submit"]')).toContainText('Sign in')
   })
 
-  test('shows validation on empty submit', async ({ page }) => {
+  test('shows Google OAuth button', async ({ page }) => {
     await page.goto('/login')
     await page.waitForLoadState('networkidle')
-    
-    const submitButton = page.locator('button[type="submit"], button:has-text("Log in"), button:has-text("Sign in")').first()
-    await submitButton.click()
-    
-    await page.waitForTimeout(500)
-    
-    await page.screenshot({ 
-      path: `${SCREENSHOT_DIR}/login-validation.png`,
-      fullPage: true 
-    })
-  })
-
-  test('shows error on invalid credentials', async ({ page }) => {
-    await page.goto('/login')
-    await page.waitForLoadState('networkidle')
-    
-    const emailInput = page.locator('input[type="email"], input[name="email"], input[placeholder*="email" i]').first()
-    const passwordInput = page.locator('input[type="password"], input[name="password"]').first()
-    const submitButton = page.locator('button[type="submit"], button:has-text("Log in"), button:has-text("Sign in")').first()
-    
-    await emailInput.fill('test@example.com')
-    await passwordInput.fill('wrongpassword')
-    await submitButton.click()
-    
-    await page.waitForTimeout(2000)
-    
-    await page.screenshot({ 
-      path: `${SCREENSHOT_DIR}/login-invalid-creds.png`,
-      fullPage: true 
-    })
+    await expect(page.locator('a[href="/api/auth/google/login"]')).toBeVisible()
+    await expect(page.locator('a[href="/api/auth/google/login"]')).toContainText('Continue with Google')
   })
 
   test('has link to signup', async ({ page }) => {
     await page.goto('/login')
     await page.waitForLoadState('networkidle')
-    
-    const signupLink = page.locator('a[href="/signup"]').first()
-    await expect(signupLink).toBeVisible()
-    
-    await page.screenshot({ 
-      path: `${SCREENSHOT_DIR}/login-to-signup-link.png`,
-      fullPage: true 
-    })
+    await expect(page.locator('a[href="/signup"]')).toBeVisible()
+    await expect(page.locator('a[href="/signup"]')).toContainText('Sign up')
+  })
+
+  test('shows validation on empty submit', async ({ page }) => {
+    await page.goto('/login')
+    await page.waitForLoadState('networkidle')
+    await page.locator('button[type="submit"]').click()
+    await expect(page.locator('text=Please fill in all fields')).toBeVisible()
+  })
+
+  test('shows error on invalid credentials', async ({ page }) => {
+    await page.goto('/login')
+    await page.waitForLoadState('networkidle')
+    await page.locator('#email').fill('nonexistent@test.com')
+    await page.locator('#password').fill('wrongpassword')
+    await page.locator('button[type="submit"]').click()
+    await expect(page.locator('text=Invalid email or password')).toBeVisible({ timeout: 10000 })
+  })
+
+  test('PV logo links back to home', async ({ page }) => {
+    await page.goto('/login')
+    await page.waitForLoadState('networkidle')
+    await page.locator('a[href="/"]').first().click()
+    await page.waitForLoadState('networkidle')
+    expect(page.url()).toContain('/')
   })
 })

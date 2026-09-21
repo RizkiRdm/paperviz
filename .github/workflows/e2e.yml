@@ -1,0 +1,77 @@
+name: E2E Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+
+      - name: Install frontend deps and build
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Install e2e deps
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: npx playwright install chromium --with-deps
+
+      - name: Start backend server
+        env:
+          GEMINI_API_KEY: test-key-not-real
+          GOOGLE_CLIENT_ID: test-client-id
+          GOOGLE_CLIENT_SECRET: test-client-secret
+          GOOGLE_REDIRECT_URL: http://localhost:8080/api/auth/google/callback
+          STRIPE_SECRET_KEY: test-stripe-key
+          STRIPE_WEBHOOK_SECRET: test-webhook-secret
+          FRONTEND_URL: http://localhost:8080
+          DATABASE_PATH: /tmp/paperviz-e2e-e2e-yml.db
+          PORT: 8080
+        run: |
+          go run ./cmd/server &
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:8080/healthz; then echo "server ready"; break; fi
+            sleep 2
+          done
+          curl -sf http://localhost:8080/healthz || (echo "server failed" && exit 1)
+
+      - name: Run Playwright tests
+        working-directory: e2e
+        env:
+          BASE_URL: http://localhost:8080
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-playwright-report
+          path: e2e/playwright-report/
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-playwright-results
+          path: e2e/playwright-results.json
+          retention-days: 30
