@@ -8,56 +8,16 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"paperviz/internal/external"
 	"paperviz/internal/handlers"
 	"paperviz/internal/repository"
 	"paperviz/internal/services"
 )
-
-// loadMigrations reads every migration SQL file into a versioned map, in
-// declaration order. Kept separate from main so tests can assert the full
-// migration chain (including 004) is registered — a missing registration
-// silently ships a schema the repository code already depends on.
-// migrationsDir is relative to the process working directory (repo root in
-// production; tests pass an absolute path since `go test` runs per-package).
-func loadMigrations(migrationsDir string) (map[int]string, error) {
-	migrations := make(map[int]string)
-
-	paths := map[int]string{
-		1:  "001_init.sql",
-		2:  "002_users.sql",
-		3:  "003_chapters.sql",
-		4:  "004_chapter_charts.sql",
-		5:  "005_evidence.sql",
-		6:  "006_document_title.sql",
-		7:  "007_saved_papers.sql",
-		8:  "008_research_collections.sql",
-		9:  "009_share_tokens.sql",
-		10: "010_document_share.sql",
-		11: "011_share_referrals.sql",
-		12: "012_usage_analytics.sql",
-		13: "013_usage_tiers.sql",
-		14: "014_structured_research_objects.sql",
-		15: "015_evidence_graph.sql",
-		16: "016_annotations.sql",
-	}
-
-	for version, file := range paths {
-		sql, err := repository.ReadMigration(filepath.Join(migrationsDir, file))
-		if err != nil {
-			return nil, fmt.Errorf("read migration %03d: %w", version, err)
-		}
-		migrations[version] = sql
-	}
-	return migrations, nil
-}
 
 func main() {
 	logFile := os.Getenv("LOG_FILE")
@@ -83,6 +43,31 @@ func main() {
 		os.Exit(1)
 	}
 
+	if os.Getenv("GOOGLE_CLIENT_ID") == "" {
+		slog.Error("GOOGLE_CLIENT_ID environment variable is required")
+		os.Exit(1)
+	}
+	if os.Getenv("GOOGLE_CLIENT_SECRET") == "" {
+		slog.Error("GOOGLE_CLIENT_SECRET environment variable is required")
+		os.Exit(1)
+	}
+	if os.Getenv("GOOGLE_REDIRECT_URL") == "" {
+		slog.Error("GOOGLE_REDIRECT_URL environment variable is required")
+		os.Exit(1)
+	}
+	if os.Getenv("STRIPE_SECRET_KEY") == "" {
+		slog.Error("STRIPE_SECRET_KEY environment variable is required")
+		os.Exit(1)
+	}
+	if os.Getenv("STRIPE_WEBHOOK_SECRET") == "" {
+		slog.Error("STRIPE_WEBHOOK_SECRET environment variable is required")
+		os.Exit(1)
+	}
+	if os.Getenv("FRONTEND_URL") == "" {
+		slog.Error("FRONTEND_URL environment variable is required")
+		os.Exit(1)
+	}
+
 	geminiModel := os.Getenv("GEMINI_MODEL")
 	if geminiModel == "" {
 		// Current fast + cheap default, good for text-only tasks. Valid
@@ -105,7 +90,7 @@ func main() {
 		port = "8080"
 	}
 
-	migrations, err := loadMigrations("migrations")
+	migrations, err := repository.LoadMigrations("migrations")
 	if err != nil {
 		slog.Error("failed to load migrations", "error", err)
 		os.Exit(1)

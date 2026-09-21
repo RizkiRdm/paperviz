@@ -7,10 +7,8 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -18,40 +16,6 @@ import (
 	papervizMCP "paperviz/internal/mcp"
 	"paperviz/internal/repository"
 )
-
-// loadMigrations reads every migration SQL file into a versioned map.
-// Replicated from cmd/server/main.go since loadMigrations is unexported.
-func loadMigrations(migrationsDir string) (map[int]string, error) {
-	migrations := make(map[int]string)
-
-	paths := map[int]string{
-		1:  "001_init.sql",
-		2:  "002_users.sql",
-		3:  "003_chapters.sql",
-		4:  "004_chapter_charts.sql",
-		5:  "005_evidence.sql",
-		6:  "006_document_title.sql",
-		7:  "007_saved_papers.sql",
-		8:  "008_research_collections.sql",
-		9:  "009_share_tokens.sql",
-		10: "010_document_share.sql",
-		11: "011_share_referrals.sql",
-		12: "012_usage_analytics.sql",
-		13: "013_usage_tiers.sql",
-		14: "014_structured_research_objects.sql",
-		15: "015_evidence_graph.sql",
-		16: "016_annotations.sql",
-	}
-
-	for version, file := range paths {
-		sql, err := repository.ReadMigration(filepath.Join(migrationsDir, file))
-		if err != nil {
-			return nil, fmt.Errorf("read migration %03d: %w", version, err)
-		}
-		migrations[version] = sql
-	}
-	return migrations, nil
-}
 
 func main() {
 	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
@@ -79,7 +43,7 @@ func main() {
 		log.Fatal("PAPERVIZ_API_KEY environment variable is required")
 	}
 
-	migrations, err := loadMigrations(migrationsDir)
+	migrations, err := repository.LoadMigrations(migrationsDir)
 	if err != nil {
 		log.Fatalf("failed to load migrations: %v", err)
 	}

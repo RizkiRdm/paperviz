@@ -75,6 +75,8 @@ func NewRouter(db *sql.DB, gemini *external.GeminiClient, staticDir string) http
 	// duration, and request ID — structured JSON output via slog.
 	r.Use(slogRequestLogger)
 
+	r.Get("/healthz", healthzHandler(db))
+
 	docHandler := NewDocumentHandler(db, gemini)
 	importHandler := NewImportHandler(db, gemini, services.NewPaperFetcher())
 	authMiddleware := NewAuthMiddleware(db)

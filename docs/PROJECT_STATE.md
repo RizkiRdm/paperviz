@@ -16,17 +16,17 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-15 — Master refactor P01-P61 final audits complete
+**Last updated:** 2026-09-21 — Chunk 12 deploy readiness 12.1-12.7 complete
 
 ---
 
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** PaperViz master refactor P01→P61 — Final audits P50-P61 complete. Architecture validated, file sizes documented, dependency directions verified.
-- **Active task file:** `docs/Task Agent/P54_file_audit.md` (P50-P61 comprehensive audit)
-- **Blocked on / pending decision:** none
-- **Next action if resuming:** Execute P09 (kill handler→repo coupling in documents.go, 36 instances) + P10 (read-model aggregation) to complete god-file decomposition. Then P11-P14 pipeline split, P15-P24 charts/evidence, P25-P36 MCP lock to 5 tools.
+- **Working on:** Chunk 12 Deploy Readiness — 12.1 migrations + 12.2 env validation + 12.3 /healthz + 12.5 mcp-parity drift fix + 12.7 CI gate done; code lane complete, `go test 446 passed`
+- **Active task file:** `goals/chunk-12-deploy-readiness/plan.md` (Lane 1 complete; Lane 2 = human dashboard setup per plan)
+- **Blocked on / pending decision:** none — Lane 2 (Railway project/volume/env vars, Google/Stripe dashboard, DNS) is Don's action, doesn't block code
+- **Next action if resuming:** Human lane: create Railway project + volume for DATABASE_PATH, set 9 env vars, register OAuth redirect + Stripe webhook, DNS → then deploy and hit `/healthz` to verify DB
 
 ---
 
@@ -141,6 +141,9 @@ something you already rejected for a clear reason.)*
 | 2026-09-08 | Scatter requires numeric X/Y | No categorical labels as X-axis for scatter charts |
 | 2026-09-08 | Pie only for parts-of-whole | Reject pie when data doesn't represent a whole |
 | 2026-09-12 | Auth session: single-session on login + strict complexity (upper/lower/digit/special) + rate-limiter TTL 5m | Closes fixation/CSRF, bounds memory without new dep; single-session breaks multi-device (see ADR-001) |
+| 2026-09-21 | `search_documents` is global stateless title search, not per-user | MCP has no session/auth to scope listing (stateless by design); global search across ephemeral docs, per-user scoping deferred — see `docs/mcp-parity.md` scope note |
+| 2026-09-21 | Deploy env vars fail-loud at startup (12.2) | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URL` + `STRIPE_SECRET_KEY/WEBHOOK_SECRET` + `FRONTEND_URL` now `slog.Error` + `os.Exit(1)` like `GEMINI_API_KEY`; exact missing var logged |
+| 2026-09-21 | Migrations single source `internal/repository/migrations.go` (12.1) | `LoadMigrations` extracted from `cmd/server`+`cmd/mcp` duplication; both binaries import same map; test asserts 19 + fails on future drift |
 
 ---
 
@@ -169,7 +172,6 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Task/chunk docs: `docs/`
 - Cost model: `docs/cost-model.md`
 - Pricing strategy: `docs/pricing-strategy.md`
-- Pricing page: `frontend/src/pages/pricing-page.jsx`
 - Conversion tracking: `internal/handlers/analytics.go` (`TrackPricingView`, `TrackUpgradeIntent`)
 - Structured Research API docs: `docs/structured-research-api.md`
 - Canonical Research Output Contract: `docs/canonical-research-output-contract.md`

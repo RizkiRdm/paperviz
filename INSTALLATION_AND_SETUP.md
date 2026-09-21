@@ -83,10 +83,22 @@ Then edit `.env` and set at minimum:
 
 ```
 GEMINI_API_KEY=your-real-key-here
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URL=http://localhost:8080/api/auth/google/callback
+STRIPE_SECRET_KEY=your-stripe-secret-key
+STRIPE_WEBHOOK_SECRET=your-stripe-webhook-secret
+FRONTEND_URL=http://localhost:5173
 ```
 
 All other variables in `.env.example` have sane defaults (see that file's
 comments) and only need overriding if you want non-default behavior.
+
+**Startup validation (Chunk 12.2):** the server fails loudly at startup if
+any of `GEMINI_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`GOOGLE_REDIRECT_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, or
+`FRONTEND_URL` is missing — the exact missing var is logged. This prevents
+confusing runtime failures on the first OAuth/Stripe request.
 
 **The Go server reads environment variables directly via `os.Getenv`** —
 it does not load `.env` files itself (no dependency was added for that,
