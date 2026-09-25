@@ -108,7 +108,12 @@ func main() {
 		slog.Error("failed to delete expired sessions on startup", "error", err)
 	}
 
-	gemini := external.NewGeminiClient(geminiAPIKey, geminiModel)
+	tr := external.NewTransport()
+	gemini, err := tr.For(external.ProviderGemini, geminiAPIKey, geminiModel)
+	if err != nil {
+		slog.Error("failed to build llm client", "error", err)
+		os.Exit(1)
+	}
 
 	// Start the expiry sweep in the background — runs once immediately,
 	// then hourly (see services/expiry.go). It never returns, so it must

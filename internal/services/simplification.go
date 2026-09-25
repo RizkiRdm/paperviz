@@ -94,7 +94,7 @@ Rewrite:`
 // Handlers validate the incoming request field before the pipeline ever
 // reaches this call, so an invalid value here indicates a bug upstream,
 // not bad user input — see handlers/documents.go for the request-time check.
-func Simplify(ctx context.Context, client *external.GeminiClient, text, level string) (string, error) {
+func Simplify(ctx context.Context, client *external.LLM, text, level string) (string, error) {
 	var template string
 	switch level {
 	case "simplified":

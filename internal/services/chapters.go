@@ -41,7 +41,7 @@ type chapterJSON struct {
 	Excerpt string `json:"excerpt"`
 }
 
-func DetectChapters(ctx context.Context, client *external.GeminiClient, simplifiedText string) ([]Chapter, error) {
+func DetectChapters(ctx context.Context, client *external.LLM, simplifiedText string) ([]Chapter, error) {
 	prompt := fmt.Sprintf(chapterDetectionPrompt, maxChapters, simplifiedText)
 	parsed, err := external.ExtractJSON[[]chapterJSON](ctx, client, prompt, 0)
 	if err != nil {

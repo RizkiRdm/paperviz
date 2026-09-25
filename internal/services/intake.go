@@ -78,7 +78,7 @@ const backgroundPipelineTimeout = 20 * time.Minute
 
 // RunPipelineAndPersist runs the full asynchronous pipeline and persists the result
 // in a single transaction (ARCHITECTURE.md Section 4 Transaction Policy).
-func RunPipelineAndPersist(db *sql.DB, gemini *external.GeminiClient, documentID string, input PipelineInput) {
+func RunPipelineAndPersist(db *sql.DB, gemini *external.LLM, documentID string, input PipelineInput) {
 	ctx, cancel := context.WithTimeout(context.Background(), backgroundPipelineTimeout)
 	defer cancel()
 

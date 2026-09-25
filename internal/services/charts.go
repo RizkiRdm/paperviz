@@ -53,7 +53,7 @@ const (
 //
 // Each chart is handled independently and a failure on one MUST NOT abort
 // the others — this is ARCHITECTURE.md Failure Scenario 3 and 4 verbatim.
-func ReVisualizeCharts(ctx context.Context, client *external.GeminiClient, extracted []ExtractedChart, pages pageText) []Chart {
+func ReVisualizeCharts(ctx context.Context, client *external.LLM, extracted []ExtractedChart, pages pageText) []Chart {
 	results := make([]Chart, 0, len(extracted))
 
 	for i, ec := range extracted {
@@ -67,7 +67,7 @@ func ReVisualizeCharts(ctx context.Context, client *external.GeminiClient, extra
 // reVisualizeOne runs the data-extraction-then-image-fallback-then-omit
 // decision for a single chart. Split out from ReVisualizeCharts so each
 // chart's error handling is isolated and testable on its own.
-func reVisualizeOne(ctx context.Context, client *external.GeminiClient, ec ExtractedChart, pageContext string, displayOrder int) Chart {
+func reVisualizeOne(ctx context.Context, client *external.LLM, ec ExtractedChart, pageContext string, displayOrder int) Chart {
 	base := Chart{
 		PageNumber:   ec.PageNumber,
 		DisplayOrder: displayOrder,
@@ -107,7 +107,7 @@ func reVisualizeOne(ctx context.Context, client *external.GeminiClient, ec Extra
 // present, or if the call/parse fails — either way, the caller falls back.
 // The returned string is the raw validated JSON, ready to store as-is in
 // charts.chart_data (ARCHITECTURE.md Section 3).
-func tryExtractChartData(ctx context.Context, client *external.GeminiClient, text string) (dataJSON string, ok bool) {
+func tryExtractChartData(ctx context.Context, client *external.LLM, text string) (dataJSON string, ok bool) {
 	prompt := fmt.Sprintf(chartDataExtractionPrompt, text)
 	parsed, err := external.ExtractJSON[chartDataJSON](ctx, client, prompt, 0)
 	if err != nil || len(parsed.Labels) == 0 || len(parsed.Values) == 0 {
@@ -124,7 +124,7 @@ func tryExtractChartData(ctx context.Context, client *external.GeminiClient, tex
 
 // annotateImage calls Gemini to write a short plain-language caption for a
 // chart image, using surrounding page text as context.
-func annotateImage(ctx context.Context, client *external.GeminiClient, text string) (string, error) {
+func annotateImage(ctx context.Context, client *external.LLM, text string) (string, error) {
 	if strings.TrimSpace(text) == "" {
 		return "", fmt.Errorf("no page context available for annotation")
 	}

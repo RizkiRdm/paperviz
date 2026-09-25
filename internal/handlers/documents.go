@@ -32,10 +32,10 @@ import (
 // request-scoped data."
 type DocumentHandler struct {
 	db     *sql.DB
-	gemini *external.GeminiClient
+	gemini *external.LLM
 }
 
-func NewDocumentHandler(db *sql.DB, gemini *external.GeminiClient) *DocumentHandler {
+func NewDocumentHandler(db *sql.DB, gemini *external.LLM) *DocumentHandler {
 	return &DocumentHandler{db: db, gemini: gemini}
 }
 

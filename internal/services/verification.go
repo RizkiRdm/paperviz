@@ -69,7 +69,7 @@ type claimComparisonResult struct {
 //
 // Call count: 2 total (1 dual-extraction + 1 comparison), down from 3
 // before the merge (2 single-extraction + 1 comparison).
-func DiffClaims(ctx context.Context, client *external.GeminiClient, originalText, simplifiedText string) (VerifyResult, error) {
+func DiffClaims(ctx context.Context, client *external.LLM, originalText, simplifiedText string) (VerifyResult, error) {
 	prompt := fmt.Sprintf(dualClaimExtractionPrompt, originalText, simplifiedText)
 	dual, err := external.ExtractJSON[dualClaimExtractionResult](ctx, client, prompt, 0)
 	if err != nil {

@@ -54,7 +54,11 @@ func main() {
 	}
 	defer db.Close()
 
-	gemini := external.NewGeminiClient(geminiAPIKey, geminiModel)
+	tr := external.NewTransport()
+	gemini, err := tr.For(external.ProviderGemini, geminiAPIKey, geminiModel)
+	if err != nil {
+		log.Fatalf("failed to build llm client: %v", err)
+	}
 
 	srv := papervizMCP.NewMCPServer(db, gemini, papervizAPIKey)
 

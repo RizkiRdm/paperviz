@@ -309,7 +309,7 @@ func downloadPDF(rawURL string) ([]byte, error) {
 }
 
 // CreateImportedDocument inserts a DOI/URL import and starts async pipeline.
-func CreateImportedDocument(db *sql.DB, gemini *external.GeminiClient, sourceType, readingLevel, originalText, title string, userID *string) (string, error) {
+func CreateImportedDocument(db *sql.DB, gemini *external.LLM, sourceType, readingLevel, originalText, title string, userID *string) (string, error) {
 	id, err := repository.NewID()
 	if err != nil {
 		return "", fmt.Errorf("generate id: %w", err)

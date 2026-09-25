@@ -204,7 +204,7 @@ var validLLMChartTypes = map[string]bool{"bar": true, "line": true, "pie": true,
 
 // GenerateChapterCharts extracts numeric evidence from a chapter, builds
 // candidate datasets, then asks the LLM to evaluate each dataset for charting.
-func GenerateChapterCharts(ctx context.Context, client *external.GeminiClient, chapter Chapter, displayOrder int) (charts []Chart, degraded bool) {
+func GenerateChapterCharts(ctx context.Context, client *external.LLM, chapter Chapter, displayOrder int) (charts []Chart, degraded bool) {
 	evidence := ExtractNumericEvidence(chapter.Excerpt, 1)
 	datasets := BuildCandidateDatasets(evidence)
 

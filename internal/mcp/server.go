@@ -11,7 +11,7 @@ import (
 // MCPServer holds shared dependencies for all MCP tool handlers.
 type MCPServer struct {
 	db          *sql.DB
-	gemini      *external.GeminiClient
+	gemini      *external.LLM
 	apiKey      string
 	rateLimiter *RateLimiter
 	jobLimiter  *JobLimiter
@@ -21,7 +21,7 @@ type MCPServer struct {
 func (s *MCPServer) Server() *mcp.Server { return s.mcpServer }
 
 // NewMCPServer creates the MCP server and registers all research tools.
-func NewMCPServer(db *sql.DB, gemini *external.GeminiClient, apiKey string) *MCPServer {
+func NewMCPServer(db *sql.DB, gemini *external.LLM, apiKey string) *MCPServer {
 	mcpSrv := &MCPServer{
 		db:          db,
 		gemini:      gemini,

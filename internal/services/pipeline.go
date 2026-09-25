@@ -41,7 +41,7 @@ const (
 // RunPipeline is canonical sequential pipeline: simplification → claim-diff
 // verification → chapter chart generation → image chart fallback → return
 // result for caller persistence. Business logic lives in pipeline_stages.go.
-func RunPipeline(ctx context.Context, gemini *external.GeminiClient, in PipelineInput) PipelineOutput {
+func RunPipeline(ctx context.Context, gemini *external.LLM, in PipelineInput) PipelineOutput {
 	emit := func(s string) {
 		if in.OnStage != nil {
 			in.OnStage(s)

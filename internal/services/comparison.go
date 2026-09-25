@@ -74,7 +74,7 @@ type evidenceClaimResult struct {
 }
 
 // ExtractPaperSummary extracts structured fields from a single paper for multi-paper comparison.
-func ExtractPaperSummary(ctx context.Context, client *external.GeminiClient, documentID, title, paperText string) (PaperSummary, error) {
+func ExtractPaperSummary(ctx context.Context, client *external.LLM, documentID, title, paperText string) (PaperSummary, error) {
 	prompt := fmt.Sprintf(paperExtractionPrompt, paperText)
 	parsed, err := external.ExtractJSON[paperExtractionResult](ctx, client, prompt, 0)
 	if err != nil {
@@ -97,7 +97,7 @@ func ExtractPaperSummary(ctx context.Context, client *external.GeminiClient, doc
 }
 
 // ComparePapers generates a structured comparison across multiple papers.
-func ComparePapers(ctx context.Context, client *external.GeminiClient, papers []PaperSummary) (PaperComparison, error) {
+func ComparePapers(ctx context.Context, client *external.LLM, papers []PaperSummary) (PaperComparison, error) {
 	if len(papers) < 2 {
 		return PaperComparison{}, fmt.Errorf("at least 2 papers required for comparison")
 	}
@@ -161,7 +161,7 @@ func buildComparisonDimensions(papers []PaperSummary) []ComparisonDimension {
 }
 
 // ponytail: joins all papers into one prompt — ceiling: token bloat past ~10 papers/long findings ; upgrade: batched per-dimension synthesis with truncation
-func synthesizeDimensions(ctx context.Context, client *external.GeminiClient, dims []ComparisonDimension, papers []PaperSummary) ([]dimensionSynthesis, error) {
+func synthesizeDimensions(ctx context.Context, client *external.LLM, dims []ComparisonDimension, papers []PaperSummary) ([]dimensionSynthesis, error) {
 	var dimensionNames []string
 	for _, d := range dims {
 		dimensionNames = append(dimensionNames, d.Dimension)
@@ -219,7 +219,7 @@ func identifyAgreementsAndDisagreements(papers []PaperSummary) (agreement []stri
 
 // CompareEvidence identifies cross-paper claims and per-paper stance.
 // ponytail: single prompt over joined evidence — ceiling: prompt bloat on many/long evidence, drops solo claims ; upgrade: chunked compare with per-claim stance votes
-func CompareEvidence(ctx context.Context, client *external.GeminiClient, papers []PaperSummary) ([]EvidenceClaim, error) {
+func CompareEvidence(ctx context.Context, client *external.LLM, papers []PaperSummary) ([]EvidenceClaim, error) {
 	if len(papers) < 2 {
 		return nil, nil
 	}

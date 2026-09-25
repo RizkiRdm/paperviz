@@ -14,11 +14,11 @@ import (
 // Service owns document domain logic. Handlers are transport only: parse → call Service → render.
 type Service struct {
 	db     *sql.DB
-	gemini *external.GeminiClient
+	gemini *external.LLM
 }
 
 // New creates Service with explicit config (no global state).
-func New(db *sql.DB, gemini *external.GeminiClient) *Service {
+func New(db *sql.DB, gemini *external.LLM) *Service {
 	return &Service{db: db, gemini: gemini}
 }
 

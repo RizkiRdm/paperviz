@@ -2,67 +2,138 @@ package external
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
-// makeEndpointClient returns a GeminiClient pointed at a canned httptest
-// server. The client's endpoint field overrides the real API URL.
-func makeEndpointClient(t *testing.T, handler http.Handler) *GeminiClient {
+const okGeminiBody = `{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`
+
+// geminiStub wires the Gemini backend to a local server and returns a client
+// with a shrunken retry schedule. The protocol layer is what these tests
+// cover; retry policy lives in llm_test.go and needs no HTTP.
+func geminiStub(t *testing.T, handler http.HandlerFunc) *LLM {
+	t.Helper()
 	ts := httptest.NewServer(handler)
 	t.Cleanup(ts.Close)
 
-	c := NewGeminiClient("test-key", "test-model")
-	c.endpoint = ts.URL + "/v1beta/models/%s:generateContent"
-	c.httpClient = ts.Client()
-	return c
+	tr := fastTransport()
+	tr.httpClient = ts.Client()
+	endpoint := ts.URL + "/v1beta/models/test-model:generateContent"
+	return tr.newLLM(ProviderGemini, "test-model", newGeminiCall("test-key", endpoint, tr.httpClient))
 }
 
-// fastClient shrinks the retry schedule so backoff sleeps don't slow tests.
-func fastClient(c *GeminiClient) *GeminiClient {
-	c.retries = 3
-	c.retryBudget = 2 * time.Second
-	c.backoffBase = 5 * time.Millisecond
-	c.backoffCeil = 20 * time.Millisecond
-	return c
+// TestGeminiCallSendsRequest pins the wire format: model in the path, key in
+// the x-goog-api-key header, and generationConfig only when asked for.
+func TestGeminiCallSendsRequest(t *testing.T) {
+	tests := []struct {
+		name         string
+		asJSON       bool
+		maxTokens    int
+		wantMIME     string
+		wantMaxToken int
+	}{
+		{"plain text", false, 0, "", 0},
+		{"json mode", true, 0, "application/json", 0},
+		{"token cap only", false, 2048, "", 2048},
+		{"json mode with token cap", true, 512, "application/json", 512},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotPath, gotKey, gotBody string
+			srv := geminiStub(t, func(w http.ResponseWriter, r *http.Request) {
+				gotPath = r.URL.Path
+				gotKey = r.Header.Get("x-goog-api-key")
+				b, _ := io.ReadAll(r.Body)
+				gotBody = string(b)
+				w.Write([]byte(okGeminiBody))
+			})
+
+			if _, err := srv.Generate(context.Background(), "hello", tt.asJSON, tt.maxTokens); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+
+			if !strings.Contains(gotPath, "test-model") {
+				t.Errorf("model missing from path: %s", gotPath)
+			}
+			if gotKey != "test-key" {
+				t.Errorf("api key header = %q, want %q", gotKey, "test-key")
+			}
+			if !strings.Contains(gotBody, `"text":"hello"`) {
+				t.Errorf("prompt missing from body: %s", gotBody)
+			}
+
+			var req struct {
+				GenerationConfig *struct {
+					ResponseMIMEType string `json:"responseMimeType"`
+					MaxOutputTokens  *int   `json:"maxOutputTokens"`
+				} `json:"generationConfig"`
+			}
+			if err := json.Unmarshal([]byte(gotBody), &req); err != nil {
+				t.Fatalf("request body is not valid json: %v", err)
+			}
+
+			if tt.wantMIME == "" && tt.wantMaxToken == 0 {
+				if req.GenerationConfig != nil {
+					t.Errorf("generationConfig sent when neither flag set: %s", gotBody)
+				}
+				return
+			}
+			if req.GenerationConfig == nil {
+				t.Fatalf("generationConfig missing from body: %s", gotBody)
+			}
+			if req.GenerationConfig.ResponseMIMEType != tt.wantMIME {
+				t.Errorf("responseMimeType = %q, want %q", req.GenerationConfig.ResponseMIMEType, tt.wantMIME)
+			}
+			if tt.wantMaxToken == 0 {
+				if req.GenerationConfig.MaxOutputTokens != nil {
+					t.Errorf("maxOutputTokens set but not requested: %d", *req.GenerationConfig.MaxOutputTokens)
+				}
+			} else if req.GenerationConfig.MaxOutputTokens == nil || *req.GenerationConfig.MaxOutputTokens != tt.wantMaxToken {
+				t.Errorf("maxOutputTokens = %v, want %d", req.GenerationConfig.MaxOutputTokens, tt.wantMaxToken)
+			}
+		})
+	}
 }
 
-func TestGenerateRetriesOnRateLimitThenSucceeds(t *testing.T) {
+// TestGeminiCallRateLimitIsRetryable covers per-minute throttling: retryable,
+// carrying the server's Retry-After.
+func TestGeminiCallRateLimitIsRetryable(t *testing.T) {
+	srv := geminiStub(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "7")
+		w.WriteHeader(http.StatusTooManyRequests)
+		w.Write([]byte(`{"error":{"code":429,"message":"You have exceeded your per-minute request quota","status":"RESOURCE_EXHAUSTED"}}`))
+	})
+
+	_, err := srv.call(context.Background(), "prompt", false, 0)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !isRetryable(err) {
+		t.Fatalf("per-minute 429 must be retryable, got %v", err)
+	}
+	delay, ok := retryAfterFrom(err)
+	if !ok || delay != 7*time.Second {
+		t.Fatalf("Retry-After = %v (ok=%v), want 7s", delay, ok)
+	}
+}
+
+// TestGeminiCallDailyQuotaFailsFast is the case Genkit's single
+// status.ErrResourceExhausted cannot express: the exhausted quota is the
+// user's, so retrying only holds a concurrency slot to fail the same way.
+func TestGeminiCallDailyQuotaFailsFast(t *testing.T) {
 	var calls atomic.Int32
-	srv := fastClient(makeEndpointClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if calls.Add(1) == 1 {
-			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":{"code":429,"message":"You have exceeded your per-minute request quota","status":"RESOURCE_EXHAUSTED"}}`))
-			return
-		}
-		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))
-	})))
-
-	text, err := srv.Generate(context.Background(), "prompt", false, 0)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
-	}
-	if text != "ok" {
-		t.Fatalf("got text %q, want %q", text, "ok")
-	}
-	if calls.Load() != 2 {
-		t.Fatalf("expected 2 calls (1 retry), got %d", calls.Load())
-	}
-}
-
-func TestGenerateFailsFastOnQuotaExhausted(t *testing.T) {
-	var calls atomic.Int32
-	srv := makeEndpointClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := geminiStub(t, func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		w.WriteHeader(http.StatusTooManyRequests)
 		w.Write([]byte(`{"error":{"code":429,"message":"You have exceeded your daily request quota","status":"RESOURCE_EXHAUSTED"}}`))
-	}))
+	})
 
 	_, err := srv.Generate(context.Background(), "prompt", false, 0)
 	if err == nil {
@@ -76,139 +147,79 @@ func TestGenerateFailsFastOnQuotaExhausted(t *testing.T) {
 	}
 }
 
-func TestGenerateHonorsRetryAfter(t *testing.T) {
-	// Server returns Retry-After: 3 on a 429. The retry loop's own backoff
-	// would be 2s on the first retry; honoring Retry-After should make it
-	// wait 3s instead. We assert elapsed >= 3s and that the call succeeded.
-	var calls atomic.Int32
-	srv := makeEndpointClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if calls.Add(1) == 1 {
-			w.Header().Set("Retry-After", "1")
-			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":{"code":429,"message":"rate limit","status":"RESOURCE_EXHAUSTED"}}`))
-			return
-		}
-		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))
-	}))
+func TestGeminiCallStatusMapping(t *testing.T) {
+	tests := []struct {
+		name        string
+		status      int
+		body        string
+		wantRetry   bool
+		wantErrPart string
+	}{
+		{"503 overload", http.StatusServiceUnavailable, `{"error":{"message":"overloaded"}}`, true, "status 503"},
+		{"400 bad request", http.StatusBadRequest, `{"error":{"message":"bad"}}`, false, "status 400"},
+		{"401 unauthorized", http.StatusUnauthorized, `{"error":{"message":"bad key"}}`, false, "status 401"},
+		{"500 server error", http.StatusInternalServerError, `{"error":{"message":"boom"}}`, false, "status 500"},
+	}
 
-	start := time.Now()
-	text, err := srv.Generate(context.Background(), "prompt", false, 0)
-	elapsed := time.Since(start)
-	if err != nil {
-		t.Fatalf("Generate failed: %v", err)
-	}
-	if text != "ok" {
-		t.Fatalf("got text %q, want %q", text, "ok")
-	}
-	// Retry-After:1 >= default 2s backoff would not stretch elapsed; assert
-	// only that the call succeeded and retried (2 calls) — the header path
-	// is covered by TestRetryAfterParsing for exactness.
-	if calls.Load() != 2 {
-		t.Fatalf("expected 2 calls, got %d", calls.Load())
-	}
-	_ = elapsed
-}
-
-func TestGenerateGivesUpAfterMaxRetries(t *testing.T) {
-	var calls atomic.Int32
-	srv := fastClient(makeEndpointClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte(`{"error":{"code":503,"message":"overloaded","status":"UNAVAILABLE"}}`))
-	})))
-
-	_, err := srv.Generate(context.Background(), "prompt", false, 0)
-	if err == nil {
-		t.Fatal("expected error after exhausting retries")
-	}
-	if calls.Load() != int32(srv.retries) {
-		t.Fatalf("expected %d calls, got %d", srv.retries, calls.Load())
-	}
-}
-
-func TestGenerateNonRetryable4xx(t *testing.T) {
-	var calls atomic.Int32
-	srv := makeEndpointClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":{"code":400,"message":"bad request","status":"INVALID_ARGUMENT"}}`))
-	}))
-
-	_, err := srv.Generate(context.Background(), "prompt", false, 0)
-	if err == nil {
-		t.Fatal("expected error for 400")
-	}
-	if calls.Load() != 1 {
-		t.Fatalf("400 must not retry; got %d calls", calls.Load())
-	}
-}
-
-func TestGenerateSerializesConcurrentCalls(t *testing.T) {
-	// Two concurrent Generate calls must never be in flight at once. The
-	// handler records concurrent in-flight count; serialization keeps it ≤1.
-	var inflight, maxInflight atomic.Int32
-	srv := makeEndpointClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cur := inflight.Add(1)
-		for {
-			prev := maxInflight.Load()
-			if cur <= prev || maxInflight.CompareAndSwap(prev, cur) {
-				break
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := geminiStub(t, func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.status)
+				w.Write([]byte(tt.body))
+			})
+			_, err := srv.call(context.Background(), "prompt", false, 0)
+			if err == nil {
+				t.Fatal("expected error")
 			}
-		}
-		defer inflight.Add(-1)
-		time.Sleep(30 * time.Millisecond)
-		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))
-	}))
-
-	client := srv
-	var wg sync.WaitGroup
-	errs := make([]error, 4)
-	for i := 0; i < 4; i++ {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			_, errs[idx] = client.Generate(context.Background(), "prompt", false, 0)
-		}(i)
-	}
-	wg.Wait()
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("call %d failed: %v", i, err)
-		}
-	}
-	if m := maxInflight.Load(); m > 1 {
-		t.Fatalf("expected serialized calls (max inflight 1), got %d", m)
+			if !strings.Contains(err.Error(), tt.wantErrPart) {
+				t.Errorf("error = %v, want it to mention %q", err, tt.wantErrPart)
+			}
+			if isRetryable(err) != tt.wantRetry {
+				t.Errorf("isRetryable(%v) = %v, want %v", err, isRetryable(err), tt.wantRetry)
+			}
+		})
 	}
 }
 
-func TestGenerateContextCanceledWhileQueued(t *testing.T) {
-	// First call holds the semaphore; a second call with a canceled context
-	// must fail fast instead of blocking forever.
-	release := make(chan struct{})
-	srv := makeEndpointClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		<-release
-		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`))
-	}))
-
-	done := make(chan struct{})
-	go func() {
-		srv.Generate(context.Background(), "first", false, 0)
-		close(done)
-	}()
-	// Let the first call acquire the semaphore.
-	time.Sleep(50 * time.Millisecond)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-	_, err := srv.Generate(ctx, "second", false, 0)
-	if err == nil {
-		t.Fatal("expected error when context canceled while queued")
+func TestGeminiCallResponseErrors(t *testing.T) {
+	tests := []struct {
+		name        string
+		body        string
+		wantErrPart string
+	}{
+		{"invalid json", `not json`, "unmarshal gemini response"},
+		{"no candidates", `{"candidates":[]}`, "no candidates"},
+		{"candidate without parts", `{"candidates":[{"content":{"parts":[]}}]}`, "no candidates"},
 	}
-	if !errors.Is(err, context.DeadlineExceeded) && !strings.Contains(err.Error(), "deadline") {
-		t.Fatalf("expected deadline error, got %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := geminiStub(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Write([]byte(tt.body))
+			})
+			_, err := srv.Generate(context.Background(), "prompt", false, 0)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrPart) {
+				t.Fatalf("error = %v, want it to mention %q", err, tt.wantErrPart)
+			}
+		})
 	}
-	close(release)
-	<-done
+}
+
+// TestGeminiCallReadsFirstCandidate guards against returning an empty string
+// when a response carries several parts.
+func TestGeminiCallReadsFirstCandidate(t *testing.T) {
+	srv := geminiStub(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"candidates":[{"content":{"parts":[{"text":"first"},{"text":"second"}]}}]}`))
+	})
+	got, err := srv.Generate(context.Background(), "prompt", false, 0)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if got != "first" {
+		t.Fatalf("got %q, want %q", got, "first")
+	}
 }
 
 func TestRetryAfterParsing(t *testing.T) {
@@ -222,6 +233,7 @@ func TestRetryAfterParsing(t *testing.T) {
 		{"garbage", "abc", 0},
 		{"zero", "0", 0},
 		{"negative", "-3", 0},
+		{"http date unsupported", "Wed, 21 Oct 2015 07:28:00 GMT", 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -243,6 +255,7 @@ func TestIsQuotaExhausted(t *testing.T) {
 		{"per minute rate limit", `{"error":{"code":429,"message":"You have exceeded your per-minute request quota","status":"RESOURCE_EXHAUSTED"}}`, false},
 		{"unparseable", `not json`, false},
 		{"empty message", `{"error":{"code":429,"message":"","status":"RESOURCE_EXHAUSTED"}}`, false},
+		{"empty body", ``, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -250,51 +263,5 @@ func TestIsQuotaExhausted(t *testing.T) {
 				t.Fatalf("isQuotaExhausted(%q) = %v, want %v", tt.body, got, tt.want)
 			}
 		})
-	}
-}
-
-func TestIsRetryable(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want bool
-	}{
-		{"503", errors.New("gemini returned status 503"), true},
-		{"429 rate limit", &retryableError{msg: "gemini rate limited (429): status=429"}, true},
-		{"400", errors.New("gemini returned status 400"), false},
-		{"quota", errors.New("gemini quota exhausted (429): status=429"), false},
-		{"connection reset", errors.New("gemini http call: Post: connection reset by peer"), true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := isRetryable(tt.err); got != tt.want {
-				t.Fatalf("isRetryable(%v) = %v, want %v", tt.err, got, tt.want)
-			}
-		})
-	}
-}
-
-// TestGenerateBudgetCapsTotalRetryTime ensures the retry budget bounds how
-// long Generate can sleep, so a persistently failing upstream can't stall
-// the pipeline for minutes.
-func TestGenerateBudgetCapsTotalRetryTime(t *testing.T) {
-	var calls atomic.Int32
-	srv := fastClient(makeEndpointClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		w.Header().Set("Retry-After", "60")
-		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"error":{"code":429,"message":"rate limit","status":"RESOURCE_EXHAUSTED"}}`))
-	})))
-
-	start := time.Now()
-	_, err := srv.Generate(context.Background(), "prompt", false, 0)
-	elapsed := time.Since(start)
-	if err == nil {
-		t.Fatal("expected error from persistent 429")
-	}
-	// Retry-After 60s would dominate the schedule; budget must cut it off
-	// near srv.retryBudget rather than sleeping 60s.
-	if elapsed > srv.retryBudget+100*time.Millisecond {
-		t.Fatalf("retry took %v, budget cap %v not enforced", elapsed, srv.retryBudget)
 	}
 }

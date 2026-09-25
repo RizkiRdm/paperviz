@@ -10,7 +10,7 @@ import (
 
 // runSimplifyStage runs simplification or returns failure output.
 // emit notifies stage transitions for persistence.
-func runSimplifyStage(ctx context.Context, gemini *external.GeminiClient, originalText, readingLevel string, emit func(string)) (string, *PipelineOutput) {
+func runSimplifyStage(ctx context.Context, gemini *external.LLM, originalText, readingLevel string, emit func(string)) (string, *PipelineOutput) {
 	emit("simplifying")
 	simplifiedText, err := Simplify(ctx, gemini, originalText, readingLevel)
 	if err != nil {
@@ -22,7 +22,7 @@ func runSimplifyStage(ctx context.Context, gemini *external.GeminiClient, origin
 
 // runVerifyStage runs claim-diff with rate-limit pause or returns failure.
 // emit notifies stage transitions for persistence.
-func runVerifyStage(ctx context.Context, gemini *external.GeminiClient, originalText, simplifiedText string, emit func(string)) (VerifyResult, *PipelineOutput) {
+func runVerifyStage(ctx context.Context, gemini *external.LLM, originalText, simplifiedText string, emit func(string)) (VerifyResult, *PipelineOutput) {
 	ratelimit.WaitRateLimit(ctx, ratelimit.DefaultDelay)
 	emit("verifying")
 	verifyResult, err := DiffClaims(ctx, gemini, originalText, simplifiedText)
@@ -37,7 +37,7 @@ func runVerifyStage(ctx context.Context, gemini *external.GeminiClient, original
 }
 
 // runFiguresStage runs chapter detection, per-chapter chart generation and image fallback.
-func runFiguresStage(ctx context.Context, gemini *external.GeminiClient, simplifiedText string, in PipelineInput, emit func(string)) ([]Chart, bool, []Chapter) {
+func runFiguresStage(ctx context.Context, gemini *external.LLM, simplifiedText string, in PipelineInput, emit func(string)) ([]Chart, bool, []Chapter) {
 	ratelimit.WaitRateLimit(ctx, ratelimit.DefaultDelay)
 	emit("generating_charts")
 	var charts []Chart

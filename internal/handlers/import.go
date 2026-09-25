@@ -25,7 +25,7 @@ type importCreator interface {
 // dbImportCreator delegates persistence to services layer.
 type dbImportCreator struct {
 	db     *sql.DB
-	gemini *external.GeminiClient
+	gemini *external.LLM
 }
 
 // Create inserts imported document and starts pipeline via service.
@@ -40,7 +40,7 @@ type ImportHandler struct {
 }
 
 // NewImportHandler constructs ImportHandler with DB+Gemini and optional fetcher.
-func NewImportHandler(db *sql.DB, gemini *external.GeminiClient, importService ...ImportService) *ImportHandler {
+func NewImportHandler(db *sql.DB, gemini *external.LLM, importService ...ImportService) *ImportHandler {
 	var svc ImportService
 	if len(importService) > 0 {
 		svc = importService[0]
