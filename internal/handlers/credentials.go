@@ -66,6 +66,13 @@ func (h *CredentialHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "unsupported_provider")
 		return
 	}
+	// Reject a provider we recognise but cannot call. Storing it would give the
+	// user a default credential that fails on every upload, which reads as a
+	// broken product rather than an unsupported option.
+	if !provider.Available() {
+		writeError(w, http.StatusBadRequest, "provider_not_available")
+		return
+	}
 
 	apiKey := strings.TrimSpace(req.APIKey)
 	if apiKey == "" {

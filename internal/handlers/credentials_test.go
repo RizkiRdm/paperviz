@@ -185,7 +185,7 @@ func TestCredentialCreateDefaultsModel(t *testing.T) {
 	db := openCredentialHandlerDB(t)
 	h := NewCredentialHandler(db, testCipher(t))
 
-	w := doJSON(t, h.Create, http.MethodPost, `{"provider":"anthropic","api_key":"`+testModelKey+`"}`, "u1")
+	w := doJSON(t, h.Create, http.MethodPost, `{"provider":"gemini","api_key":"`+testModelKey+`"}`, "u1")
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status = %d; body %s", w.Code, w.Body.String())
 	}
@@ -193,8 +193,36 @@ func TestCredentialCreateDefaultsModel(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if got.Model != external.ProviderAnthropic.DefaultModel() {
-		t.Fatalf("model = %q, want %q", got.Model, external.ProviderAnthropic.DefaultModel())
+	if got.Model != external.ProviderGemini.DefaultModel() {
+		t.Fatalf("model = %q, want %q", got.Model, external.ProviderGemini.DefaultModel())
+	}
+}
+
+// TestCredentialCreateRejectsUnavailableProvider covers the recognised-but-not-
+// implemented case. Storing a key we cannot call would leave the user with a
+// default credential that fails on every upload.
+func TestCredentialCreateRejectsUnavailableProvider(t *testing.T) {
+	db := openCredentialHandlerDB(t)
+	h := NewCredentialHandler(db, testCipher(t))
+
+	for _, provider := range []string{"anthropic", "openai"} {
+		t.Run(provider, func(t *testing.T) {
+			body := `{"provider":"` + provider + `","api_key":"` + testModelKey + `"}`
+			w := doJSON(t, h.Create, http.MethodPost, body, "u1")
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400; body %s", w.Code, w.Body.String())
+			}
+			if !strings.Contains(w.Body.String(), "provider_not_available") {
+				t.Fatalf("body = %q, want provider_not_available", w.Body.String())
+			}
+			list, err := repository.NewCredentialRepo(db).ListByUser("u1")
+			if err != nil {
+				t.Fatalf("list: %v", err)
+			}
+			if len(list) != 0 {
+				t.Fatalf("a rejected provider was stored anyway: %+v", list)
+			}
+		})
 	}
 }
 

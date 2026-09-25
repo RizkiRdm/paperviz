@@ -35,6 +35,15 @@ func (p Provider) Valid() bool {
 	return false
 }
 
+// Available reports whether this build has a backend for the provider. It is
+// narrower than Valid: a provider can be a recognised vendor while having no
+// route to it yet. Storing a key we cannot call would leave the user with a
+// default credential that fails on every upload, so the credential API checks
+// this rather than Valid.
+func (p Provider) Available() bool {
+	return p == ProviderGemini
+}
+
 // DefaultModel returns the model used when a user supplies a key without
 // naming a model. Chosen for cost and latency on structured extraction.
 func (p Provider) DefaultModel() string {
