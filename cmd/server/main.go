@@ -41,31 +41,6 @@ func main() {
 	// request by the resolver. GEMINI_API_KEY is only read by cmd/mcp, which
 	// runs on the user's own machine.
 
-	if os.Getenv("GOOGLE_CLIENT_ID") == "" {
-		slog.Error("GOOGLE_CLIENT_ID environment variable is required")
-		os.Exit(1)
-	}
-	if os.Getenv("GOOGLE_CLIENT_SECRET") == "" {
-		slog.Error("GOOGLE_CLIENT_SECRET environment variable is required")
-		os.Exit(1)
-	}
-	if os.Getenv("GOOGLE_REDIRECT_URL") == "" {
-		slog.Error("GOOGLE_REDIRECT_URL environment variable is required")
-		os.Exit(1)
-	}
-	if os.Getenv("STRIPE_SECRET_KEY") == "" {
-		slog.Error("STRIPE_SECRET_KEY environment variable is required")
-		os.Exit(1)
-	}
-	if os.Getenv("STRIPE_WEBHOOK_SECRET") == "" {
-		slog.Error("STRIPE_WEBHOOK_SECRET environment variable is required")
-		os.Exit(1)
-	}
-	if os.Getenv("FRONTEND_URL") == "" {
-		slog.Error("FRONTEND_URL environment variable is required")
-		os.Exit(1)
-	}
-
 	dbPath := os.Getenv("DATABASE_PATH")
 	if dbPath == "" {
 		dbPath = "paperviz.db"

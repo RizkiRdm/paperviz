@@ -19,23 +19,22 @@ func NewAccountHandler(db *sql.DB) *AccountHandler {
 
 // accountSummary is the wire shape for account summary responses.
 type accountSummary struct {
-	Email            string `json:"email"`
-	SubscriptionTier string `json:"subscription_tier"`
-	UsageCount       int    `json:"usage_count"`
+	Email      string `json:"email"`
+	UsageCount int    `json:"usage_count"`
 }
 
 // GetSummary handles GET /api/account/summary.
 func (h *AccountHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("user_id").(string)
+	userID := UserIDFromContext(r.Context())
 	if userID == "" {
 		writeError(w, http.StatusUnauthorized, "unauthenticated")
 		return
 	}
 
-	var email, tier string
+	var email string
 	err := h.db.QueryRow(
-		`SELECT email, COALESCE(subscription_tier, 'free') FROM users WHERE id = ?`, userID,
-	).Scan(&email, &tier)
+		`SELECT email FROM users WHERE id = ?`, userID,
+	).Scan(&email)
 	if err != nil {
 		slog.Error("get account summary failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -53,9 +52,8 @@ func (h *AccountHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, accountSummary{
-		Email:            email,
-		SubscriptionTier: tier,
-		UsageCount:       usageCount,
+		Email:      email,
+		UsageCount: usageCount,
 	})
 }
 
