@@ -15,15 +15,15 @@ For any task that modifies or generates UI, styling, layout, or components:
 3. Do not invent any colors, spacing, or fonts outside of these rules.
 
 ## Project Context
-PaperViz converts academic papers (PDF/pasted text) into simplified-language versions plus re-visualized charts, served at ephemeral (7-day) no-auth share links. Target user: undergraduate students. Full context in PRD.md. Solo-dev project with ~1hr/day human oversight — agent autonomy within a phase is expected, but cross-phase scope changes require explicit human sign-off.
+PaperViz converts academic papers (PDF/pasted text/DOI/URL) into simplified-language versions, verified claims, structured research objects, and evidence-grounded figures. Product direction is agent-first, with web auth, billing, and manual ingestion as supporting human surfaces. Full context in `PRODUCT.md`, `docs/PRD.md`, and `docs/overview.md`. Solo-dev project with ~1hr/day human oversight — agent autonomy within a phase is expected, but cross-phase scope changes require explicit human sign-off.
 
 ## Tech Stack
-- Backend: Go 1.22+, `chi` router, `modernc.org/sqlite` (no CGO), raw `database/sql`.
-- Frontend: React 18 + Vite + Tailwind CSS + shadcn/ui, Recharts for chart rendering.
+- Backend: Go 1.25, `chi` router, `modernc.org/sqlite` (no CGO), raw `database/sql`.
+- Frontend: React 19 + Vite 8 + Tailwind CSS 4 + shadcn/ui, Recharts for chart rendering.
 - LLM: Google Gemini API, direct HTTP integration.
 - PDF processing: Go-native text/image extraction libraries (pinned exact versions in `go.mod`).
 - No Docker/orchestration requirement for MVP — single binary + SQLite file.
-- Agent access: `internal/mcp` (stdio MCP server, `cmd/mcp`), stateless, text-only input, read-only research data — separate interface, same service layer as REST. See `docs/mcp-parity.md`.
+- Agent access: `internal/mcp` (stdio MCP server, `cmd/mcp`), stateless text intake and research-data retrieval, separate interface sharing services/data with REST. See `docs/mcp-parity.md`.
 
 ## graphify
 Code graph at `graphify-out/`. Query before grep/read.
@@ -38,7 +38,7 @@ Rules:
 ## Known Issues
 - **Silent catches banned in frontend (12.1 precedent).** Every `catch` MUST handle: user-facing inline error + Retry, dev `console.error`, preserve inputs; `research-map.jsx` block is canonical standard.
 - **Ponytail full-mode convention (12.1 precedent).** Ceiling comments only, format `// ponytail: <simplification> — ceiling: <limit> ; upgrade: <path>`; never logic with the marking; `comparison.go` 5 hits is canonical example.
-- **Chart image_fallback has no image-serving endpoint.** `charts` table stores `image_blob BLOB` but `GET /api/documents/:id` response has no image field. Frontend shows annotation only. Fix requires new endpoint or base64-inline decision. Not blocking — satisfies PLAN.md Phase 4 "done means" (demonstrated capture). Revisit before chart re-visualization ships fully.
+- **Chart image serving exists.** Stored `image_blob` values are served through `GET /api/documents/:id/charts/:chartId/image`; the frontend still distinguishes original figure bytes from PaperViz interpretation. Keep endpoint MIME validation and document ownership scoping intact.
 - **WAL mode required after DB reset.** Enabled via PRAGMA journal_mode=WAL + synchronous=NORMAL in `repository/db.go`. DB file must be deleted when schema changes (single flat migration). Already gitignored.
 - **B3 (single-call verification) skipped** — requires live API key + real-document regression testing against B2 before shipping. Plan still describes it as optional.
 - **Annotations require authentication.** Unauthenticated users cannot create/edit/delete annotations. Export endpoint also requires auth. Design decision: annotations are per-user research context, not collaborative.
@@ -116,7 +116,7 @@ When schema changes (new column/table):
 
 ## Agent-Integration Rules (discovered 2026-09-09, Chunk 10 audit)
 - [DO] Treat MCP as an additive interface layer only. It shares the service layer with REST (`docs/mcp-parity.md` architecture rule) — it does not replace or gate the consumer web app.
-- [DO] Keep MCP tools stateless and read-only for research data (`analyze_paper`, `get_summary`, `get_figures`, `get_claims`, `get_evidence`, `compare_papers`). No auth, no user-library access by design.
+- [DO] Keep MCP tools stateless and scoped to deterministic intake and research-data retrieval (`ingest_document`, `search_documents`, `get_document`, `get_figures`, `get_evidence`). No user-library access or user-owned management operations by design.
 - [DON'T] Expose user-owned operations (list, save, rename, delete, share, referral) through MCP. These stay REST-only, human-only — this was a deliberate decision, not an oversight (`docs/mcp-parity.md`).
 - [DON'T] Add a new MCP tool or a new SEO/marketing route without a demand signal first (see Chunk 10.5/10.6 checkpoints). This repo has a documented pattern of shipping ahead of validation — don't repeat it here.
 - [DO] Keep `docs/mcp-parity.md` and `goals/chunk-7-4-mcp/plan.md` in sync with `internal/mcp/tools.go`. Docs listing unimplemented tools is worse than no docs — it misleads the next agent session.

@@ -1,95 +1,222 @@
 # PaperViz
 
-Upload a PDF. Get a plain-language summary with re-visualized charts.
+PaperViz turns academic papers into simplified explanations, verified claims, and evidence-grounded figures. It is designed for AI agents that need structured research data, with a web app for authentication, billing, and manual paper upload.
 
----
+> **Current architecture note:** the web ingestion path runs the full Gemini-backed processing pipeline. The repository's MCP server currently exposes five deterministic data tools over stdio; its `ingest_document` tool stores text but does not start the LLM pipeline. See [Current limitations](#current-limitations) before relying on the agent workflow.
 
-## Screenshots
+## Product Surfaces
 
-| Landing | Login | Signup |
-|:---:|:---:|:---:|
-| ![Landing](assets/01-landing-page.png) | ![Login](assets/02-login-page.png) | ![Signup](assets/03-signup-page.png) |
+### Agent interface
 
-| Pricing | Compare | Dashboard |
-|:---:|:---:|:---:|
-| ![Pricing](assets/04-pricing-page.png) | ![Compare](assets/05-compare-page.png) | ![Dashboard](assets/06-dashboard-redirect.png) |
+The local MCP server exposes five tools:
 
-| 404 | Navigation |
-|:---:|:---:|
-| ![404](assets/07-404-page.png) | ![Nav](assets/12-nav-dashboard-login.png) |
+| Tool | Purpose |
+|---|---|
+| `ingest_document` | Validate and store pasted paper text |
+| `search_documents` | Search stored documents by title |
+| `get_document` | Retrieve metadata and selected research sections |
+| `get_figures` | Retrieve chart data, source locations, and provenance |
+| `get_evidence` | Retrieve evidence and linked claims |
 
----
+MCP and REST share the same SQLite database when configured with the same `DATABASE_PATH`. MCP tools do not call Gemini directly.
+
+### Web interface
+
+The React application supports:
+
+- PDF, pasted-text, DOI, and URL ingestion
+- Simplified and ELI5 reading levels
+- Asynchronous processing with visible stage updates
+- Simplified explanations and claim verification
+- Evidence-grounded chart generation
+- Claims, evidence, methods, results, tables, and citations
+- Authentication, API keys, billing, collections, annotations, and exports
+- Ephemeral document and figure sharing
+
+## Trust Model
+
+PaperViz separates evidence extraction from AI interpretation:
+
+1. Deterministic code extracts numeric evidence and table data from paper text.
+2. Deterministic code groups evidence into candidate datasets.
+3. Gemini may choose chart type, title, and explanation.
+4. Gemini may not invent chart values.
+5. A deterministic grounding validator rejects unsupported data before rendering.
+6. Simplified claims are compared with original claims; detected mismatches remain visible as evidence.
+
+Core principle: **AI may transform evidence, but it must never manufacture evidence.**
+
+## Architecture
+
+```mermaid
+flowchart LR
+    User[Person] --> Web[React web app]
+    Agent[AI agent] --> MCP[MCP stdio server]
+
+    Web --> REST[REST handlers]
+    REST --> App[Document app service]
+    App --> Services[Domain services]
+    MCP --> Tools[MCP tools]
+    Tools --> Services
+    Tools --> Repo[Repositories]
+
+    Services --> Repo
+    Services --> External[Gemini, PDF, Crossref, Unpaywall]
+    Repo --> SQLite[(SQLite + WAL)]
+
+    REST --> Static[Built React assets]
+```
+
+Dependency direction:
+
+```text
+Web UI → REST handlers → app/domain services → repositories → SQLite
+MCP client → MCP tools → app/domain services and repositories
+Domain services → external providers
+```
+
+The production runtime is one Go binary serving both API routes and built frontend assets. The MCP process is a separate stdio entrypoint and can share the same database file.
+
+## Technology
+
+| Area | Technology |
+|---|---|
+| Backend | Go 1.25, `chi`, raw `database/sql` |
+| Database | SQLite through `modernc.org/sqlite`, WAL enabled, no CGO |
+| Frontend | React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Recharts |
+| Agent interface | Model Context Protocol over stdio |
+| LLM | Google Gemini API through direct HTTP client |
+| PDF | `pdfcpu` and `ledongthuc/pdf`, processed in memory |
+| Validation | Go tests, frontend lint/build, Playwright E2E |
 
 ## Quick Start
 
+### Prerequisites
+
+- Go 1.25
+- Node.js 24
+- npm
+- Google Gemini API key
+- Placeholder or real Google OAuth and Stripe values
+
+The server validates required environment variables at startup. See [`docs/getting-started.md`](docs/getting-started.md) for variable-by-variable setup.
+
+### 1. Configure
+
 ```bash
-# Prerequisites: Go 1.22+, Node.js 18+, npm 9+
-# Get a Gemini API key: https://aistudio.google.com/apikey
-
-# 1. Configure
 cp .env.example .env
-# Edit .env — set GEMINI_API_KEY=your-key
+```
 
-# 2. Install deps
-go mod tidy
-cd frontend && npm install && cd ..
+Edit `.env`. At minimum, provide non-empty values for every variable marked required in that file.
 
-# 3. Run (two terminals)
-# Terminal 1 — backend:
-export $(grep -v '^#' .env | xargs) && go run ./cmd/server
-# Terminal 2 — frontend dev server:
-cd frontend && npm run dev
+### 2. Install dependencies
+
+```bash
+go mod download
+npm --prefix frontend ci
+```
+
+### 3. Start backend
+
+PaperViz does not load `.env` inside the Go process. Export it before starting the server:
+
+```bash
+set -a
+source .env
+set +a
+go run ./cmd/server
+```
+
+Verify backend health:
+
+```bash
+curl http://localhost:8080/healthz
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
+
+### 4. Start frontend
+
+In a second terminal:
+
+```bash
+npm --prefix frontend run dev
 ```
 
 Open `http://localhost:5173`.
 
-## Build & Run (production)
+Vite proxies `/api` requests to the backend port configured by `PORT`.
+
+## Build and Run
 
 ```bash
-make build    # builds frontend + Go binary
-make run      # runs ./server with .env vars
+make build
+make run
 ```
 
-Single binary serves API + built frontend on port 8080 (set via `PORT` in `.env`).
+`make build` installs frontend dependencies when needed, creates `frontend/dist`, and builds `./server`. `make run` rebuilds and starts that binary with variables exported from `.env`.
 
-## How It Works
+For explicit builds:
 
-1. Upload a PDF (text-layer only, no OCR) or paste text
-2. Backend extracts text + chart images
-3. Gemini simplifies content to chosen reading level (ELI5 / Simplified), then verifies claims against the original
-4. Simplified text is split into chapters; charts are re-generated per chapter (or re-rendered from captured images)
-5. Shareable link expires after 7 days of inactivity
+```bash
+npm --prefix frontend run build
+CGO_ENABLED=0 go build -o server ./cmd/server
+```
 
-## Tech Stack
+## Repository Map
 
-- **Backend:** Go 1.22+, chi router, modernc.org/sqlite (pure Go, no CGO)
-- **Frontend:** React 18, Vite, Tailwind CSS, Recharts
-- **LLM:** Google Gemini API (direct HTTP, no SDK)
-- **PDF:** pdfcpu + ledongthuc/pdf (in-memory, no disk writes)
-
-## Deployment
-
-Single Go binary + SQLite. No Docker required, but container-friendly.
-
-| Platform | Notes |
-|---|---|
-| **Railway** / **Fly.io** | Container-native, easy DB volume setup |
-| **Render** | Deploy from Git, supports Go natively |
-| **VPS** (DigitalOcean, etc.) | Run the binary directly |
-
-All require `GEMINI_API_KEY` set as an environment variable.
+```text
+paperviz/
+├── cmd/
+│   ├── server/              # HTTP application entrypoint
+│   └── mcp/                 # stdio MCP entrypoint
+├── internal/
+│   ├── app/documents/       # document application service and read model
+│   ├── handlers/            # REST transport, middleware, auth, billing
+│   ├── services/            # pipeline and domain logic
+│   ├── repository/          # raw SQLite repositories and migrations
+│   ├── external/            # Gemini, PDF, DOI, and URL integrations
+│   ├── mcp/                 # MCP tools, schemas, limits, and errors
+│   ├── models/              # shared chart and research value types
+│   ├── apperr/              # shared application errors
+│   └── infra/               # infrastructure helpers
+├── migrations/              # 19 ordered SQL migrations
+├── frontend/                # React SPA
+├── e2e/                     # Playwright tests
+├── docs/                    # Product, architecture, operations, and API docs
+├── DESIGN.md                # UI source of truth
+└── AGENTS.md                # repository rules and known engineering context
+```
 
 ## Documentation
 
-| File | What it covers |
+Start with [`docs/README.md`](docs/README.md) for reading paths and source-of-truth rules.
+
+| Goal | Read |
 |---|---|
-| `INSTALLATION_AND_SETUP.md` | Detailed setup, caveats, project structure |
-| `docs/architecture.md` | Design decisions, layers, data flow |
-| `docs/PRD.md` | Product requirements, acceptance scenarios |
-| `DESIGN.md` | Design system, tokens, components |
-| `docs/PLAN.md` | Phase tracking, implementation checklist |
-| `AGENTS.md` | Agent rules, known issues |
+| Understand product and trust model | [`docs/overview.md`](docs/overview.md) |
+| Run locally and analyze a paper | [`docs/getting-started.md`](docs/getting-started.md) |
+| Change, test, or debug the system | [`docs/maintainer-guide.md`](docs/maintainer-guide.md) |
+| Look up routes, files, config, and commands | [`docs/codebase-reference.md`](docs/codebase-reference.md) |
+| Understand architecture constraints | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| Understand paper processing | [`docs/DATA_PIPELINE.md`](docs/DATA_PIPELINE.md) |
+| Use REST API | [`docs/structured-research-api.md`](docs/structured-research-api.md) and [`docs/openapi.yaml`](docs/openapi.yaml) |
+| Understand MCP scope | [`docs/mcp-parity.md`](docs/mcp-parity.md) |
+| Review current engineering state | [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) |
 
-## License
+## Current Limitations
 
-MIT
+- Scanned-image PDFs are not supported; input PDFs need a text layer.
+- `ingest_document` performs deterministic text intake only. It does not invoke Gemini, start the web processing pipeline, or wait for simplified output.
+- `/agents` currently generates remote MCP configuration for `https://paperviz.com/api/mcp`, but the current server router does not expose that HTTP MCP transport. The repository ships a local stdio MCP entrypoint.
+- MCP search is global and stateless; it is not scoped to an authenticated user's library.
+- SQLite uses one open connection, and the architecture is designed for a single low-concurrency instance rather than horizontal scaling.
+- Some public static SEO pages and screenshot assets predate the current route cuts. Product navigation follows `frontend/src/App.jsx`, not those artifacts.
+
+## Contributing Rules
+
+Before changing code, read [`AGENTS.md`](AGENTS.md). Before changing UI, read [`DESIGN.md`](DESIGN.md) completely. Keep documentation synchronized with behavior when routes, tools, environment variables, or architecture boundaries change.
