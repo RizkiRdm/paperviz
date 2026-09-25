@@ -8,6 +8,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"io"
 	"log/slog"
 	"net/http"
@@ -115,12 +116,32 @@ func main() {
 		os.Exit(1)
 	}
 
+	// CREDENTIAL_ENCRYPTION_KEY fails loud, unlike the peripheral integrations
+	// that used to be required here. A wrong key does not disable a feature:
+	// it makes every stored BYOK credential permanently unreadable while the
+	// server still appears healthy, so it must never be allowed to boot.
+	encKeyRaw := os.Getenv("CREDENTIAL_ENCRYPTION_KEY")
+	if encKeyRaw == "" {
+		slog.Error("CREDENTIAL_ENCRYPTION_KEY environment variable is required")
+		os.Exit(1)
+	}
+	encKey, err := base64.StdEncoding.DecodeString(encKeyRaw)
+	if err != nil {
+		slog.Error("CREDENTIAL_ENCRYPTION_KEY must be base64-encoded", "error", err)
+		os.Exit(1)
+	}
+	cipher, err := external.NewCipher(encKey)
+	if err != nil {
+		slog.Error("failed to build credential cipher", "error", err)
+		os.Exit(1)
+	}
+
 	// Start the expiry sweep in the background — runs once immediately,
 	// then hourly (see services/expiry.go). It never returns, so it must
 	// run in its own goroutine, not block main().
 	go services.RunExpirySweepLoop(repository.NewDocumentRepo(db))
 
-	router := handlers.NewRouter(db, gemini, staticDir)
+	router := handlers.NewRouter(db, gemini, cipher, staticDir)
 
 	slog.Info("paperviz server starting", "port", port, "database_path", dbPath)
 	if err := http.ListenAndServe(":"+port, router); err != nil {

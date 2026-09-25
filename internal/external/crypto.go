@@ -76,6 +76,15 @@ func (c *Cipher) Decrypt(ciphertext, nonce []byte, aad string) ([]byte, error) {
 	return plaintext, nil
 }
 
+// CredentialAAD builds the additional authenticated data for a credential
+// blob. Both the write and read paths must call this: if they disagree, GCM
+// authentication fails and the credential becomes unreadable. Binding the
+// tuple means a row cannot be replayed under a different user, provider, or
+// model.
+func CredentialAAD(userID string, p Provider, model string) string {
+	return userID + "|" + string(p) + "|" + model
+}
+
 // KeyHint returns at most the last 4 characters, for display only. Never
 // enough to reconstruct a key, and never a prefix — a prefix is both a
 // recognisable fingerprint and a searchable leak.

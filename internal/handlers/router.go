@@ -54,7 +54,7 @@ func spaNotFound(staticDir string, fileServer http.Handler) http.HandlerFunc {
 // SPA. staticDir is the frontend's built assets directory (frontend/dist),
 // served directly by this Go binary — no separate frontend server in
 // production, per ARCHITECTURE.md's "single binary" architecture style.
-func NewRouter(db *sql.DB, gemini *external.LLM, staticDir string) http.Handler {
+func NewRouter(db *sql.DB, gemini *external.LLM, cipher *external.Cipher, staticDir string) http.Handler {
 	r := chi.NewRouter()
 
 	// RequestID injects a unique request ID into every request context so
@@ -147,6 +147,14 @@ func NewRouter(db *sql.DB, gemini *external.LLM, staticDir string) http.Handler 
 		r.Get("/google/callback", authHandler.GoogleCallback)
 		r.With(authMiddleware.RequireAuth).Get("/apikey", apiKeyHandler.GetApiKey)
 		r.With(authMiddleware.RequireAuth).Post("/apikey/regenerate", apiKeyHandler.RegenerateApiKey)
+	})
+
+	credentialHandler := NewCredentialHandler(db, cipher)
+	r.Route("/api/credentials", func(r chi.Router) {
+		r.With(authMiddleware.RequireAuth).Post("/", credentialHandler.Create)
+		r.With(authMiddleware.RequireAuth).Get("/", credentialHandler.List)
+		r.With(authMiddleware.RequireAuth).Post("/{id}/default", credentialHandler.SetDefault)
+		r.With(authMiddleware.RequireAuth).Delete("/{id}", credentialHandler.Delete)
 	})
 
 	r.Route("/api/billing", func(r chi.Router) {
