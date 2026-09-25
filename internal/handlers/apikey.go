@@ -51,7 +51,7 @@ func (h *ApiKeyHandler) GetApiKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var stored string
-	err := h.db.QueryRow(`SELECT COALESCE(api_key, '') FROM users WHERE id = ?`, userID).Scan(&stored)
+	err := h.db.QueryRow(`SELECT COALESCE(api_key_hash, '') FROM users WHERE id = ?`, userID).Scan(&stored)
 	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, http.StatusNotFound, "user_not_found")
 		return
@@ -93,7 +93,7 @@ func (h *ApiKeyHandler) issueKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.db.Exec(`UPDATE users SET api_key = ? WHERE id = ?`, hashApiKey(key), userID); err != nil {
+	if _, err := h.db.Exec(`UPDATE users SET api_key_hash = ? WHERE id = ?`, hashApiKey(key), userID); err != nil {
 		slog.Error("store api key digest failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
@@ -112,7 +112,7 @@ func generateApiKey() (string, error) {
 }
 
 // hashApiKey returns the hex SHA-256 digest stored in place of the key. The
-// users.api_key column holds this digest, never the key itself.
+// users.api_key_hash column holds this digest, never the key itself.
 func hashApiKey(key string) string {
 	sum := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(sum[:])
@@ -124,7 +124,7 @@ func hashApiKey(key string) string {
 func LookupUserByApiKey(ctx context.Context, db *sql.DB, presented string) (string, error) {
 	var userID string
 	err := db.QueryRowContext(ctx,
-		`SELECT id FROM users WHERE api_key = ? AND api_key != ''`, hashApiKey(presented),
+		`SELECT id FROM users WHERE api_key_hash = ? AND api_key_hash != ''`, hashApiKey(presented),
 	).Scan(&userID)
 	if err != nil {
 		return "", err

@@ -16,10 +16,15 @@ import (
 func openApiKeyTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	migrations := make(map[int]string)
+	// 021 drops the oauth and billing columns, so 017 and 019 must be loaded
+	// first: a DROP cannot succeed on a column that was never created.
 	for v, file := range map[int]string{
 		1:  "001_init.sql",
 		2:  "002_users.sql",
+		17: "017_oauth_columns.sql",
 		18: "018_api_key_column.sql",
+		19: "019_billing_columns.sql",
+		21: "021_drop_oauth_billing.sql",
 	} {
 		sqlStr, err := repository.ReadMigration(filepath.Join("..", "..", "migrations", file))
 		if err != nil {
@@ -72,7 +77,7 @@ func TestApiKeyIsNeverStoredInPlaintext(t *testing.T) {
 	}
 
 	var stored string
-	if err := db.QueryRow(`SELECT COALESCE(api_key, '') FROM users WHERE id = ?`, "u1").Scan(&stored); err != nil {
+	if err := db.QueryRow(`SELECT COALESCE(api_key_hash, '') FROM users WHERE id = ?`, "u1").Scan(&stored); err != nil {
 		t.Fatalf("read stored key: %v", err)
 	}
 	if stored == "" {

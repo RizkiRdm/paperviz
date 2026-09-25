@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-// migrationPaths maps version numbers to SQL filenames for all 20 migrations.
+// migrationPaths maps version numbers to SQL filenames for all 21 migrations.
 // Single source of truth — both cmd/server and cmd/mcp call LoadMigrations
 // to prevent drift (Chunk 12.1).
 var migrationPaths = map[int]string{
@@ -29,6 +29,7 @@ var migrationPaths = map[int]string{
 	18: "018_api_key_column.sql",
 	19: "019_billing_columns.sql",
 	20: "020_user_credentials.sql",
+	21: "021_drop_oauth_billing.sql",
 }
 
 // LoadMigrations reads every migration SQL file into a versioned map.

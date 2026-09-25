@@ -11,7 +11,7 @@ import (
 
 // TestLoadMigrationsRegistersAll guards the regression where migrations were
 // never registered in LoadMigrations. Unregistered, repository queries fail
-// with "no such column" on every request. Covers all 20 migrations and
+// with "no such column" on every request. Covers all 21 migrations and
 // fails if a new migration file appears on disk without registration.
 func TestLoadMigrationsRegistersChapterCharts(t *testing.T) {
 	// go test runs with the package dir as cwd; migrations live at repo root.
@@ -42,6 +42,7 @@ func TestLoadMigrationsRegistersChapterCharts(t *testing.T) {
 		18: {"api_key"},
 		19: {"stripe_customer_id"},
 		20: {"user_credentials"},
+		21: {"DROP COLUMN oauth_provider", "RENAME COLUMN api_key TO api_key_hash"},
 	}
 
 	if len(migrations) != len(want) {
