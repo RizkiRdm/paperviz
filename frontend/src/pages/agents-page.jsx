@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
-import { Button } from "@/components/ui/button"
 
 const CLIENTS = [
   {
@@ -57,28 +56,13 @@ const TEST_PROMPT = "Analyze this paper and give me a simplified summary with ke
 
 export function AgentsPage() {
   const [activeTab, setActiveTab] = useState("claude-code")
-  const [apiKey, setApiKey] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((user) => {
-        if (user) {
-          return fetch("/api/auth/apikey").then((res) => (res.ok ? res.json() : null))
-        }
-        return null
-      })
-      .then((data) => {
-        if (data?.key) setApiKey(data.key)
-      })
-      .catch((err) => { console.error("Failed to load API key", err) })
-      .finally(() => setLoading(false))
-  }, [])
-
   const activeClient = CLIENTS.find((c) => c.id === activeTab)
-  const config = activeClient?.config(apiKey || "YOUR_API_KEY")
+  // The service key cannot be fetched: the server returns it exactly once, at
+  // issue time, and stores only a digest afterwards. The snippet carries a
+  // placeholder the user substitutes with the key they revealed in /account.
+  const config = activeClient?.config("YOUR_PAPERVIZ_API_KEY")
 
   async function copyToClipboard() {
     try {
@@ -125,37 +109,22 @@ export function AgentsPage() {
           </div>
 
           <div className="p-6" role="tabpanel" id={`panel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
-            {loading ? (
-              <div className="text-sm text-[#737373]">Loading...</div>
-            ) : !apiKey ? (
-              <div className="text-center py-8">
-                <p className="text-sm text-[#737373] mb-4">
-                  Sign in to get your API key pre-filled
-                </p>
-                <Link to="/login">
-                  <Button>Sign in with Google</Button>
-                </Link>
-              </div>
-            ) : (
-              <>
-                <div className="relative">
-                  <pre className="rounded-[6px] bg-[#f5f5f5] border border-[#e5e5e5] p-4 text-xs font-mono text-[#171717] overflow-x-auto whitespace-pre-wrap">
-                    {config}
-                  </pre>
-                  <button
-                    onClick={copyToClipboard}
-                    className="absolute top-2 right-2 rounded-[6px] border border-[#e5e5e5] bg-white px-3 py-1 text-xs font-medium text-[#737373] hover:bg-[#f5f5f5] transition-colors"
-                  >
-                    {copied ? "Copied!" : "Copy"}
-                  </button>
-                </div>
+            <div className="relative">
+              <pre className="rounded-[6px] bg-[#f5f5f5] border border-[#e5e5e5] p-4 text-xs font-mono text-[#171717] overflow-x-auto whitespace-pre-wrap">
+                {config}
+              </pre>
+              <button
+                onClick={copyToClipboard}
+                className="absolute top-2 right-2 rounded-[6px] border border-[#e5e5e5] bg-white px-3 py-1 text-xs font-medium text-[#737373] hover:bg-[#f5f5f5] transition-colors"
+              >
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
 
-                <div className="mt-6 rounded-[6px] border border-[#e5e5e5] bg-[#fafafa] p-4">
-                  <p className="text-xs font-medium text-[#737373] mb-2">Try it:</p>
-                  <code className="text-xs font-mono text-[#171717]">{TEST_PROMPT}</code>
-                </div>
-              </>
-            )}
+            <div className="mt-6 rounded-[6px] border border-[#e5e5e5] bg-[#fafafa] p-4">
+              <p className="text-xs font-medium text-[#737373] mb-2">Try it:</p>
+              <code className="text-xs font-mono text-[#171717]">{TEST_PROMPT}</code>
+            </div>
           </div>
         </div>
 
