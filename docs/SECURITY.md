@@ -2,7 +2,7 @@
 
 ## 1. Security Scope
 
-Covers authentication, authorization, input validation, file handling, rate limiting, external requests, secrets management, data isolation, and retention for PaperViz (Go `chi` + SQLite, React frontend, Gemini API). Agent/MCP surface is read-only.
+Covers authentication, authorization, input validation, file handling, rate limiting, external requests, secrets management, data isolation, and retention for PaperViz (Go `chi` + SQLite, React frontend, Gemini API). Agent/MCP surface supports deterministic text intake and research-data retrieval; it does not expose user-owned management operations.
 
 ## 2. Threat Model
 
@@ -56,7 +56,7 @@ No RBAC. Single `user` role. Access controlled by resource ownership.
 | Share tokens | Figures inherit document `visibility`; share service gates visibility/expired checks | `share.go` |
 | Export | `ExportResearchContext` excludes `OriginalText`/`SimplifiedText` (copyright) | `export.go` |
 | Account / API key / Billing | `RequireAuth` | `router.go` |
-| MCP tools | Separate interface, read-only, `PAPERVIZ_API_KEY` required, no user-library access | `internal/mcp/server.go` |
+| MCP tools | Separate interface, deterministic intake/retrieval, `PAPERVIZ_API_KEY` required, no user-library access | `internal/mcp/server.go` |
 
 `OptionalAuth` for document creation: attaches `userID` only if valid session; anonymous allowed but usage tracked by fingerprint.
 
@@ -93,12 +93,13 @@ No RBAC. Single `user` role. Access controlled by resource ownership.
 
 ### Tool Permissions
 
-* MCP server (`internal/mcp`): stdio, `6` tools — `analyze_paper`, `get_summary`, `get_figures`, `get_claims`, `get_evidence`, `compare_papers`. All stateless, read-only, text-only input.
+* MCP server (`internal/mcp`): stdio, `5` tools — `ingest_document`, `search_documents`, `get_document`, `get_figures`, `get_evidence`. `ingest_document` is deterministic text intake; the other tools retrieve shared research data. No tool calls Gemini.
+* MCP is stateless and text-only. It does not carry REST session ownership or expose user library operations.
 
 ### Allowed / Restricted
 
-* Allowed: research data retrieval via service layer shared with REST (`docs/mcp-parity.md`).
-* Restricted: no user-owned operations (`list/save/rename/delete/share/referral`) via MCP; no write tools; `PAPERVIZ_API_KEY` auth per-key rate limiting (analyze 5/min, read 30/min, compare 2/min), `500KB` size cap, 5-min timeout, concurrent job limiter.
+* Allowed: deterministic pasted-text intake and research data retrieval through shared services/repositories (`docs/mcp-parity.md`).
+* Restricted: no user-owned operations (`list/save/rename/delete/share/referral`) via MCP; no hidden LLM calls; `PAPERVIZ_API_KEY` auth, per-key rate limiting (ingest 5/min, read 30/min), 500 KiB input cap, and concurrent job limiter.
 
 ### Prompt Injection
 
@@ -129,7 +130,7 @@ No RBAC. Single `user` role. Access controlled by resource ownership.
 |-------|-----------|-------|
 | Document create | `POST /api/documents`, `POST /api/import/doi|url` | `1 req/30s, burst 2` (`rateLimitDocumentCreate`) |
 | Auth | `POST /api/auth/signup|login`, `GET /api/auth/me` | `5 req/60s, burst 3` (`rateLimitAuth`) |
-| MCP (per-key) | `analyze_paper 5/min, read 30/min, compare 2/min` | token bucket (`internal/mcp/ratelimit.go`) |
+| MCP (per-key) | `ingest_document 5/min; read/search 30/min` | token bucket (`internal/mcp/ratelimit.go`) |
 
 *Only POST wrapped for documents; GET unrestricted. No user-based limiter beyond IP.
 

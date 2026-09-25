@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Turn an academic paper (PDF text-layer, pasted text, or DOI/URL import) into simplified language at chosen reading level plus evidence-grounded visualizations. AI may transform evidence but must never manufacture numeric values — every chart value is traceable to extracted evidence. Pipeline runs synchronously in `POST /api/documents` (no queue/broker).
+Turn an academic paper (PDF text-layer, pasted text, or DOI/URL import) into simplified language at the chosen reading level plus evidence-grounded visualizations. AI may transform evidence but must never manufacture numeric values — every chart value is traceable to extracted evidence. Web ingestion starts the pipeline in an in-process goroutine after intake; no queue or broker is used.
 
 ## 2. Pipeline Overview
 
@@ -149,7 +149,7 @@ One chart failure must not abort others (reVisualizeOne isolation).
 {"chart_type":"bar","title":"...","labels":["A","B"],"values":[72.4,81.7],"provenance":{"evidence_ids":["..."],"grounding_status":"verified"}}
 ```
 
-Stored `charts.chart_data JSON`, `source_method ∈ {data_extracted,image_fallback,omitted}`, `image_blob BLOB` (≤5 images/doc, not served yet).
+Stored `charts.chart_data JSON`, `source_method ∈ {data_extracted,image_fallback,omitted}`, and bounded `image_blob BLOB` (≤5 images/doc). Stored chart images are served through `GET /api/documents/:id/charts/:chartId/image` when available.
 
 ### Output Guarantees
 
@@ -184,12 +184,13 @@ No persistent metrics (see `OBSERVABILITY.md`).
 
 ## 11. Known Limitations
 
-* `image_blob` not served (annotation only).
-* `WAL` required after DB reset (single migration, gitignored).
-* `B3` single-call verification skipped.
+* Stored chart images are served through the document chart-image endpoint when present; extraction and MIME validation still apply.
+* WAL mode is required after a database reset; the database file remains local and gitignored.
+* B3 single-call verification remains skipped.
 
 ## 12. Future Changes
 
-* SSE/polling for long documents.
-* Periodic `DeleteExpired` sweeper (now only startup).
-* Serve `image_blob` via endpoint.
+* Add durable asynchronous execution only through an explicit architecture decision; current web processing is in-process.
+* Improve long-document progress transport if polling becomes insufficient.
+* Define and implement agent-side processing semantics for MCP ingestion.
+* Keep expiry behavior aligned with the seven-day inactivity policy; the current sweeper runs at startup and hourly.
