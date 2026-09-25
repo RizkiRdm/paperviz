@@ -1,138 +1,179 @@
-# PaperViz — Canonical Flow (P02)
+# PaperViz Current User Flow
 
-Date: 2026-09-14
-Plan: `.omo/plans/paperviz_master_refactor_plan.md` §2 (no redesign)
-Inventory: `docs/Task Agent/P01_inventory.md`
-Status: definition only. No UI or API edits in P02.
+> Current product-flow contract, source-verified on 2026-09-25. When this document conflicts with `frontend/src/App.jsx`, `internal/handlers/router.go`, or current service behavior, code wins and this document must be updated.
 
----
-
-## Deps invariants
-
-- `UI → API → App → Domain/Services → Repo/Infra` — no reverse edges. Handlers transport only.
-- `User Model → MCP → App/Data` — MCP data/tools only, no reasoning, no hidden Gemini.
-
----
-
-## 1. Canonical flow
-
-Single primary journey. Secondary surfaces contained, not dominant.
+## Canonical Web Journey
 
 ```mermaid
 flowchart LR
-    A[Input<br/>/ , /upload] --> B[Processing<br/>5 stages]
-    B --> C[Understanding<br/>simplified]
-    C --> D[Evidence<br/>claims provenance]
-    D --> E[Figures<br/>grounded charts]
-    E --> F[Source<br/>original]
-    F --> G[Mgmt<br/>share collections visibility]
+    A[Input] --> B[Processing]
+    B --> C[Understanding]
+    C --> D[Evidence]
+    D --> E[Figures]
+    E --> F[Source]
+    F --> G[Management]
 
-    subgraph Primary
-    A --> B --> C
-    end
-
-    subgraph Result page sections
-    C --> D --> E --> F --> G
-    end
-
-    H[MCP<br/>5 tools] -. data only .-> G
-    I[Dashboard<br/>/account] -. secondary .-> A
+    A[/ PDF, paste, DOI, URL /]
+    G[Annotations, collections, export, sharing, visibility]
 ```
 
-### Stages — 1-line purpose each
+### Stage purposes
 
-| # | Stage | Purpose |
+| Stage | User goal | Current implementation |
 |---|---|---|
-| 1 | Input | Capture paper: PDF, pasted text, DOI, URL. Single form, explicit `source_type`. |
-| 2 | Processing | Show progress: reading doc, extracting structure, preparing evidence, rebuilding figures, completing. |
-| 3 | Understanding | Plain-language summary at chosen level. |
-| 4 | Evidence | Claims with source text, page, section, figure/table refs, provenance. |
-| 5 | Figures | Re-visualized charts with grounding badge verified/partial/unsupported/failed. |
-| 6 | Source | Original text and metadata, collapsible. |
-| 7 | Mgmt | Share, collections, visibility. Secondary actions on Result. |
+| Input | Choose a paper source and reading level | Unified form with PDF, paste, DOI, and URL tabs |
+| Processing | Know whether work is progressing | Two-second polling, five user-facing stage labels, long-running warning, timeout, retry |
+| Understanding | Read a simplified explanation | Simplified or ELI5 output |
+| Evidence | Check claims against source context | Claims, evidence, comparisons, and structured research objects |
+| Figures | Understand numeric findings | Grounded charts, provenance, annotations, and unsupported states |
+| Source | Return to original material | Original text and source metadata |
+| Management | Retain or share useful context | Annotations, collections, export, visibility, and share links |
 
-Processing maps pipeline `OnStage` simplifying/verifying/generating_charts to 5 user labels. Implementation details hidden.
+Processing, Understanding, Evidence, Figures, Source, and Management share one result route: `/:documentId`.
 
-Result page holds stages 3-7 as sections on one page (`/:documentId`). Not separate routes.
+## User-facing processing labels
 
----
+Internal pipeline stages are mapped to five stable labels:
 
-## 2. Screen ranking
+1. Reading paper
+2. Extracting structure
+3. Preparing evidence
+4. Rebuilding figures
+5. Completing
 
-| Rank | Screens | Role | Routes |
+Users should not need to understand Gemini prompts, repository transactions, or evidence-extraction implementation to follow progress.
+
+## Primary Web Flow
+
+1. Person opens `/`.
+2. Person chooses PDF, pasted text, DOI, or URL.
+3. Person selects `Simplified` or `eli5` when applicable.
+4. Frontend calls `POST /api/documents/` or matching import endpoint.
+5. Backend validates input, inserts a processing document, and starts the asynchronous pipeline.
+6. Frontend navigates to `/:documentId`.
+7. Frontend polls the document until terminal state.
+8. Result page renders understanding, evidence, figures, source, and management sections.
+9. Person can inspect, annotate, organize, export, or share according to ownership and visibility rules.
+
+### Failure behavior
+
+- Input errors appear inline and preserve the current input for retry.
+- Rate limits and network failures receive user-facing messages.
+- Long processing produces a soft warning; ten-minute polling timeout exposes retry.
+- Verification mismatch detail remains visible.
+- One failed figure does not invalidate unrelated document output.
+- Unsupported grounded data is not rendered as trustworthy chart data.
+
+## Agent Flow
+
+### Intended product direction
+
+A person authenticates, obtains an API key, configures an AI client, and uses PaperViz MCP to retrieve structured research data.
+
+### Implemented local MCP flow
+
+```mermaid
+flowchart LR
+    Client[AI MCP client] --> Stdio[cmd/mcp stdio]
+    Stdio --> Tools[Five MCP tools]
+    Tools --> Services[Shared services]
+    Tools --> Repo[Repositories]
+    Services --> Repo
+    Repo --> DB[(Shared SQLite)]
+```
+
+Available operations:
+
+- deterministic pasted-text intake;
+- global title search;
+- selective document retrieval;
+- figure and provenance retrieval;
+- evidence and claim retrieval.
+
+### Agent-flow gap
+
+MCP ingestion does not start simplification, verification, or figure generation. A document created only through MCP can remain in `processing` state. The `/agents` page also generates a remote `/api/mcp` configuration that is not registered by the current HTTP router.
+
+The local stdio server is implemented. The full remote agent-first journey is not yet end-to-end complete.
+
+## Screen Ranking
+
+| Priority | Surface | Route or runtime | Role |
 |---|---|---|---|
-| Primary | Input, Processing, Result | Core loop. Must be obvious, fast, coherent. | `/`, `/:documentId` |
-| Secondary | Dashboard, Collections, Compare, Share public view | Recent docs, search, resume work. Support, not center. | `/account`, `/share/doc/:token`, `/share/fig/:token`, compare in-app only |
-| Tertiary | MCP surface | Agent data access. 5 deterministic tools. | `internal/mcp` — no UI route except `/agents` docs |
-| Supporting | Auth, NotFound | Entry guard, error boundary. | `/login`, `/signup`, `*` |
+| Primary web | Input | `/` | Manual paper ingestion |
+| Primary web | Processing and result | `/:documentId` | Full paper-understanding journey |
+| Supporting web | Account | `/account` | API key, usage, subscription, account context |
+| Supporting web | Authentication | `/login`, `/signup` | Session entry |
+| Supporting web | Agent setup | `/agents` | Generated client configuration; remote transport currently mismatched |
+| Secondary web | Public sharing | `/share/doc/:shareToken`, `/share/fig/:shareToken` | Expiring shared research views |
+| Agent runtime | MCP | `cmd/mcp` over stdio | Deterministic data access |
+| Supporting | Not found | `*` | Error boundary |
 
-Tertiary never dominates primary. Secondary copy and nav weight stays secondary (P51 gate).
+Account and auth surfaces support the product but must not replace input and result as the dominant web journey.
 
----
+## Frontend Route Inventory
 
-## 3. Route → stage mapping
+Source: `frontend/src/App.jsx`.
 
-### Frontend `frontend/src/App.jsx` — 9 routes
-
-| Route | Component | File | Stage |
-|---|---|---|---|
-| `/` | `UploadPage` | `frontend/src/pages/upload-page.jsx` (43 LOC) | Input |
-| `/login` | `LoginPage` | `frontend/src/pages/login-page.jsx` (112 LOC) | Supporting |
-| `/signup` | `SignupPage` | `frontend/src/pages/signup-page.jsx` (112 LOC) | Supporting |
-| `/account` | `AccountPage` | `frontend/src/pages/account-page.jsx` (162 LOC) | Mgmt secondary |
-| `/agents` | `AgentsPage` | `frontend/src/pages/agents-page.jsx` (167 LOC) | Tertiary docs |
-| `/share/fig/:shareToken` | `ShareFigurePage` | `frontend/src/pages/share-figure-page.jsx` (151 LOC) | Mgmt secondary — public figure |
-| `/share/doc/:shareToken` | `SharePaperPage` | `frontend/src/pages/share-paper-page.jsx` (231 LOC) | Mgmt secondary — public doc |
-| `/:documentId` | `ResultPage` | `frontend/src/pages/result-page.jsx` (743 LOC GOD) | Processing + Understanding + Evidence + Figures + Source + Mgmt |
-| `*` | `NotFoundPage` | `frontend/src/pages/not-found-page.jsx` (19 LOC) | Supporting |
-
-Note: `/upload` alias referenced in plan §2 as canonical Input entry. Not registered in `App.jsx` current. `/` serves Input. Dup entry consolidation deferred to P03.
-
-Dead refs still present (P01 §7): `result-page.jsx:305,724` → `/dashboard`, `upgrade-cta.jsx:16` → `/pricing`. Routes not registered. 404 via `spaNotFound`. Fix in P03.
-
-### Backend `internal/handlers/router.go` (182 LOC)
-
-| API prefix | Handler | Stage |
+| Route | Component | Purpose |
 |---|---|---|
-| `POST /api/documents` | `DocumentHandler.Create` | Input ingestion |
-| `GET /api/documents/:id` (+ charts, claims, tables, methods, results, citations, evidence-graph, research-map) | `DocumentHandler.*` | Result read-model |
-| `POST /api/documents/compare` | `DocumentHandler.Compare` | Compare — in-app only |
-| `POST /api/import/doi`, `POST /api/import/url` | `ImportHandler` | Input — DOI/URL |
-| `GET /share/doc/:token`, `GET /share/fig/:token` | `ShareHandler` | Mgmt public view |
-| `POST /api/documents/:id/share`, `POST /api/documents/:id/charts/:chartId/share` | `ShareHandler` | Mgmt share creation |
-| `GET /api/collections`, `POST /api/collections` etc | `CollectionHandler` | Mgmt secondary |
-| `GET /api/documents/:id/annotations` etc | `AnnotationHandler` | Mgmt within Result |
-| `POST /api/auth/signup`, `/login`, `/google/*` | `AuthHandler` | Supporting |
-| `GET /api/account/summary`, `GET /api/usage` | `AccountHandler`, `UsageHandler` | Mgmt secondary |
-| `*` unmatched | `spaNotFound` | Supporting — API 404 JSON, SPA fallback |
+| `/` | `UploadPage` | PDF, paste, DOI, and URL input |
+| `/upload` | Redirect | Compatibility redirect to `/` |
+| `/dashboard` | Redirect | Compatibility redirect to `/account` |
+| `/login` | `LoginPage` | Login |
+| `/signup` | `SignupPage` | Signup |
+| `/account` | `AccountPage` | Account, API key, usage, billing |
+| `/agents` | `AgentsPage` | MCP client configuration |
+| `/share/fig/:shareToken` | `ShareFigurePage` | Public figure |
+| `/share/doc/:shareToken` | `SharePaperPage` | Public paper |
+| `/:documentId` | `ResultPage` | Processing and complete result |
+| `*` | `NotFoundPage` | Not found |
 
----
+Static files under `frontend/public/` may include pages no longer registered in React. They are not canonical routes.
 
-## 4. Assumptions
+## Backend Flow Grouping
 
-- Scope read-only doc. No route, handler, or component edits. Single file deliverable.
-- LOC from `P01_inventory.md` 2026-09-14, `wc -l` incl comments. 200 LOC flag, 250 hard gate (P54).
-- Handler→repo coupling = literal `New.*Repo` in `handlers/*.go` (43 hits, documents.go 33). Transitive edges via `graphify path` pending P09.
-- Dead routes = string match `/dashboard` `/pricing` `/compare` `/explain` in `frontend/src` after 11.5 cuts. Dynamic construction not covered.
-- MCP tool count = `grep -c "Name:" internal/mcp/tools.go` — current 6, target 5. P02 does not change count.
-- `time.Sleep` in `pipeline.go:74,108` stays until P14. Processing stage labels centralized in P06.
-- `/upload` consolidation, dead-link removal, redirect matrix deferred to P03. This doc records intended flow, not current routing correctness.
-- Verification baseline: `go test ./...` 422 passed, `go vet` clean, `gofmt -l .` empty per P01. No new tests in P02.
+Source: `internal/handlers/router.go`.
 
----
+| Flow group | Representative operations |
+|---|---|
+| Health | `GET /healthz` |
+| Input | `POST /api/documents/`, `POST /api/import/doi`, `POST /api/import/url` |
+| Processing result | `GET /api/documents/:id` |
+| Research objects | claims, tables, methods, results, citations, evidence graph, research map |
+| Figures | chart image and structured figure data |
+| User management | title, save, delete, list, stats |
+| Research context | annotations, collections, export |
+| Sharing | document/figure token generation, revocation, visibility, public views |
+| Identity | signup, login, logout, session, Google OAuth, API key |
+| Billing | checkout, portal, webhook |
+| Usage and analytics | usage, account analytics, referral and upgrade events |
 
-## 5. Out of scope
+See [`../codebase-reference.md`](../codebase-reference.md) for the full route table.
 
-No redesign in P02. No JSX edits, no Go edits, no route registration changes, no token or style invention, no infra added. Definition only. Design tokens (`DESIGN.md` Dub) not applied here. UX rebuild in P04-P06, routing fixes in P03.
+## Management Rules
 
----
+- Document lists, saved state, deletion, annotations, collections, sharing, and visibility require authenticated ownership where implemented.
+- Public shared payloads exclude private source material and user identifiers.
+- Export excludes original and simplified full text.
+- MCP does not expose these user-owned management operations.
+- Public share responses carry `noindex, nofollow` headers.
 
-## 6. Constraints honored
+## Current Flow Gaps
 
-- Inspect only: `App.jsx`, `router.go`, `pages/*.jsx` existence, `P01_inventory.md`, plan §0/§2.
-- No scan of `.gitignore` or unrelated docs.
-- No new abstractions, no ORM, queue, or broker.
+| Gap | User or maintainer impact |
+|---|---|
+| MCP text intake does not start processing | Agent-only ingestion cannot produce simplified output |
+| `/agents` points to absent remote transport | Generated setup cannot complete against current server |
+| MCP search is global | Results are not scoped to a signed-in user's library |
+| Public static SEO artifacts lag route cuts | Search and screenshot surfaces can show removed product areas |
+| Single SQLite connection | Limits concurrent agent and browser traffic |
 
----
+## Invariants
 
-Verified: `frontend/src/App.jsx` 36L, `internal/handlers/router.go` 182L, `frontend/src/pages/*.jsx` 9 files, `P01_inventory.md` 372L, plan §0/§2 read. File exists. No UI code changes.
+- `frontend/src/App.jsx` is the frontend route source of truth.
+- `internal/handlers/router.go` is the REST route source of truth.
+- `internal/mcp/tools.go` is the MCP tool source of truth.
+- The result page remains one route, not five disconnected section routes.
+- Verification and grounding states remain visible.
+- Human management operations do not become MCP tools without explicit product approval.
