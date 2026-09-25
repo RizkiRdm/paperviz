@@ -18,6 +18,8 @@
 
 **Last updated:** 2026-09-21 — Chunk 12 deploy readiness 12.1-12.7 complete
 
+> **Documentation verification note (2026-09-25):** entries below preserve project history and may describe earlier tool counts, routes, or validation results. For current behavior, verify `internal/mcp/tools.go`, `internal/handlers/router.go`, `frontend/src/App.jsx`, and the focused architecture/product documents. The current MCP surface has five deterministic tools; web ingestion runs the full pipeline in an in-process goroutine.
+
 ---
 
 ## Current Focus
@@ -46,16 +48,16 @@ something that should stay frozen.)*
 - Chunk 4.1 Shareable Figure Explanation — done 2026-08-24, known limitation: no interactive Recharts on share page (image + text only)
 - Chunk 4.2 Shareable Paper Explanation — done 2026-08-25 (`POST/DELETE /api/documents/{id}/share`, `PATCH /api/documents/{id}/visibility`, public `GET /share/doc/{token}`, `/share/doc/:shareToken` page)
 - Chunk 4.3 Product-Led Referral Loop — done 2026-08-25 (`share_visits`/`share_conversions` counters on documents+charts, visit++ on public share GETs, `POST /api/share-referrals` conversion beacon, CTA links carry `?ref=`, upload page persists ref via `localStorage.paperviz_ref`)
-- Chunk 5.1 SEO Architecture — done 2026-08-25 (`docs/seo-architecture.md` = IA source of truth; router NotFound is now a real dispatcher: `/api/*`→404 JSON, static files served, GET/HEAD→SPA fallback; `X-Robots-Tag: noindex, nofollow` on share GET/HEAD)
+- Chunk 5.1 SEO Architecture — historical IA work; current routing and static-file rules are maintained in `internal/handlers/router.go` and `docs/codebase-reference.md`
 - Chunk 5.2 Product Pages — done 2026-08-26 (3 static HTML landing pages in `frontend/public/`: research-paper-summarizer, figure-explanation, compare-research-papers; `robots.txt`; React Router routes for SPA fallback; inline styles matching DESIGN.md; structured data + OG tags)
 - Chunk 5.3 Programmatic SEO foundation — done 2026-08-26 (`frontend/seo/explain-pages.json` publish registry, `/explain/:slug` route + `ExplainPage`, crawlable `frontend/public/explain/sleep-quality-executive-function.html`, `/sitemap.xml`, `robots.txt` Sitemap line, default `X-Robots-Tag: noindex, nofollow` on `/explain/*`)
 - Chunk 6.2 Usage Limits — done 2026-08-27 (Free/Pro/Research tiers, `user_tiers` table, fingerprint-based tracking, `UsageLimitMiddleware` on POST /api/documents, `GET /api/usage` endpoint, frontend `UsageDisplay` + `UpgradeCta` components)
-- Chunk 6.3 Cost Model — done 2026-08-28 (`docs/cost-model.md` — Gemini API pricing analysis, per-operation cost breakdown, tier margin analysis, storage/bandwidth estimates, sensitivity analysis)
-- Chunk 6.4 Pricing & Packaging Experiment — done 2026-08-29 (`docs/pricing-strategy.md` — 3-tier pricing, experiment design; `frontend/src/pages/pricing-page.jsx` — 3-column pricing page; conversion tracking endpoints)
+- Chunk 6.3 Cost Model — historical pricing analysis removed during documentation cleanup; current provider cost must be evaluated from live pricing
+- Chunk 6.4 Pricing & Packaging Experiment — historical experiment removed during documentation cleanup; current billing implementation is in `internal/handlers/billing.go`
 - Chunk 7.1 Structured Research API — done 2026-08-29 (`docs/structured-research-api.md` — comprehensive API documentation for all endpoints)
 - Chunk 7.2 Canonical Research Output Contract — done 2026-08-29 (`docs/canonical-research-output-contract.md` — 15 entity schemas with provenance and uncertainty models)
 - Chunk 7.3 OpenAPI — done 2026-08-31 (`docs/openapi.yaml` — 1748-line OpenAPI 3.1.0 spec, 34 endpoints, 31 component schemas, session cookie auth, rate limits, error codes)
-- Chunk 7.4 MCP — done 2026-08-31 (`cmd/mcp/main.go`, `internal/mcp/` — 6 research tools: analyze_paper, get_summary, get_figures, get_claims, get_evidence, compare_papers; official Go SDK, stdio transport)
+- Chunk 7.4 MCP — initial stdio MCP server shipped 2026-08-31; its original six-tool surface was later replaced by the current five deterministic tools in `internal/mcp/tools.go` (`ingest_document`, `search_documents`, `get_document`, `get_figures`, `get_evidence`).
 - Chunk 7.5 Human/Agent Capability Parity — done 2026-08-31 (`docs/mcp-parity.md` — MCP↔REST parity map; `internal/mcp/tools.go` — added image_url base64 to get_figures; documented intentionally unavailable agent operations)
 - Chunk 7.6 MCP Usage, Security & Cost Controls — done 2026-08-31 (`internal/mcp/errors.go` — MCPError type + sentinels; `internal/mcp/ratelimit.go` — per-key token bucket (analyze 5/min, read 30/min, compare 2/min); `internal/mcp/jobs.go` — concurrent job limiter; `internal/mcp/server.go` — API key auth; `internal/mcp/tools.go` — 500KB size cap, 5-min timeout, rate/job checks; `cmd/mcp/main.go` — PAPERVIZ_API_KEY required)
 - Chunk 8.1 Structured Research Objects — done 2026-09-01 (`migrations/014_structured_research_objects.sql` — 5 new tables: claims, paper_tables, methods, results, citations; `internal/repository/` — 5 new repos: ClaimRepo, PaperTableRepo, MethodRepo, ResultRepo, CitationRepo; `internal/handlers/documents.go` — 5 GET endpoints; `docs/canonical-research-output-contract.md` — updated with new entity schemas; 203 tests passing)
@@ -69,7 +71,7 @@ something that should stay frozen.)*
 - Chunk 12.1 ponytail slice (`comparison.go` ceiling comments) — done 2026-09-04 (`internal/services/comparison.go` ~136/163/189/221/252: fixed-8-dimensions; single-prompt join; first-2-papers stance; joined-evidence prompt; exact-overlap keywords; each `// ponytail: ... — ceiling: ... ; upgrade: ...`; YAGNI kept: buildComparisonDimensions, synthesizeDimensions, identifyAgreementsAndDisagreements, findCommonKeywords+stopWords, ExtractPaperSummary/ComparePapers/CompareEvidence; zero logic change, no dead lines; grep ponytail 5 hits; `gofmt` clean; `go vet` clean; `go test` 328 passed 7 pkgs)
 - Auth rate limiting (TASK-1) — done 2026-09-04 (`internal/handlers/ratelimit.go` — `rateLimitAuth` middleware, 5 req/60s/burst 3; `internal/handlers/router.go` — `/signup` and `/login` wrapped; 331 tests passing)
 - Chart missing value fix (TASK-2) — done 2026-09-05 (`frontend/src/components/data-chart.jsx` — replaced `?? 0` silent zero-fill with `.filter()` exclude undefined/null; missing values now dropped from chart render instead of rendered as zero; explanatory comment added; `npm run build` clean)
-- Docs consolidation (TASK-3) — done 2026-09-06 (`docs/archive/progress.md`, `docs/archive/current_task.md`, `docs/archive/prd.md` — archived stale files with superseded notices; PRD.md confirmed canonical via diff; zero dangling refs)
+- Docs consolidation (TASK-3) — archived superseded progress, task, and PRD files were removed during documentation cleanup; current state is maintained in `docs/PROJECT_STATE.md` and `docs/PRD.md`
 - Chart engine rework (C2-C17) — done 2026-09-08 (`internal/models/evidence.go` — NumericEvidence + EvidenceSource types; `internal/models/dataset.go` — CandidateDataset + DatasetPoint; `internal/models/chart_spec.go` — ChartSpec + BarData/LineData/ScatterData/PieData + ChartProvenance; `internal/services/evidence_extract.go` — ExtractNumericEvidence (5 regex patterns); `internal/services/table_extract.go` — ExtractTableData; `internal/services/dataset_build.go` — BuildCandidateDatasets; `internal/services/grounding.go` — ValidateGrounding (10 rules); `internal/services/charts.go` — GenerateChapterCharts (evidence→datasets→LLM plan, multi-chart per chapter); `internal/services/chart_regression_test.go` — 8 regression cases; `internal/services/chart_validation_test.go` — 5 real-paper validation cases; `frontend/src/components/data-chart.jsx` — grounding status badge + validation; `frontend/src/components/chart-card.jsx` — provenance display + unsupported state; 421 tests passing across 6 packages; `npm run build` clean)
 - Verification-polish chunk — done 2026-09-04 (`frontend/src/pages/result-page.jsx` ~313-328 badge gating + ~364-394 banner detail/claims opener/compare; `frontend/src/components/status-banners.jsx` 29+/12− hardened panel + badge; `internal/services/intake.go` ~154-172 claims fan-out tx; `save_pipeline_result_test.go` 3 new test cases; behavior: verification_failed now shows real `mismatch_detail` + claims opener + Compare-with-Original; Verified badge disabled when no claim_diff + aria-expanded on opener; ClaimComparisonPanel try/catch + empty state + count badge; pipeline writes one claims row per `OriginalClaims` in the same tx; `go test` 331 passed 7 pkgs; `npm run build` clean; screenshots snap-16/17 confirmed)
 - Chunk 11.1 Google OAuth — done 2026-09-10 (`internal/handlers/auth.go` — GoogleLogin + GoogleCallback handlers; `internal/repository/users.go` — UpsertByOAuth + GetByOAuth methods; `migrations/017_oauth_columns.sql` — oauth_provider, oauth_id columns; `frontend/src/pages/login-page.jsx` — "Continue with Google" button; `.env.example` — GOOGLE_CLIENT_ID/SECRET/REDIRECT_URL; 422 tests passing)
@@ -158,7 +160,7 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Share API client fns: `frontend/src/lib/api.js`
 - Referral counters: repo methods in `internal/repository/documents.go` + `charts.go`, service in `internal/services/share.go` (`TrackReferralConversion`), route `POST /api/share-referrals`
 - Ref attribution: `frontend/src/pages/upload-page.jsx` (localStorage capture + beacon), CTA links on both share pages
-- SEO IA + URL-space contract: `docs/seo-architecture.md`; router dispatcher `internal/handlers/router.go` (`spaNotFound`, `noindexMiddleware`)
+- SEO IA + URL-space contract: historical artifact removed; current router dispatcher is `internal/handlers/router.go` (`spaNotFound`, `noindexMiddleware`)
 - Landing pages (static HTML): `frontend/public/research-paper-summarizer.html`, `frontend/public/figure-explanation.html`, `frontend/public/compare-research-papers.html`
 - Explain publish registry + pages: `frontend/seo/explain-pages.json`, `frontend/src/pages/explain-page.jsx`, `frontend/public/explain/*.html`
 - Sitemap: `frontend/public/sitemap.xml`
@@ -170,8 +172,8 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Usage API: `internal/handlers/usage.go`
 - Frontend usage components: `frontend/src/components/usage-display.jsx`, `frontend/src/components/upgrade-cta.jsx`
 - Task/chunk docs: `docs/`
-- Cost model: `docs/cost-model.md`
-- Pricing strategy: `docs/pricing-strategy.md`
+- Cost model: historical analysis removed; current cost controls are documented in `docs/DATA_PIPELINE.md`
+- Pricing strategy: historical experiment removed; current billing routes are in `internal/handlers/billing.go`
 - Conversion tracking: `internal/handlers/analytics.go` (`TrackPricingView`, `TrackUpgradeIntent`)
 - Structured Research API docs: `docs/structured-research-api.md`
 - Canonical Research Output Contract: `docs/canonical-research-output-contract.md`

@@ -19,7 +19,7 @@ Failure in Gemini or PDF extraction is isolated per-stage; failure in DB is glob
 | Component | Failure | Impact | Detection | Recovery |
 |-----------|---------|--------|-----------|----------|
 | PDF extraction | Timeout (2.5s text/image), large PDF 20 MiB | Document rejected, `400` | `context.WithTimeout` + `slog.Warn` timeout branch | User retries with smaller PDF |
-| Gemini simplify/verify | Timeout, 429, 5xx | Pipeline stage `simplify`/`verify` fails, `pipeline stage failed` logged | `slog.Error` + `writeError 500` | No automatic retry; user re-uploads |
+| Gemini simplify/verify | Timeout, 429, 5xx | Background pipeline stage fails; document is marked `failed` with an error message | `slog.Error` with document ID and stage | User retries with a new upload |
 | Chart evidence extraction | No evidence found | `no evidence extracted` `slog.Info`, `degraded=false` | `len(datasets)==0` in `GenerateChapterCharts` | Degraded success (no charts, document still saved) |
 | Chart grounding | Inconsistent units, missing evidence, negative pie, NaN/Inf | `Grounded=unsupported`, chart not rendered, `logChartFailure` | `ValidateGrounding` 10 rules | Fallback: text evidence only, other charts unaffected |
 | Gemini rate limit (server 429) | `Gemini rate limited by server` | Stage fails | `slog.Error` | No retry loop (client-side backoff only in `gemini.go` retry up to 3 with exponential backoff) |
@@ -40,7 +40,7 @@ Failure in Gemini or PDF extraction is isolated per-stage; failure in DB is glob
 
 ### Job Execution
 
-* No background worker/job queue. Pipeline runs synchronously in `POST /api/documents` handler (no ORM, no broker per non-goals). Request holds connection.
+* No background worker or job queue. Web ingestion starts the pipeline in an in-process goroutine after intake; `POST /api/documents` returns a document ID while processing continues. No broker or external worker is used.
 
 ## 5. Retries
 
@@ -82,36 +82,43 @@ PDF: no retry, return partial + Warn
 
 * No deduplication key. Retry of `POST /api/documents` creates duplicate document. `share_tokens` lazily generated; revoking `private` clears token.
 
-## 7. Job / Worker Reliability
+## 7. In-Process Processing Reliability
 
-No async jobs. Synchronous handler model.
+PaperViz has no durable job queue or external worker. Web ingestion starts `RunPipelineAndPersist` in a goroutine after the intake transaction, and the client polls the document while it runs.
 
-### Job States
+### Processing States
 
+```text
+intake → simplify → verify → chapters/evidence → figures → persist
+                                      ↓
+                         failure recorded on document row
 ```
-pipeline: simplify → verify → chapters → charts → persist
-         ↓ fail → log "pipeline stage failed" → 500
-```
 
-`processing_stages` table tracks per-stage status (updated via `intake.go: update processing stage failed`).
+`processing_stage` records the current user-visible pipeline stage. A document remains `processing` until the pipeline writes a terminal state or fails.
 
-### Duplicate Jobs
+### Duplicate Work
 
-* No duplicate detection beyond IP rate limiting (`1 req/30s burst 2`).
+* No durable deduplication key exists. A client retry of `POST /api/documents` creates another document and another in-process run.
+* IP rate limiting limits burst creation but does not provide idempotency.
 
-### Worker Crash
+### Process Failure
 
-* Server `Recoverer` middleware converts panic to 500; DB WAL ensures committed writes survive.
+* HTTP `Recoverer` converts handler panics to 500 responses.
+* A process exit can interrupt an in-flight goroutine; there is no durable replay mechanism.
+* SQLite WAL preserves committed writes that reach disk before exit.
 
-### Stuck Jobs
+### Stuck Processing
 
-* No stuck-job detector; pipeline timeout is request timeout. Leaked PDF goroutines remain observable via `Warn` log.
+* The background pipeline has a 20-minute context timeout.
+* There is no separate stuck-job detector because no durable job registry exists.
+* If a document remains `processing`, inspect pipeline logs, Gemini failures, PDF timeout warnings, and whether the intake originated through MCP-only flow.
+
 
 ## 8. Dependency Failure
 
 ### Model Provider (Gemini)
 
-* 429/5xx → backoff retry (3). After failure, pipeline returns 500, document not stored. `logChartFailure` categories: `CHART_SELECTION_ERROR`, `GROUNDING_ERROR`.
+* 429/5xx → backoff retry (3). After exhaustion, the in-process pipeline records a failed document state and error message; there is no HTTP 500 because processing is asynchronous. `logChartFailure` categories: `CHART_SELECTION_ERROR`, `GROUNDING_ERROR`.
 
 ### Storage (SQLite)
 
@@ -156,7 +163,7 @@ pipeline: simplify → verify → chapters → charts → persist
 ## 12. Known Reliability Risks
 
 * No periodic sweeping of expired sessions (only on startup).
-* Synchronous pipeline holds HTTP connection; large PDFs under Gemini latency may hit client timeout.
+* In-process background processing shares the single SQLite connection; long Gemini latency can keep a document in `processing`, and there is no durable replay mechanism.
 * Leaked PDF goroutines on timeout remain running until completion (observable via Warn, not bounded).
 * Single SQLite file is SPOF; no replica/healthcheck beyond `WAL` + `synchronous=NORMAL`.
 

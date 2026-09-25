@@ -1,5 +1,7 @@
 # TASK-3 — Archive Stale Docs, Reconcile Duplicate PRD Files
 
+> Historical task record. The archive files and duplicate PRD targets referenced below were removed during documentation cleanup; do not rerun this task.
+
 ## Metadata
 - id: TASK-3
 - priority: P2

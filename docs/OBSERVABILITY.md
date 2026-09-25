@@ -124,9 +124,9 @@ MCP tools share service layer with REST (`docs/mcp-parity.md`); tool usage logge
 ### Model Usage
 
 * model: `gemini-...` via `external.GeminiClient`
-* input/output tokens: not explicitly logged per call (estimated via `cost-model.md` only)
+* input/output tokens: not explicitly logged per call; no current runtime cost ledger
 * latency: per-call `Gemini call` log
-* estimated cost: tier margin analysis in `docs/cost-model.md` (not runtime)
+* estimated cost: historical pricing analysis was removed; use current provider pricing when evaluating cost
 
 ## 9. Health Checks
 
