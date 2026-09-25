@@ -146,6 +146,7 @@ func NewRouter(db *sql.DB, gemini *external.LLM, cipher *external.Cipher, static
 		r.Get("/google/login", authHandler.GoogleLogin)
 		r.Get("/google/callback", authHandler.GoogleCallback)
 		r.With(authMiddleware.RequireAuth).Get("/apikey", apiKeyHandler.GetApiKey)
+		r.With(authMiddleware.RequireAuth).Post("/apikey", apiKeyHandler.CreateApiKey)
 		r.With(authMiddleware.RequireAuth).Post("/apikey/regenerate", apiKeyHandler.RegenerateApiKey)
 	})
 
