@@ -1,8 +1,10 @@
 # PaperViz
 
-PaperViz turns academic papers into simplified explanations, verified claims, and evidence-grounded figures. It is designed for AI agents that need structured research data, with a web app for authentication, billing, and manual paper upload.
+PaperViz turns academic papers into simplified explanations, verified claims, and evidence-grounded figures. It is designed for AI agents that need structured research data, with a web app for account management and manual paper upload.
 
-> **Current architecture note:** the web ingestion path runs the full Gemini-backed processing pipeline. The repository's MCP server currently exposes five deterministic data tools over stdio; its `ingest_document` tool stores text but does not start the LLM pipeline. See [Current limitations](#current-limitations) before relying on the agent workflow.
+PaperViz runs on infrastructure and credentials it owns, and nothing else. There is no Google OAuth account, no Stripe account, and no model vendor account: users bring their own model key, which is encrypted at rest. Model spend belongs to the user, so the service is free to run without metering anyone's wallet.
+
+> **Current architecture note:** the web ingestion path runs the full LLM-backed processing pipeline using the requesting user's own model key. The repository's MCP server currently exposes five deterministic data tools over stdio; its `ingest_document` tool stores text but does not start the LLM pipeline. See [Current limitations](#current-limitations) before relying on the agent workflow.
 
 ## Product Surfaces
 
@@ -18,7 +20,7 @@ The local MCP server exposes five tools:
 | `get_figures` | Retrieve chart data, source locations, and provenance |
 | `get_evidence` | Retrieve evidence and linked claims |
 
-MCP and REST share the same SQLite database when configured with the same `DATABASE_PATH`. MCP tools do not call Gemini directly.
+MCP and REST share the same SQLite database when configured with the same `DATABASE_PATH`. The local MCP server reads the model key from its own environment and calls the provider directly, so no credential passes through this service.
 
 ### Web interface
 
@@ -30,7 +32,7 @@ The React application supports:
 - Simplified explanations and claim verification
 - Evidence-grounded chart generation
 - Claims, evidence, methods, results, tables, and citations
-- Authentication, API keys, billing, collections, annotations, and exports
+- Authentication, model key management, collections, annotations, and exports
 - Ephemeral document and figure sharing
 
 ## Trust Model
@@ -39,8 +41,8 @@ PaperViz separates evidence extraction from AI interpretation:
 
 1. Deterministic code extracts numeric evidence and table data from paper text.
 2. Deterministic code groups evidence into candidate datasets.
-3. Gemini may choose chart type, title, and explanation.
-4. Gemini may not invent chart values.
+3. The model may choose chart type, title, and explanation.
+4. The model may not invent chart values.
 5. A deterministic grounding validator rejects unsupported data before rendering.
 6. Simplified claims are compared with original claims; detected mismatches remain visible as evidence.
 
@@ -61,7 +63,7 @@ flowchart LR
     Tools --> Repo[Repositories]
 
     Services --> Repo
-    Services --> External[Gemini, PDF, Crossref, Unpaywall]
+    Services --> External[Model providers, PDF, Crossref, Unpaywall]
     Repo --> SQLite[(SQLite + WAL)]
 
     REST --> Static[Built React assets]
@@ -85,7 +87,7 @@ The production runtime is one Go binary serving both API routes and built fronte
 | Database | SQLite through `modernc.org/sqlite`, WAL enabled, no CGO |
 | Frontend | React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Recharts |
 | Agent interface | Model Context Protocol over stdio |
-| LLM | Google Gemini API through direct HTTP client |
+| LLM | Provider-agnostic HTTP client, one backend per vendor, key supplied per request (BYOK) |
 | PDF | `pdfcpu` and `ledongthuc/pdf`, processed in memory |
 | Validation | Go tests, frontend lint/build, Playwright E2E |
 
@@ -96,10 +98,20 @@ The production runtime is one Go binary serving both API routes and built fronte
 - Go 1.25
 - Node.js 24
 - npm
-- Google Gemini API key
-- Placeholder or real Google OAuth and Stripe values
 
-The server validates required environment variables at startup. See [`docs/getting-started.md`](docs/getting-started.md) for variable-by-variable setup.
+No vendor account is needed. The one secret the server needs is
+`CREDENTIAL_ENCRYPTION_KEY`, which you generate yourself:
+
+```bash
+openssl rand -base64 32
+```
+
+Users supply their own model key in the web UI. A Gemini key in your
+environment is only needed to run the local MCP server, which calls the
+provider directly from your machine.
+
+The server validates required environment variables at startup. See
+[`docs/getting-started.md`](docs/getting-started.md) for variable-by-variable setup.
 
 ### 1. Configure
 
@@ -173,18 +185,20 @@ CGO_ENABLED=0 go build -o server ./cmd/server
 paperviz/
 ├── cmd/
 │   ├── server/              # HTTP application entrypoint
-│   └── mcp/                 # stdio MCP entrypoint
+│   ├── mcp/                 # stdio MCP entrypoint
+│   └── admin/               # account recovery CLI
 ├── internal/
 │   ├── app/documents/       # document application service and read model
-│   ├── handlers/            # REST transport, middleware, auth, billing
+│   ├── app/credentials/     # resolves a user's stored key into a model client
+│   ├── handlers/            # REST transport, middleware, auth, credentials
 │   ├── services/            # pipeline and domain logic
 │   ├── repository/          # raw SQLite repositories and migrations
-│   ├── external/            # Gemini, PDF, DOI, and URL integrations
+│   ├── external/            # model provider clients, PDF, DOI, URL
 │   ├── mcp/                 # MCP tools, schemas, limits, and errors
 │   ├── models/              # shared chart and research value types
 │   ├── apperr/              # shared application errors
 │   └── infra/               # infrastructure helpers
-├── migrations/              # 19 ordered SQL migrations
+├── migrations/              # 21 ordered SQL migrations
 ├── frontend/                # React SPA
 ├── e2e/                     # Playwright tests
 ├── docs/                    # Product, architecture, operations, and API docs
@@ -211,7 +225,11 @@ Start with [`docs/README.md`](docs/README.md) for reading paths and source-of-tr
 ## Current Limitations
 
 - Scanned-image PDFs are not supported; input PDFs need a text layer.
-- `ingest_document` performs deterministic text intake only. It does not invoke Gemini, start the web processing pipeline, or wait for simplified output.
+- `ingest_document` performs deterministic text intake only. It does not invoke a model, start the web processing pipeline, or wait for simplified output.
+- Analysing a paper requires an account with a model key configured. Because the server holds no model credential of its own, there is no anonymous or free-tier path to a processed document: uploads without a usable key fail with `missing_credential`.
+- Only the Gemini backend is implemented. `anthropic` and `openai` are accepted by the credential API and stored, but resolving one fails until their backends land.
+- Service API keys are returned exactly once, at issue time, and stored only as a SHA-256 digest. A lost key cannot be recovered, only replaced.
+- There is no self-service password reset. Use `go run ./cmd/admin reset-password <email>`, which also revokes that account's live sessions.
 - `/agents` currently generates remote MCP configuration for `https://paperviz.com/api/mcp`, but the current server router does not expose that HTTP MCP transport. The repository ships a local stdio MCP entrypoint.
 - MCP search is global and stateless; it is not scoped to an authenticated user's library.
 - SQLite uses one open connection, and the architecture is designed for a single low-concurrency instance rather than horizontal scaling.
