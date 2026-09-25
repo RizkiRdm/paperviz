@@ -70,11 +70,15 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		userID = &uid
 	}
 
-	svc := documents.New(h.db, h.gemini)
-	docID, code, err := svc.Create(readingLevel, hasFile, pdfBytes, pastedText, userID)
+	svc := documents.New(h.db, h.provider)
+	docID, code, err := svc.Create(r.Context(), readingLevel, hasFile, pdfBytes, pastedText, userID)
 	if err != nil {
-		if code == "no_text_layer" {
+		switch code {
+		case "no_text_layer":
 			writeError(w, http.StatusUnprocessableEntity, "no_text_layer")
+			return
+		case "missing_credential", "credential_unreadable", "internal_error":
+			writeCredentialError(w, err)
 			return
 		}
 		slog.Error("document intake failed", "error", err)

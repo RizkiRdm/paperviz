@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"paperviz/internal/external"
+	"paperviz/internal/app/credentials"
 	"paperviz/internal/services"
 )
 
@@ -54,7 +54,7 @@ func spaNotFound(staticDir string, fileServer http.Handler) http.HandlerFunc {
 // SPA. staticDir is the frontend's built assets directory (frontend/dist),
 // served directly by this Go binary — no separate frontend server in
 // production, per ARCHITECTURE.md's "single binary" architecture style.
-func NewRouter(db *sql.DB, gemini *external.LLM, cipher *external.Cipher, staticDir string) http.Handler {
+func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) http.Handler {
 	r := chi.NewRouter()
 
 	// RequestID injects a unique request ID into every request context so
@@ -77,8 +77,8 @@ func NewRouter(db *sql.DB, gemini *external.LLM, cipher *external.Cipher, static
 
 	r.Get("/healthz", healthzHandler(db))
 
-	docHandler := NewDocumentHandler(db, gemini)
-	importHandler := NewImportHandler(db, gemini, services.NewPaperFetcher())
+	docHandler := NewDocumentHandler(db, provider)
+	importHandler := NewImportHandler(db, provider, services.NewPaperFetcher())
 	authMiddleware := NewAuthMiddleware(db)
 	shareHandler := NewShareHandler(db)
 	analyticsHandler := NewAnalyticsHandler(db)
@@ -150,7 +150,7 @@ func NewRouter(db *sql.DB, gemini *external.LLM, cipher *external.Cipher, static
 		r.With(authMiddleware.RequireAuth).Post("/apikey/regenerate", apiKeyHandler.RegenerateApiKey)
 	})
 
-	credentialHandler := NewCredentialHandler(db, cipher)
+	credentialHandler := NewCredentialHandler(db, provider.Cipher())
 	r.Route("/api/credentials", func(r chi.Router) {
 		r.With(authMiddleware.RequireAuth).Post("/", credentialHandler.Create)
 		r.With(authMiddleware.RequireAuth).Get("/", credentialHandler.List)

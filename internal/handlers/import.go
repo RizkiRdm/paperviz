@@ -1,13 +1,15 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
 
-	"paperviz/internal/external"
+	"paperviz/internal/app/credentials"
 	"paperviz/internal/services"
 )
 
@@ -19,18 +21,26 @@ type ImportService interface {
 
 // importCreator handles persistence for imported documents.
 type importCreator interface {
-	Create(sourceType, readingLevel, originalText, title string, userID *string) (string, error)
+	Create(ctx context.Context, sourceType, readingLevel, originalText, title string, userID *string) (string, error)
 }
 
 // dbImportCreator delegates persistence to services layer.
 type dbImportCreator struct {
-	db     *sql.DB
-	gemini *external.LLM
+	db       *sql.DB
+	provider *credentials.Resolver
 }
 
 // Create inserts imported document and starts pipeline via service.
-func (c *dbImportCreator) Create(sourceType, readingLevel, originalText, title string, userID *string) (string, error) {
-	return services.CreateImportedDocument(c.db, c.gemini, sourceType, readingLevel, originalText, title, userID)
+func (c *dbImportCreator) Create(ctx context.Context, sourceType, readingLevel, originalText, title string, userID *string) (string, error) {
+	resolvedID := ""
+	if userID != nil {
+		resolvedID = *userID
+	}
+	client, err := c.provider.For(ctx, resolvedID)
+	if err != nil {
+		return "", err
+	}
+	return services.CreateImportedDocument(c.db, client, sourceType, readingLevel, originalText, title, userID)
 }
 
 // ImportHandler handles DOI/URL import endpoints.
@@ -39,15 +49,15 @@ type ImportHandler struct {
 	creator       importCreator
 }
 
-// NewImportHandler constructs ImportHandler with DB+Gemini and optional fetcher.
-func NewImportHandler(db *sql.DB, gemini *external.LLM, importService ...ImportService) *ImportHandler {
+// NewImportHandler constructs ImportHandler with DB+credential resolver and optional fetcher.
+func NewImportHandler(db *sql.DB, provider *credentials.Resolver, importService ...ImportService) *ImportHandler {
 	var svc ImportService
 	if len(importService) > 0 {
 		svc = importService[0]
 	}
 	return &ImportHandler{
 		importService: svc,
-		creator:       &dbImportCreator{db: db, gemini: gemini},
+		creator:       &dbImportCreator{db: db, provider: provider},
 	}
 }
 
@@ -104,8 +114,12 @@ func (h *ImportHandler) ImportByDOI(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "fetch_failed")
 		return
 	}
-	id, err := h.creator.Create("doi", readingLevel, originalText, title, userID)
+	id, err := h.creator.Create(r.Context(), "doi", readingLevel, originalText, title, userID)
 	if err != nil {
+		if errors.Is(err, credentials.ErrNoCredential) || errors.Is(err, credentials.ErrCredentialUnreadable) {
+			writeCredentialError(w, err)
+			return
+		}
 		slog.Error("create imported document failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
@@ -151,8 +165,12 @@ func (h *ImportHandler) ImportByURL(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "fetch_failed")
 		return
 	}
-	id, err := h.creator.Create("url", readingLevel, originalText, title, userID)
+	id, err := h.creator.Create(r.Context(), "url", readingLevel, originalText, title, userID)
 	if err != nil {
+		if errors.Is(err, credentials.ErrNoCredential) || errors.Is(err, credentials.ErrCredentialUnreadable) {
+			writeCredentialError(w, err)
+			return
+		}
 		slog.Error("create imported document failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return

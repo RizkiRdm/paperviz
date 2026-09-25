@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 
+	"paperviz/internal/app/credentials"
 	"paperviz/internal/external"
 	"paperviz/internal/handlers"
 	"paperviz/internal/repository"
@@ -35,14 +36,10 @@ func main() {
 
 	slog.SetDefault(slog.New(external.NewJSONLHandler(io.MultiWriter(os.Stdout, f))))
 
-	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
-	if geminiAPIKey == "" {
-		// PROHIBITED per ARCHITECTURE.md Section 5: no hardcoded keys, no
-		// keys in committed config files. If this is missing, fail loudly
-		// at startup rather than silently running with a broken LLM client.
-		slog.Error("GEMINI_API_KEY environment variable is required")
-		os.Exit(1)
-	}
+	// No AI vendor credential is required here. PaperViz holds no model
+	// account: every call runs on a key the user supplied, decrypted per
+	// request by the resolver. GEMINI_API_KEY is only read by cmd/mcp, which
+	// runs on the user's own machine.
 
 	if os.Getenv("GOOGLE_CLIENT_ID") == "" {
 		slog.Error("GOOGLE_CLIENT_ID environment variable is required")
@@ -67,13 +64,6 @@ func main() {
 	if os.Getenv("FRONTEND_URL") == "" {
 		slog.Error("FRONTEND_URL environment variable is required")
 		os.Exit(1)
-	}
-
-	geminiModel := os.Getenv("GEMINI_MODEL")
-	if geminiModel == "" {
-		// Current fast + cheap default, good for text-only tasks. Valid
-		// stable models as of 2026-07: gemini-3.5-flash, gemini-2.5-flash-lite.
-		geminiModel = "gemini-2.5-flash-lite"
 	}
 
 	dbPath := os.Getenv("DATABASE_PATH")
@@ -110,11 +100,6 @@ func main() {
 	}
 
 	tr := external.NewTransport()
-	gemini, err := tr.For(external.ProviderGemini, geminiAPIKey, geminiModel)
-	if err != nil {
-		slog.Error("failed to build llm client", "error", err)
-		os.Exit(1)
-	}
 
 	// CREDENTIAL_ENCRYPTION_KEY fails loud, unlike the peripheral integrations
 	// that used to be required here. A wrong key does not disable a feature:
@@ -136,12 +121,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	// The resolver is process-wide; the clients it produces are not. It holds
+	// the shared transport and cipher and builds a per-user client from a
+	// credential decrypted at request time.
+	resolver := credentials.NewResolver(db, tr, cipher)
+
 	// Start the expiry sweep in the background — runs once immediately,
 	// then hourly (see services/expiry.go). It never returns, so it must
 	// run in its own goroutine, not block main().
 	go services.RunExpirySweepLoop(repository.NewDocumentRepo(db))
 
-	router := handlers.NewRouter(db, gemini, cipher, staticDir)
+	router := handlers.NewRouter(db, resolver, staticDir)
 
 	slog.Info("paperviz server starting", "port", port, "database_path", dbPath)
 	if err := http.ListenAndServe(":"+port, router); err != nil {

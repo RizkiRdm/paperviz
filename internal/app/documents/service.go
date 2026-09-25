@@ -1,34 +1,54 @@
 package documents
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log/slog"
 	"time"
 
-	"paperviz/internal/external"
+	"paperviz/internal/app/credentials"
 	"paperviz/internal/repository"
 	"paperviz/internal/services"
 )
 
 // Service owns document domain logic. Handlers are transport only: parse → call Service → render.
 type Service struct {
-	db     *sql.DB
-	gemini *external.LLM
+	db       *sql.DB
+	provider *credentials.Resolver
 }
 
 // New creates Service with explicit config (no global state).
-func New(db *sql.DB, gemini *external.LLM) *Service {
-	return &Service{db: db, gemini: gemini}
+func New(db *sql.DB, provider *credentials.Resolver) *Service {
+	return &Service{db: db, provider: provider}
 }
 
 // Create validates, inserts, and starts pipeline async.
-func (s *Service) Create(readingLevel string, hasFile bool, pdfBytes []byte, pastedText string, userID *string) (string, string, error) {
+//
+// The model credential is resolved before the row is inserted, so a user with
+// no key configured is told so instead of leaving a document that can never be
+// processed.
+func (s *Service) Create(ctx context.Context, readingLevel string, hasFile bool, pdfBytes []byte, pastedText string, userID *string) (string, string, error) {
+	resolvedID := ""
+	if userID != nil {
+		resolvedID = *userID
+	}
+	client, err := s.provider.For(ctx, resolvedID)
+	if err != nil {
+		if errors.Is(err, credentials.ErrNoCredential) {
+			return "", "missing_credential", err
+		}
+		if errors.Is(err, credentials.ErrCredentialUnreadable) {
+			return "", "credential_unreadable", err
+		}
+		return "", "internal_error", err
+	}
+
 	res, code, err := services.ValidateAndInsert(s.db, readingLevel, hasFile, pdfBytes, pastedText, userID)
 	if err != nil {
 		return "", code, err
 	}
-	go services.RunPipelineAndPersist(s.db, s.gemini, res.DocumentID, services.PipelineInput{
+	go services.RunPipelineAndPersist(s.db, client, res.DocumentID, services.PipelineInput{
 		OriginalText: res.OriginalText,
 		SourceType:   res.SourceType,
 		ReadingLevel: readingLevel,

@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"paperviz/internal/app/credentials"
 	"paperviz/internal/app/documents"
 	"paperviz/internal/external"
 	"paperviz/internal/repository"
@@ -26,17 +27,30 @@ import (
 )
 
 // DocumentHandler holds everything the two document endpoints need: a DB
-// handle (for opening transactions) and a Gemini client (passed down to the
-// pipeline). It has no other state — request-scoped values are never stored
-// on this struct, per AGENTS.md "MUST NOT use global mutable state for
-// request-scoped data."
+// handle (for opening transactions) and a credential resolver, which produces
+// the model client for whoever is making the request. It has no other state —
+// request-scoped values are never stored on this struct, per AGENTS.md "MUST
+// NOT use global mutable state for request-scoped data."
 type DocumentHandler struct {
-	db     *sql.DB
-	gemini *external.LLM
+	db       *sql.DB
+	provider *credentials.Resolver
 }
 
-func NewDocumentHandler(db *sql.DB, gemini *external.LLM) *DocumentHandler {
-	return &DocumentHandler{db: db, gemini: gemini}
+func NewDocumentHandler(db *sql.DB, provider *credentials.Resolver) *DocumentHandler {
+	return &DocumentHandler{db: db, provider: provider}
+}
+
+// resolveClient builds a model client for the requesting user and writes the
+// error response itself, returning false when the caller should stop. Every
+// endpoint that reaches a model goes through here, so an unconfigured key
+// produces the same answer everywhere instead of a per-handler variant.
+func (h *DocumentHandler) resolveClient(w http.ResponseWriter, r *http.Request) (*external.LLM, bool) {
+	client, err := h.provider.For(r.Context(), UserIDFromContext(r.Context()))
+	if err != nil {
+		writeCredentialError(w, err)
+		return nil, false
+	}
+	return client, true
 }
 
 type listDocumentResponse struct {
@@ -217,7 +231,7 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // Get handles GET /api/documents/:id.
 func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	svc := documents.New(h.db, h.gemini)
+	svc := documents.New(h.db, h.provider)
 	rm, err := svc.GetReadModel(id)
 	if errors.Is(err, repository.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
@@ -958,6 +972,11 @@ func (h *DocumentHandler) Compare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	client, ok := h.resolveClient(w, r)
+	if !ok {
+		return
+	}
+
 	docRepo := repository.NewDocumentRepo(h.db)
 	var papers []services.PaperSummary
 
@@ -973,7 +992,7 @@ func (h *DocumentHandler) Compare(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		summary, err := services.ExtractPaperSummary(r.Context(), h.gemini, doc.ID, doc.Title, doc.OriginalText)
+		summary, err := services.ExtractPaperSummary(r.Context(), client, doc.ID, doc.Title, doc.OriginalText)
 		if err != nil {
 			slog.Error("extract paper summary failed", "document_id", docID, "error", err)
 			writeError(w, http.StatusInternalServerError, "extraction_failed")
@@ -982,7 +1001,7 @@ func (h *DocumentHandler) Compare(w http.ResponseWriter, r *http.Request) {
 		papers = append(papers, summary)
 	}
 
-	comparison, err := services.ComparePapers(r.Context(), h.gemini, papers)
+	comparison, err := services.ComparePapers(r.Context(), client, papers)
 	if err != nil {
 		slog.Error("compare papers failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "comparison_failed")

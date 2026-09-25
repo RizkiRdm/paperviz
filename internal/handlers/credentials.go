@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"paperviz/internal/app/credentials"
 	"paperviz/internal/external"
 	"paperviz/internal/repository"
 )
@@ -197,5 +198,23 @@ func toCredentialResponse(c repository.Credential) credentialResponse {
 		Model:     c.Model,
 		KeyHint:   c.KeyHint,
 		IsDefault: c.IsDefault,
+	}
+}
+
+// writeCredentialError maps a credential resolution failure onto a response.
+// It is shared by every endpoint that needs a model client, so a user missing
+// a key gets the same actionable answer wherever they hit it.
+func writeCredentialError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, credentials.ErrNoCredential):
+		writeError(w, http.StatusBadRequest, "missing_credential")
+	case errors.Is(err, credentials.ErrCredentialUnreadable):
+		// Almost always a rotated CREDENTIAL_ENCRYPTION_KEY. Logged, because
+		// the user needs to be told and the operator needs to see it.
+		slog.Error("model credential unreadable", "error", err)
+		writeError(w, http.StatusInternalServerError, "credential_unreadable")
+	default:
+		slog.Error("resolve model credential failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
 	}
 }
