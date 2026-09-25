@@ -78,9 +78,30 @@ const backgroundPipelineTimeout = 20 * time.Minute
 
 // RunPipelineAndPersist runs the full asynchronous pipeline and persists the result
 // in a single transaction (ARCHITECTURE.md Section 4 Transaction Policy).
+//
+// The concurrency slot is taken here rather than at the request boundary. This
+// function is what actually consumes CPU, and it runs in a detached goroutine,
+// so a cap applied in the handler would bound submissions instead of work.
 func RunPipelineAndPersist(db *sql.DB, gemini *external.LLM, documentID string, input PipelineInput) {
 	ctx, cancel := context.WithTimeout(context.Background(), backgroundPipelineTimeout)
 	defer cancel()
+
+	if err := pipelines.acquire(ctx); err != nil {
+		// The pipeline timeout elapsed while queued. Record the failure through
+		// the normal persistence path so the document does not sit in
+		// "processing" forever.
+		slog.Error("pipeline gave up waiting for a concurrency slot",
+			"document_id", documentID, "error", err)
+		if perr := savePipelineResult(db, documentID, PipelineOutput{
+			Status:       repository.StatusFailed,
+			ErrorMessage: "server was busy; please try again",
+		}); perr != nil {
+			slog.Error("record pipeline queue failure failed",
+				"document_id", documentID, "error", perr)
+		}
+		return
+	}
+	defer pipelines.release()
 
 	startTime := time.Now()
 

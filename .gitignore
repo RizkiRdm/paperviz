@@ -9,6 +9,8 @@
 
 # Go build artifacts
 /server
+/admin
+/mcp
 /cmd/server/server
 /paperviz
 
@@ -43,7 +45,7 @@ e2e/node_modules/
 e2e/tests/e2e-results/
 
 # Generated reports
-report/
+# report/
 
 # Air live-reload artifacts
 tmp/

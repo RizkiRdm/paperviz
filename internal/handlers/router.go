@@ -88,7 +88,7 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 	exportHandler := NewExportHandler(db)
 
 	r.Route("/api/documents", func(r chi.Router) {
-		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/", docHandler.Create)
+		r.With(requireIngestionEnabled, rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/", docHandler.Create)
 		r.Get("/{id}", docHandler.Get)
 		r.Get("/{id}/charts/{chartId}/image", docHandler.GetChartImage)
 		r.Get("/{id}/claims", docHandler.GetClaims)
@@ -119,8 +119,8 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 
 	// Import routes handle DOI/URL-based paper ingestion.
 	r.Route("/api/import", func(r chi.Router) {
-		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/doi", importHandler.ImportByDOI)
-		r.With(rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/url", importHandler.ImportByURL)
+		r.With(requireIngestionEnabled, rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/doi", importHandler.ImportByDOI)
+		r.With(requireIngestionEnabled, rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/url", importHandler.ImportByURL)
 	})
 
 	r.With(noindexMiddleware).Get("/share/fig/{shareToken}", shareHandler.GetSharedFigure)
