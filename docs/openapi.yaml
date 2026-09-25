@@ -218,15 +218,150 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/credentials:
+    post:
+      operationId: createCredential
+      summary: "Store a model API key (BYOK)"
+      description: |
+        Encrypts the supplied key with AES-256-GCM and stores it against the
+        authenticated user. PaperViz holds no model vendor account, so this key
+        pays for the analysis.
+
+        The response never contains the key. Only `key_hint`, the last four
+        characters, is stored alongside it for display.
+      tags: ["Credentials"]
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, api_key]
+              properties:
+                provider:
+                  type: string
+                  enum: [gemini, anthropic, openai]
+                  description: "Only `gemini` has an implemented backend today."
+                model:
+                  type: string
+                  description: "Optional. Defaults to the provider's default model."
+                api_key:
+                  type: string
+                  format: password
+                  description: "The user's own provider key. Never logged, never returned."
+      responses:
+        "201":
+          description: "Credential stored"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Credential"
+        "400":
+          description: "Unsupported provider or missing key"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      operationId: listCredentials
+      summary: "List stored credentials"
+      description: "Returns metadata only. Ciphertext and plaintext keys are never included."
+      tags: ["Credentials"]
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: "Credential list"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Credential"
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/credentials/{id}:
+    delete:
+      operationId: deleteCredential
+      summary: "Delete a stored credential"
+      description: "Scoped to the authenticated user. An unknown or unowned id is a no-op."
+      tags: ["Credentials"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Deleted"
+          content:
+            application/json:
+              schema:
+                type: object
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/credentials/{id}/default:
+    post:
+      operationId: setDefaultCredential
+      summary: "Promote a credential to default"
+      description: |
+        The credential used for analysis. Promoting one demotes the previous
+        default; the database enforces at most one default per user.
+      tags: ["Credentials"]
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Promoted"
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          description: "No such credential for this user"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/documents:
     post:
       operationId: createDocument
       summary: "Create a new document for analysis"
       description: |
-        Upload a PDF (max 20 MiB) or paste text for analysis. The backend extracts text and chart images, then runs simplification, claim verification, chapter detection, and chart generation via Gemini API.
+        Upload a PDF (max 20 MiB) or paste text for analysis. The backend extracts text and chart images, then runs simplification, claim verification, chapter detection, and chart generation using the authenticated user's own model key.
+
+        **Requires a configured credential.** There is no server-side model key, so a request from a user with no default credential fails with `missing_credential` (400) and no document is created.
 
         **Rate limit:** 1 request per 30 seconds per IP fingerprint.
-        **Usage limit:** Monthly paper limit applies per tier (free: 5 papers).
+        **Kill switch:** When `INGESTION_ENABLED=false`, this returns 503 with `Retry-After` while read, share, and library routes keep working.
         Processing runs in the background — poll `GET /api/documents/{id}` until status is `complete`.
 
         Accepts `multipart/form-data`.
@@ -1736,6 +1871,29 @@ components:
           type: string
           format: date
           example: "2026-09-01"
+
+    # ── Credentials ───────────────────────────────────────────────
+    Credential:
+      type: object
+      description: |
+        Metadata for one stored model key. There is deliberately no field that
+        can carry the key itself or the stored ciphertext.
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+          enum: [gemini, anthropic, openai]
+        model:
+          type: string
+        key_hint:
+          type: string
+          description: "Last four characters, for display only."
+          example: "7890"
+        is_default:
+          type: boolean
+          description: "True when this credential is used for analysis."
+      required: ["id", "provider", "model", "key_hint", "is_default"]
 
     # ── Error ─────────────────────────────────────────────────────
     ErrorResponse:
