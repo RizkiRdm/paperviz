@@ -32,7 +32,13 @@ graphify-out/
 .gemini/
 .impeccable/
 .omo/
-.opencode/
+.opencode/*
+# ...except project intelligence, which documents our own patterns and is
+# meant to be shared. Agent tooling stays ignored. Note the /* form: git cannot
+# re-include a path whose parent directory is itself excluded.
+!.opencode/context/
+.opencode/context/*
+!.opencode/context/project-intelligence/
 .playwright-mcp/
 .playwright-cli/
 
