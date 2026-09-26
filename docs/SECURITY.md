@@ -2,18 +2,18 @@
 
 ## 1. Security Scope
 
-Covers authentication, authorization, input validation, file handling, rate limiting, external requests, secrets management, data isolation, and retention for PaperViz (Go `chi` + SQLite, React frontend, Gemini API). Agent/MCP surface supports deterministic text intake and research-data retrieval; it does not expose user-owned management operations.
+Covers authentication, authorization, input validation, file handling, rate limiting, external requests, secrets management, data isolation, and retention for PaperViz (Go `chi` + SQLite, React frontend, provider-agnostic model access under BYOK). Agent/MCP surface supports deterministic text intake and research-data retrieval; it does not expose user-owned management operations.
 
 ## 2. Threat Model
 
 ### Assets
 
-* User data: email, password_hash, sessions, API keys (`api_key` column)
+* User data: email, password_hash, sessions, API keys (`api_key_hash` column, SHA-256 digest)
 * Uploaded documents: PDF bytes (in-memory only, not persisted to disk), extracted text, simplified text, charts
 * Structured research data: claims, tables, methods, results, citations, annotations, collections
-* API credentials: `GEMINI_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `STRIPE_SECRET_KEY/WEBHOOK_SECRET`, `PAPERVIZ_API_KEY` (MCP)
+* User model credentials: encrypted blobs in `user_credentials` (AES-256-GCM), `key_hint`
+* Process secrets: `CREDENTIAL_ENCRYPTION_KEY` (server), `GEMINI_API_KEY` and `PAPERVIZ_API_KEY` (MCP only)
 * Generated results: share tokens (`share_token` on documents/charts), public share pages
-* Stripe customer/subscription state
 
 ### Threat Actors
 
@@ -103,20 +103,21 @@ No RBAC. Single `user` role. Access controlled by resource ownership.
 
 ### Prompt Injection
 
-* **Current**: Document text is never concatenated into agent system prompts that grant tool control; `external/gemini.go` uses text-only prompts with JSON schema expectations. No explicit injection filter.
+* **Current**: Document text is never concatenated into agent system prompts that grant tool control; `external/llm.go` uses text-only prompts with JSON schema expectations. No explicit injection filter.
 * **Status**: Partially implemented — grounding validator prevents model-manufactured evidence but no dedicated prompt-injection sanitizer. Risk documented as known limitation.
 
 ## 8. Secrets
 
 | Secret | Purpose | Storage |
 |--------|---------|---------|
-| `GEMINI_API_KEY` | LLM calls (direct HTTP, no gateway) | env, `os.Getenv` |
-| `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URL` | OAuth | env |
-| `STRIPE_SECRET_KEY/WEBHOOK_SECRET/PRICE_PRO/PRICE_RESEARCH` | Billing | env |
+| `CREDENTIAL_ENCRYPTION_KEY` | AES-256-GCM key for stored user model keys | env, `os.Getenv`; never persisted |
+| `GEMINI_API_KEY` | Provider calls from the local MCP process | env, `cmd/mcp` only |
 | `PAPERVIZ_API_KEY` | MCP per-key auth | env (MCP) |
-| `session_token`, `oauth_state` cookies | Session | `HttpOnly; Secure; SameSite=Lax` |
+| `session_token` cookie | Session | `HttpOnly; Secure; SameSite=Lax` |
 
-*Exposure prevention*: No `slog.Info("gemini debug"... )` (removed A1); `slog.Error` never logs full document text (ARCHITECTURE Logging Policy); no hardcoded secrets; `.env.example` documents required vars; MCP requires `PAPERVIZ_API_KEY`.
+*User model keys* are the other secret class. They are supplied by the user through the web UI, stored as AES-256-GCM ciphertext with AAD bound to `user_id|provider|model`, and returned only as `key_hint` (last 4 characters). The server holds no model vendor credential of its own, so no server-side key may be introduced — a user with no credential gets `missing_credential`, which is the correct answer.
+
+*Exposure prevention*: No `slog.Info("gemini debug"... )` (removed A1); `slog.Error` never logs full document text (ARCHITECTURE Logging Policy); no plaintext model key is ever logged, returned, or stored; no hardcoded secrets; `.env.example` documents required vars; MCP requires `PAPERVIZ_API_KEY`.
 
 ## 9. Data Isolation
 

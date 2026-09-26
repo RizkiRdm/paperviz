@@ -319,22 +319,19 @@ MCP constraints:
 
 | Variable | Consumer | Required | Default or notes |
 |---|---|---:|---|
-| `GEMINI_API_KEY` | server, MCP | Yes | Direct Gemini API key |
-| `GEMINI_MODEL` | server, MCP | No | `gemini-2.5-flash-lite` |
-| `DATABASE_PATH` | server, MCP | No | `paperviz.db` |
+| `CREDENTIAL_ENCRYPTION_KEY` | server | Yes | base64 32 bytes; AES-256-GCM for stored user keys. Startup fails if missing or malformed |
+| `INGESTION_ENABLED` | server | No | `true`. `false` returns 503 on document creation; read/share/library keep working |
+| `PIPELINE_MAX_CONCURRENCY` | server | No | `2`. Bounds concurrent pipelines, not model spend |
+| `DATABASE_PATH` | server, MCP, admin | No | `paperviz.db` |
 | `STATIC_DIR` | server | No | `frontend/dist` |
 | `PORT` | server and Vite proxy | No | `8080` |
 | `LOG_FILE` | server | No | `paperviz.log.jsonl` |
-| `GOOGLE_CLIENT_ID` | server | Yes | Startup fails if empty |
-| `GOOGLE_CLIENT_SECRET` | server | Yes | Startup fails if empty |
-| `GOOGLE_REDIRECT_URL` | server | Yes | Local default in `.env.example` |
-| `STRIPE_SECRET_KEY` | server | Yes | Startup fails if empty |
-| `STRIPE_WEBHOOK_SECRET` | server | Yes | Startup fails if empty |
-| `STRIPE_PRICE_PRO` | server | No in startup check | Required for Pro checkout |
-| `STRIPE_PRICE_RESEARCH` | server | No in startup check | Required for Research checkout |
-| `FRONTEND_URL` | server | Yes | Startup fails if empty |
-| `PAPERVIZ_API_KEY` | MCP | Yes | Process-level MCP key |
-| `MIGRATIONS_DIR` | MCP | No | `migrations` |
+| `GEMINI_API_KEY` | MCP only | Yes for MCP | Local stdio server calls the provider directly; the web server never reads it |
+| `GEMINI_MODEL` | MCP only | No | `gemini-2.5-flash-lite` |
+| `PAPERVIZ_API_KEY` | MCP | Yes for MCP | Process-level MCP key |
+| `MIGRATIONS_DIR` | MCP, admin | No | `migrations` |
+
+The server holds no model vendor credential. Web model calls run on the requesting user's own key, decrypted per request by `internal/app/credentials.Resolver`; there is no `GEMINI_API_KEY` and no `FRONTEND_URL` in the server path. `CREDENTIAL_ENCRYPTION_KEY` is the only secret `cmd/server` refuses to boot without.
 
 The HTTP process does not load `.env`. Export values before running it.
 

@@ -21,19 +21,23 @@ go mod download
 npm --prefix frontend ci
 ```
 
-Edit `.env` before starting the server. The HTTP process validates these variables at startup:
+Edit `.env` before starting the server. The HTTP process validates one variable at startup:
 
 ```dotenv
-GEMINI_API_KEY=your-real-key
-GOOGLE_CLIENT_ID=non-empty-local-value
-GOOGLE_CLIENT_SECRET=non-empty-local-value
-GOOGLE_REDIRECT_URL=http://localhost:8080/api/auth/google/callback
-STRIPE_SECRET_KEY=non-empty-local-value
-STRIPE_WEBHOOK_SECRET=non-empty-local-value
-FRONTEND_URL=http://localhost:5173
+CREDENTIAL_ENCRYPTION_KEY=base64-encoded-32-random-bytes
 ```
 
-Non-empty local placeholders allow server startup, but Google OAuth and Stripe operations require real provider configuration.
+Generate it with `openssl rand -base64 32`. Everything else is optional:
+
+```dotenv
+INGESTION_ENABLED=true
+PIPELINE_MAX_CONCURRENCY=2
+DATABASE_PATH=paperviz.db
+STATIC_DIR=frontend/dist
+PORT=8080
+```
+
+PaperViz holds no third-party account. There is no OAuth provider, no payment processor, and no model vendor key: users add their own model key in the web UI, and it is encrypted at rest with `CREDENTIAL_ENCRYPTION_KEY`. Losing or rotating that key makes every stored user key unreadable. The local MCP process reads `GEMINI_API_KEY` and `PAPERVIZ_API_KEY` separately, from your own machine.
 
 ## Run in development
 

@@ -46,7 +46,7 @@ Failure in Gemini or PDF extraction is isolated per-stage; failure in DB is glob
 
 ### Retryable Errors
 
-* Gemini 429 (`Gemini rate limited`), 5xx with backoff in `external/gemini.go: GenerateWithRetry` (up to 3, `backoff = 2s << attempt`).
+* Provider 429 and 5xx with backoff in `external/llm.go` (`Transport`, up to 3, `backoff = 2s << attempt`). The provider SDK's own retry is disabled with `WithMaxRetries(0)` so the two schedules cannot compound.
 
 ### Non-Retryable Errors
 

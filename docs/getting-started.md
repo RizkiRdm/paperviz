@@ -39,29 +39,26 @@ cp .env.example .env
 A minimal bootable local file looks like this:
 
 ```dotenv
-GEMINI_API_KEY=your-gemini-key
-GEMINI_MODEL=gemini-2.5-flash-lite
+CREDENTIAL_ENCRYPTION_KEY=base64-encoded-32-random-bytes
+INGESTION_ENABLED=true
+PIPELINE_MAX_CONCURRENCY=2
 
 DATABASE_PATH=paperviz.db
 STATIC_DIR=frontend/dist
 PORT=8080
+```
 
-GOOGLE_CLIENT_ID=local-placeholder
-GOOGLE_CLIENT_SECRET=local-placeholder
-GOOGLE_REDIRECT_URL=http://localhost:8080/api/auth/google/callback
+Generate the one required secret with:
 
-STRIPE_SECRET_KEY=local-placeholder
-STRIPE_WEBHOOK_SECRET=local-placeholder
-STRIPE_PRICE_PRO=
-STRIPE_PRICE_RESEARCH=
-FRONTEND_URL=http://localhost:5173
+```bash
+openssl rand -base64 32
 ```
 
 Notes:
 
-- `GEMINI_API_KEY` must be real for paper processing.
-- Google OAuth needs provider credentials and a registered callback before it can work.
-- Stripe checkout needs real API values and price identifiers.
+- `CREDENTIAL_ENCRYPTION_KEY` must be present and valid; the server exits at startup otherwise. Losing or rotating it makes every stored user model key unreadable.
+- Users bring their own model key through the web UI, so no model credential belongs in this file.
+- To run the local MCP server, export `GEMINI_API_KEY` in that process only. `cmd/mcp` calls the provider directly from your machine.
 - The server reads process environment variables directly; it does not load `.env` itself.
 - Never commit `.env` or real credentials.
 
