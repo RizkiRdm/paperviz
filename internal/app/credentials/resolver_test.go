@@ -183,15 +183,26 @@ func TestResolverCredentialIsUserScoped(t *testing.T) {
 	}
 }
 
-func TestResolverRejectsProviderWithoutBackend(t *testing.T) {
-	r, db, cipher := newTestResolver(t)
-	seedUser(t, db, "u1")
-	// Valid provider, but this build has no backend wired for it yet.
-	addCredential(t, db, cipher, "u1", "anthropic", "", testKey, true)
+// TestResolverResolvesEverySupportedProvider proves each accepted provider
+// yields a usable client, so a user who stored a Claude or OpenAI key does not
+// discover at upload time that the backend is missing.
+func TestResolverResolvesEverySupportedProvider(t *testing.T) {
+	for _, providerName := range []string{"gemini", "anthropic", "openai"} {
+		t.Run(providerName, func(t *testing.T) {
+			r, db, cipher := newTestResolver(t)
+			seedUser(t, db, "u1")
+			addCredential(t, db, cipher, "u1", providerName, "", testKey, true)
 
-	if _, err := r.For(context.Background(), "u1"); err == nil {
-		t.Fatal("expected an error for a provider with no backend")
-	} else if errors.Is(err, ErrNoCredential) {
-		t.Fatalf("wrong error class: %v", err)
+			client, err := r.For(context.Background(), "u1")
+			if err != nil {
+				t.Fatalf("For(%s): %v", providerName, err)
+			}
+			if client == nil {
+				t.Fatalf("For(%s) returned no client", providerName)
+			}
+			if string(client.Provider()) != providerName {
+				t.Fatalf("provider = %q, want %q", client.Provider(), providerName)
+			}
+		})
 	}
 }

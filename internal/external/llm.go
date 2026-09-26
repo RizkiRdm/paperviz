@@ -35,15 +35,6 @@ func (p Provider) Valid() bool {
 	return false
 }
 
-// Available reports whether this build has a backend for the provider. It is
-// narrower than Valid: a provider can be a recognised vendor while having no
-// route to it yet. Storing a key we cannot call would leave the user with a
-// default credential that fails on every upload, so the credential API checks
-// this rather than Valid.
-func (p Provider) Available() bool {
-	return p == ProviderGemini
-}
-
 // DefaultModel returns the model used when a user supplies a key without
 // naming a model. Chosen for cost and latency on structured extraction.
 func (p Provider) DefaultModel() string {
@@ -156,14 +147,7 @@ func (t *Transport) For(p Provider, apiKey, model string) (*LLM, error) {
 	if model == "" {
 		model = p.DefaultModel()
 	}
-	switch p {
-	case ProviderGemini:
-		return t.newLLM(p, model, newGeminiCall(apiKey, fmt.Sprintf(geminiEndpoint, model), t.httpClient)), nil
-	case ProviderAnthropic, ProviderOpenAI:
-		return nil, fmt.Errorf("provider %q has no backend in this build", p)
-	default:
-		return nil, fmt.Errorf("unsupported provider %q", p)
-	}
+	return t.newLLM(p, model, newGoAICall(p, model, apiKey, t.httpClient)), nil
 }
 
 // Generate sends one prompt and returns the model's text.
@@ -332,4 +316,22 @@ func ExtractJSON[T any](ctx context.Context, client *LLM, prompt string, maxToke
 		return zero, fmt.Errorf("unmarshal json response %q: %w", trimmed, err)
 	}
 	return parsed, nil
+}
+
+// stripJSONFences removes a surrounding markdown code fence, which models add
+// even when told to return bare JSON.
+func stripJSONFences(s string) string {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "```") {
+		return s
+	}
+	nl := strings.Index(s, "\n")
+	if nl < 0 {
+		return s
+	}
+	s = s[nl+1:]
+	if idx := strings.LastIndex(s, "```"); idx >= 0 {
+		s = s[:idx]
+	}
+	return strings.TrimSpace(s)
 }

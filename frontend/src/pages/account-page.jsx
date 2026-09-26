@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 
-// Only providers with a working backend are offered. The API rejects the rest
-// with provider_not_available, so listing them would be a dead control.
-const PROVIDERS = [{ value: "gemini", label: "Google Gemini" }]
+const PROVIDERS = [
+  { value: "gemini", label: "Google Gemini" },
+  { value: "anthropic", label: "Anthropic Claude" },
+  { value: "openai", label: "OpenAI" },
+]
 
 export function AccountPage() {
   const navigate = useNavigate()

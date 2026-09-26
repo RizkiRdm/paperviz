@@ -7,6 +7,7 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/pdfcpu/pdfcpu v0.9.1
+	github.com/zendev-sh/goai v0.10.4
 	golang.org/x/crypto v0.54.0
 	golang.org/x/time v0.15.0
 	modernc.org/sqlite v1.34.4
@@ -29,7 +30,7 @@ require (
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/image v0.21.0 // indirect
-	golang.org/x/oauth2 v0.35.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect

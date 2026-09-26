@@ -198,31 +198,52 @@ func TestCredentialCreateDefaultsModel(t *testing.T) {
 	}
 }
 
-// TestCredentialCreateRejectsUnavailableProvider covers the recognised-but-not-
-// implemented case. Storing a key we cannot call would leave the user with a
-// default credential that fails on every upload.
-func TestCredentialCreateRejectsUnavailableProvider(t *testing.T) {
+// TestCredentialCreateAcceptsEverySupportedProvider proves each provider with a
+// backend is storable, so the dropdown and the API agree.
+func TestCredentialCreateAcceptsEverySupportedProvider(t *testing.T) {
+	for _, provider := range []string{"gemini", "anthropic", "openai"} {
+		t.Run(provider, func(t *testing.T) {
+			db := openCredentialHandlerDB(t)
+			h := NewCredentialHandler(db, testCipher(t))
+
+			body := `{"provider":"` + provider + `","api_key":"` + testModelKey + `"}`
+			w := doJSON(t, h.Create, http.MethodPost, body, "u1")
+			if w.Code != http.StatusCreated {
+				t.Fatalf("status = %d, want 201; body %s", w.Code, w.Body.String())
+			}
+			var got credentialResponse
+			if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if got.Provider != provider {
+				t.Fatalf("provider = %q, want %q", got.Provider, provider)
+			}
+			if strings.Contains(w.Body.String(), testModelKey) {
+				t.Fatalf("response leaked the key: %s", w.Body.String())
+			}
+		})
+	}
+}
+
+// TestCredentialCreateRejectsUnknownProvider keeps the validation real: a
+// vendor we have no route to is still refused rather than stored.
+func TestCredentialCreateRejectsUnknownProvider(t *testing.T) {
 	db := openCredentialHandlerDB(t)
 	h := NewCredentialHandler(db, testCipher(t))
 
-	for _, provider := range []string{"anthropic", "openai"} {
-		t.Run(provider, func(t *testing.T) {
-			body := `{"provider":"` + provider + `","api_key":"` + testModelKey + `"}`
-			w := doJSON(t, h.Create, http.MethodPost, body, "u1")
-			if w.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want 400; body %s", w.Code, w.Body.String())
-			}
-			if !strings.Contains(w.Body.String(), "provider_not_available") {
-				t.Fatalf("body = %q, want provider_not_available", w.Body.String())
-			}
-			list, err := repository.NewCredentialRepo(db).ListByUser("u1")
-			if err != nil {
-				t.Fatalf("list: %v", err)
-			}
-			if len(list) != 0 {
-				t.Fatalf("a rejected provider was stored anyway: %+v", list)
-			}
-		})
+	w := doJSON(t, h.Create, http.MethodPost, `{"provider":"llama","api_key":"`+testModelKey+`"}`, "u1")
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "unsupported_provider") {
+		t.Fatalf("body = %q, want unsupported_provider", w.Body.String())
+	}
+	list, err := repository.NewCredentialRepo(db).ListByUser("u1")
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(list) != 0 {
+		t.Fatalf("a rejected provider was stored anyway: %+v", list)
 	}
 }
 
