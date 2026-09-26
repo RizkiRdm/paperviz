@@ -121,7 +121,43 @@ Plan: `.omo/plans/byok_auth_billing_removal.md`. Threats addressed: (a) key thef
 - Claim-diff verification MUST be tested against the Phase 0 corrupted-passage case (PLAN.md) to confirm it actually catches injected errors — a verification system that never fails its own test is not proven.
 
 ## Git Rules
-- Every task do MUST commit and push to remote repository.
+- Every task MUST end with a commit and a push to `origin`. Uncommitted work is unfinished work.
+- MUST run the Verification Commands gate BEFORE committing. A commit that fails `go test ./...` or `gofmt -l .` is a broken commit; fix it in the same change, never amend around a failure.
+- Stage files selectively (`git add <path>`). Never `git add -A` or `git add .` — this repo gitignores `.env`, `paperviz.db*`, `.opencode/`, and scratch output, and a blind add is how those leak into history.
+- Never commit secrets. `.env`, real API keys, `paperviz.db`, and build output stay ignored.
+- Do NOT force-push to `main`. Do NOT rewrite published history. If a commit must be corrected, add a new commit.
+- Do NOT use `git update-index --skip-worktree` or `--assume-unchanged` to hide local changes.
+- After code changes, run `graphify update .` so the code graph does not lag the tree.
+
+### Commit messages
+Conventional Commits, lowercase, imperative mood, no trailing period:
+
+```text
+<type>(<scope>): <subject ≤50 chars>
+```
+- Allowed types: `feat`, `fix`, `docs`, `refactor`, `test`, `perf`, `build`, `ci`, `chore`, `revert`.
+- Add a body only when the *why* is not obvious from the subject. Never restate the diff.
+- Scopes in use: `byok`, `web`, `db`, `mcp`, `ops`, `auth`, `admin`, `pipeline`, `evidence`, `docs`.
+- Refer to plan/ADR ids when the change belongs to one: `feat(byok): ... (P07)`.
+
+### Versioning and tags — SemVer
+PaperViz follows [Semantic Versioning](https://semver.org). The version lives in a git tag; there is no version constant in the code.
+
+- Tag format: `vMAJOR.MINOR.PATCH`, annotated (`git tag -a`), message = one-line summary of the release.
+- The project is **pre-1.0**. `MAJOR` stays `0` until the REST contract in `docs/openapi.yaml` is declared stable; bumping to `1.0.0` is an explicit owner decision, not an agent decision.
+- `MINOR` — a feature, or a **breaking change while `MAJOR` is 0** (pre-1.0 semver: anything may break). New endpoint, new MCP tool, removed field, changed response shape, removed feature.
+- `PATCH` — backward-compatible fix or internal change. Bug fix, dependency bump, docs, refactor with no contract change, test, CI.
+- Tag only a state that passed the full Verification Commands gate on a clean tree.
+- Tag every user-visible deploy. Docs-only or internal chores do not need a tag.
+- A tag is immutable. Found a bug in a released version? Cut a new PATCH/MINOR tag. Do NOT move or delete an existing tag.
+
+```bash
+# release
+git tag -a v0.1.0 -m "BYOK pivot: three providers, no server-side credential"
+git push origin main --tags
+```
+
+- Record notable version decisions in `docs/PROJECT_STATE.md` and architecture changes in `docs/decisions.md` or `docs/DECISIONS/`.
 
 ## Agent-Integration Rules (discovered 2026-09-09, Chunk 10 audit)
 - [DO] Treat MCP as an additive interface layer only. It shares the service layer with REST (`docs/mcp-parity.md` architecture rule) — it does not replace or gate the consumer web app.
