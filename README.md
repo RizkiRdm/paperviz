@@ -87,7 +87,7 @@ The production runtime is one Go binary serving both API routes and built fronte
 | Database | SQLite through `modernc.org/sqlite`, WAL enabled, no CGO |
 | Frontend | React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Recharts |
 | Agent interface | Model Context Protocol over stdio |
-| LLM | Provider-agnostic HTTP client, one backend per vendor, key supplied per request (BYOK) |
+| LLM | `github.com/zendev-sh/goai` for Gemini, Anthropic, and OpenAI protocol; own retry, concurrency, and JSON recovery. Key supplied per request (BYOK) |
 | PDF | `pdfcpu` and `ledongthuc/pdf`, processed in memory |
 | Validation | Go tests, frontend lint/build, Playwright E2E |
 
@@ -227,7 +227,7 @@ Start with [`docs/README.md`](docs/README.md) for reading paths and source-of-tr
 - Scanned-image PDFs are not supported; input PDFs need a text layer.
 - `ingest_document` performs deterministic text intake only. It does not invoke a model, start the web processing pipeline, or wait for simplified output.
 - Analysing a paper requires an account with a model key configured. Because the server holds no model credential of its own, there is no anonymous or free-tier path to a processed document: uploads without a usable key fail with `missing_credential`.
-- Only the Gemini backend is implemented. `anthropic` and `openai` are accepted by the credential API and stored, but resolving one fails until their backends land.
+- Model keys work for Gemini, Anthropic Claude, and OpenAI. Provider protocol comes from `github.com/zendev-sh/goai`; retry, concurrency, and JSON recovery are PaperViz's own.
 - Service API keys are returned exactly once, at issue time, and stored only as a SHA-256 digest. A lost key cannot be recovered, only replaced.
 - There is no self-service password reset. Use `go run ./cmd/admin reset-password <email>`, which also revokes that account's live sessions.
 - `/agents` currently generates remote MCP configuration for `https://paperviz.com/api/mcp`, but the current server router does not expose that HTTP MCP transport. The repository ships a local stdio MCP entrypoint.
