@@ -2,6 +2,8 @@ package services
 
 import (
 	"log/slog"
+	"os"
+	"strconv"
 	"time"
 )
 
@@ -22,6 +24,23 @@ const sweepInterval = 1 * time.Hour
 // easy to fake in a unit test without a real database.
 type ExpiryDeleter interface {
 	DeleteExpiredBefore(cutoff int64) (int64, error)
+	ListExpiredBefore(cutoff int64) ([]string, error)
+}
+
+// ExpiryDryRun reports whether the sweep should log what it would delete
+// instead of deleting. The 7-day window is a product decision and is unchanged
+// either way; this only makes an irreversible bulk delete previewable.
+func ExpiryDryRun() bool {
+	raw := os.Getenv("EXPIRY_DRY_RUN")
+	if raw == "" {
+		return false
+	}
+	dryRun, err := strconv.ParseBool(raw)
+	if err != nil {
+		slog.Warn("ignoring invalid EXPIRY_DRY_RUN, treating as delete", "value", raw)
+		return false
+	}
+	return dryRun
 }
 
 // RunExpirySweepLoop deletes documents past the 7-day inactivity window
@@ -46,15 +65,30 @@ func RunExpirySweepLoop(repo ExpiryDeleter) {
 // sweepOnce runs a single expiry pass. charts and claim_diffs rows cascade
 // automatically via the ON DELETE CASCADE foreign keys defined in
 // migrations/001_init.sql — this function only needs to delete from
-// documents.
+// documents. Each id is logged at warn level before deletion so an
+// irreversible bulk delete leaves a per-document trail in the log, not just
+// an aggregate count.
 func sweepOnce(repo ExpiryDeleter) {
 	cutoff := time.Now().Add(-expiryWindow).Unix()
+	ids, err := repo.ListExpiredBefore(cutoff)
+	if err != nil {
+		slog.Error("expiry sweep failed", "error", err)
+		return
+	}
+	if len(ids) == 0 {
+		return
+	}
+	if ExpiryDryRun() {
+		slog.Warn("expiry sweep dry run, nothing deleted", "stage", "expiry_sweep", "would_delete", ids)
+		return
+	}
+	for _, id := range ids {
+		slog.Warn("expiry sweep deleting document", "stage", "expiry_sweep", "document_id", id)
+	}
 	deleted, err := repo.DeleteExpiredBefore(cutoff)
 	if err != nil {
 		slog.Error("expiry sweep failed", "error", err)
 		return
 	}
-	if deleted > 0 {
-		slog.Info("expiry sweep", "stage", "expiry_sweep", "documents_deleted", deleted)
-	}
+	slog.Info("expiry sweep", "stage", "expiry_sweep", "documents_deleted", deleted)
 }

@@ -99,6 +99,30 @@ func (r *DocumentRepo) DeleteExpiredBefore(cutoff int64) (int64, error) {
 	return res.RowsAffected()
 }
 
+// ListExpiredBefore returns the ids of documents whose last_accessed_at is
+// older than cutoff, so a caller can log or preview each deletion instead of
+// only seeing an aggregate count.
+func (r *DocumentRepo) ListExpiredBefore(cutoff int64) ([]string, error) {
+	rows, err := r.db.Query(`SELECT id FROM documents WHERE last_accessed_at < ?`, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("list expired documents: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan expired document: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate expired documents: %w", err)
+	}
+	return ids, nil
+}
+
 // ListByUser returns documents belonging to a user, ordered by most recent, paginated.
 func (r *DocumentRepo) ListByUser(userID string, limit, offset int) ([]Document, error) {
 	rows, err := r.db.Query(
