@@ -1,5 +1,5 @@
 // ponytail: chart card redesign per DESIGN.md (hairline border, white canvas surface)
-import { lazy, Suspense, useState, useRef, useEffect } from "react"
+import { lazy, Suspense, useState, useRef, useEffect, useMemo } from "react"
 import { Image as ImageIcon, BookMarked, ChevronDown, Share2, Copy, Check } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -114,6 +114,20 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
   // Derive grounding status from source method — never invent trust.
   const groundingStatus = isOmitted ? "unsupported" : isDataExtracted ? "verified" : "partial"
   const evidenceCount = evidence.length
+
+  // chart_data is a JSON string on the wire (documented in openapi.yaml);
+  // DataChart needs the object. Parse here, at the single read point, so the
+  // REST contract stays unchanged.
+  const parsedChartData = useMemo(() => {
+    if (!isDataExtracted) return null
+    if (typeof chart.chart_data !== "string") return chart.chart_data
+    try {
+      return JSON.parse(chart.chart_data)
+    } catch (err) {
+      console.error("chart_data is not valid JSON:", err)
+      return null
+    }
+  }, [chart.chart_data, isDataExtracted])
 
   async function handleShare() {
     if (sharing) return
@@ -236,15 +250,18 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
             {isImageFallback && chart.annotation && (
               <p className="text-xs leading-relaxed text-[#171717]">{chart.annotation}</p>
             )}
-            {isDataExtracted && (
+            {isDataExtracted && parsedChartData && (
               <Suspense
                 fallback={<p className="text-xs text-[#737373]">Loading interactive chart…</p>}
               >
                 <LazyDataChart
-                  chartData={chart.chart_data}
+                  chartData={parsedChartData}
                   provenance={{ grounding_status: groundingStatus, source_page: pageNumber }}
                 />
               </Suspense>
+            )}
+            {isDataExtracted && !parsedChartData && (
+              <p className="text-xs text-[#dc2626]">Chart data could not be read.</p>
             )}
           </div>
         </div>
