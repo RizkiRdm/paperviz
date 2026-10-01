@@ -11,11 +11,21 @@ test.describe('Agents Page', () => {
     await expect(page.locator('[role="tab"]', { hasText: 'Claude Code' })).toBeVisible()
   })
 
-  test('shows sign-in prompt when not authenticated', async ({ page }) => {
+  test('publishes a stdio config, not a nonexistent hosted endpoint', async ({ page }) => {
     await page.goto('/agents')
     await page.waitForLoadState('networkidle')
-    await expect(page.locator('text=Sign in to get your API key')).toBeVisible()
-    await expect(page.locator('a[href="/login"]')).toBeVisible()
+    // The repo ships a stdio MCP server (cmd/mcp). Publishing a config that
+    // points at /api/mcp hands users an endpoint the router does not serve.
+    await expect(page.locator('body')).not.toContainText('/api/mcp')
+    await expect(page.locator('pre')).toContainText('paperviz-mcp')
+    await expect(page.locator('pre')).toContainText('GEMINI_API_KEY')
+  })
+
+  test('tells the user ChatGPT has no hosted endpoint', async ({ page }) => {
+    await page.goto('/agents')
+    await page.waitForLoadState('networkidle')
+    await page.locator('[role="tab"]', { hasText: 'ChatGPT' }).click()
+    await expect(page.locator('[role="tabpanel"]')).toContainText('does not expose a hosted MCP endpoint')
   })
 
   test('switching tabs updates config panel', async ({ page }) => {
