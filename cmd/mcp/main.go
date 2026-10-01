@@ -25,7 +25,7 @@ func main() {
 
 	geminiModel := os.Getenv("GEMINI_MODEL")
 	if geminiModel == "" {
-		geminiModel = "gemini-2.5-flash-lite"
+		geminiModel = external.ProviderGemini.DefaultModel()
 	}
 
 	dbPath := os.Getenv("DATABASE_PATH")

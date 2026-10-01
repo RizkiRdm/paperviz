@@ -162,7 +162,7 @@ MCP startup requires:
 
 ```dotenv
 GEMINI_API_KEY=your-gemini-key
-GEMINI_MODEL=gemini-2.5-flash-lite
+GEMINI_MODEL=gemini-3.1-flash-lite
 DATABASE_PATH=/absolute/path/to/paperviz/paperviz.db
 MIGRATIONS_DIR=/absolute/path/to/paperviz/migrations
 PAPERVIZ_API_KEY=local-mcp-key

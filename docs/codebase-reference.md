@@ -327,7 +327,7 @@ MCP constraints:
 | `PORT` | server and Vite proxy | No | `8080` |
 | `LOG_FILE` | server | No | `paperviz.log.jsonl` |
 | `GEMINI_API_KEY` | MCP only | Yes for MCP | Local stdio server calls the provider directly; the web server never reads it |
-| `GEMINI_MODEL` | MCP only | No | `gemini-2.5-flash-lite` |
+| `GEMINI_MODEL` | MCP only | No | `gemini-3.1-flash-lite` |
 | `PAPERVIZ_API_KEY` | MCP | Yes for MCP | Process-level MCP key |
 | `MIGRATIONS_DIR` | MCP, admin | No | `migrations` |
 
