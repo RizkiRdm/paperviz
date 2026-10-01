@@ -209,10 +209,11 @@ func writeCredentialError(w http.ResponseWriter, err error) {
 	case errors.Is(err, credentials.ErrNoCredential):
 		writeError(w, http.StatusBadRequest, "missing_credential")
 	case errors.Is(err, credentials.ErrCredentialUnreadable):
-		// Almost always a rotated CREDENTIAL_ENCRYPTION_KEY. Logged, because
-		// the user needs to be told and the operator needs to see it.
+		// Causes: a rotated CREDENTIAL_ENCRYPTION_KEY, or a credential row whose
+		// provider/model no longer matches the AAD it was sealed with. Neither
+		// resolves on retry, so this is a conflict rather than a server fault.
 		slog.Error("model credential unreadable", "error", err)
-		writeError(w, http.StatusInternalServerError, "credential_unreadable")
+		writeError(w, http.StatusConflict, "credential_unreadable")
 	default:
 		slog.Error("resolve model credential failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
