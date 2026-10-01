@@ -89,8 +89,8 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 
 	r.Route("/api/documents", func(r chi.Router) {
 		r.With(requireIngestionEnabled, rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/", docHandler.Create)
-		r.Get("/{id}", docHandler.Get)
-		r.Get("/{id}/charts/{chartId}/image", docHandler.GetChartImage)
+		r.With(authMiddleware.OptionalAuth).Get("/{id}", docHandler.Get)
+		r.With(authMiddleware.OptionalAuth).Get("/{id}/charts/{chartId}/image", docHandler.GetChartImage)
 		r.Get("/{id}/claims", docHandler.GetClaims)
 		r.Get("/{id}/tables", docHandler.GetTables)
 		r.Get("/{id}/methods", docHandler.GetMethods)

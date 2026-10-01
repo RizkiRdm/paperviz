@@ -21,6 +21,7 @@ import (
 
 	"paperviz/internal/app/credentials"
 	"paperviz/internal/app/documents"
+	"paperviz/internal/apperr"
 	"paperviz/internal/external"
 	"paperviz/internal/repository"
 	"paperviz/internal/services"
@@ -172,9 +173,24 @@ func (h *DocumentHandler) Stats(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// writeDocumentAccessError maps an ownership failure to 403 and a missing
+// document to 404, so a cross-user write never leaks whether the id exists.
+func writeDocumentAccessError(w http.ResponseWriter, err error, msg string) {
+	switch {
+	case errors.Is(err, apperr.Permission):
+		writeError(w, http.StatusForbidden, "forbidden")
+	case services.IsDocumentNotFound(err):
+		writeError(w, http.StatusNotFound, "not_found")
+	default:
+		slog.Error(msg, "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+	}
+}
+
 // ToggleSaved handles PUT /api/documents/:id/save
 func (h *DocumentHandler) ToggleSaved(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	userID := UserIDFromContext(r.Context())
 
 	var req toggleSavedRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -182,9 +198,8 @@ func (h *DocumentHandler) ToggleSaved(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := services.ToggleDocumentSaved(h.db, id, req.Saved); err != nil {
-		slog.Error("toggle saved failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
+	if err := services.ToggleDocumentSaved(h.db, id, userID, req.Saved); err != nil {
+		writeDocumentAccessError(w, err, "toggle saved failed")
 		return
 	}
 
@@ -194,6 +209,7 @@ func (h *DocumentHandler) ToggleSaved(w http.ResponseWriter, r *http.Request) {
 // UpdateTitle handles PATCH /api/documents/:id
 func (h *DocumentHandler) UpdateTitle(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	userID := UserIDFromContext(r.Context())
 
 	var req updateTitleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -206,9 +222,8 @@ func (h *DocumentHandler) UpdateTitle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := services.RenameDocument(h.db, id, req.Title); err != nil {
-		slog.Error("update title failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
+	if err := services.RenameDocument(h.db, id, userID, req.Title); err != nil {
+		writeDocumentAccessError(w, err, "update title failed")
 		return
 	}
 
@@ -218,10 +233,10 @@ func (h *DocumentHandler) UpdateTitle(w http.ResponseWriter, r *http.Request) {
 // Delete handles DELETE /api/documents/:id
 func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	userID := UserIDFromContext(r.Context())
 
-	if err := services.DeleteDocument(h.db, id); err != nil {
-		slog.Error("delete document failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
+	if err := services.DeleteDocument(h.db, id, userID); err != nil {
+		writeDocumentAccessError(w, err, "delete document failed")
 		return
 	}
 
@@ -240,6 +255,10 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("get document failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	if err := services.AuthorizeDocumentAccess(&rm.Document, UserIDFromContext(r.Context())); err != nil {
+		writeDocumentAccessError(w, err, "get document forbidden")
 		return
 	}
 	doc := rm.Document
@@ -331,6 +350,11 @@ func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *DocumentHandler) GetChartImage(w http.ResponseWriter, r *http.Request) {
 	docID := chi.URLParam(r, "id")
 	chartID := chi.URLParam(r, "chartId")
+
+	if err := services.DocumentAccessAllowed(h.db, docID, UserIDFromContext(r.Context())); err != nil {
+		writeDocumentAccessError(w, err, "get chart image forbidden")
+		return
+	}
 
 	chartRepo := repository.NewChartRepo(h.db)
 	chart, err := chartRepo.GetByDocumentAndID(docID, chartID)
