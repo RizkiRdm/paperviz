@@ -13,6 +13,31 @@ import (
 	"paperviz/internal/services"
 )
 
+// writeImportError maps an import lookup failure to a status. A DOI that does
+// not exist, a paywalled paper, or a URL we refuse to fetch is the caller's
+// problem (4xx); only an unrecognized upstream failure stays a 502.
+func writeImportError(w http.ResponseWriter, err error, kind, value, msg string) {
+	status, code := http.StatusBadGateway, "fetch_failed"
+	switch {
+	case errors.Is(err, services.ErrInvalidDOI):
+		status, code = http.StatusBadRequest, "invalid_doi"
+	case errors.Is(err, services.ErrDOINotFound):
+		status, code = http.StatusNotFound, "doi_not_found"
+	case errors.Is(err, services.ErrPaywallBlocked):
+		status, code = http.StatusUnprocessableEntity, "paywalled"
+	case errors.Is(err, services.ErrInvalidURL):
+		status, code = http.StatusBadRequest, "invalid_url"
+	case errors.Is(err, services.ErrSSRFBlocked):
+		status, code = http.StatusBadRequest, "url_not_allowed"
+	case errors.Is(err, services.ErrNotPDF):
+		status, code = http.StatusUnprocessableEntity, "not_a_pdf"
+	}
+	if status == http.StatusBadGateway {
+		slog.Error(msg, kind, value, "error", err)
+	}
+	writeError(w, status, code)
+}
+
 // ImportService defines fetching for DOI/URL imports.
 type ImportService interface {
 	FetchByDOI(doi string) (string, string, error)
@@ -110,8 +135,7 @@ func (h *ImportHandler) ImportByDOI(w http.ResponseWriter, r *http.Request) {
 	}
 	originalText, title, err := h.importService.FetchByDOI(req.DOI)
 	if err != nil {
-		slog.Error("fetch by DOI failed", "doi", req.DOI, "error", err)
-		writeError(w, http.StatusBadGateway, "fetch_failed")
+		writeImportError(w, err, "doi", req.DOI, "fetch by DOI failed")
 		return
 	}
 	id, err := h.creator.Create(r.Context(), "doi", readingLevel, originalText, title, userID)
@@ -161,8 +185,7 @@ func (h *ImportHandler) ImportByURL(w http.ResponseWriter, r *http.Request) {
 	}
 	originalText, title, err := h.importService.FetchByURL(req.URL)
 	if err != nil {
-		slog.Error("fetch by URL failed", "url", req.URL, "error", err)
-		writeError(w, http.StatusBadGateway, "fetch_failed")
+		writeImportError(w, err, "url", req.URL, "fetch by URL failed")
 		return
 	}
 	id, err := h.creator.Create(r.Context(), "url", readingLevel, originalText, title, userID)
