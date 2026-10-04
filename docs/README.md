@@ -121,11 +121,10 @@ Non-negotiable constraints:
 
 ### Historical material
 
-- [`docs/Task Agent/`](Task%20Agent/)
 - [`report/`](../report/)
 - Goal files under `goals/`
 
-Archived `docs/archive/` files were removed after their content was superseded by `docs/PROJECT_STATE.md` and `docs/PRD.md`.
+Archived `docs/archive/` and `docs/Task Agent/` files were removed after their content was superseded by `docs/PROJECT_STATE.md`, `docs/PRD.md`, and `.omo/plans/`.
 
 
 Historical material can explain why a decision existed. It must not be cited as proof that current code still behaves that way.
