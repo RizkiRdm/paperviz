@@ -6,6 +6,8 @@ const ERROR_MESSAGES = {
   email_taken: "An account with this email already exists.",
   invalid_email: "Please enter a valid email address.",
   password_too_short: "Password must be at least 8 characters.",
+  password_too_weak:
+    "Password needs an uppercase letter, a lowercase letter, a number, and a symbol.",
   internal_error: "Something went wrong. Please try again.",
 }
 
