@@ -161,11 +161,7 @@ export function UploadPage() {
           )}
         </div>
 
-        {user ? (
-          <p className="mt-4 text-center text-xs text-[#737373]">Free to run. Add your own model key on the <Link to="/account">account page</Link> to analyse a paper.</p>
-        ) : (
-          <p className="mt-4 text-center text-xs text-[#737373]">Free to run. <Link to="/login">Sign in</Link>, then add your own model key on the account page to analyse a paper.</p>
-        )}
+        <p className="mt-4 text-center text-xs text-[#737373]">Free to run. Add your own model key on the <Link to="/account">account page</Link> to analyse a paper.</p>
       </div>
     </div>
   )
