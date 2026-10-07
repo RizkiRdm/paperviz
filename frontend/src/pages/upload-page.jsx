@@ -6,6 +6,7 @@ import { ReadingLevelSelector } from "@/components/ui/reading-level-selector"
 import { ErrorBanner } from "@/components/ui/status-banners"
 import { createDocument, importByDOI, importByURL } from "@/lib/api"
 import { useApi } from "@/hooks/useApi"
+import { useCurrentUser } from "@/hooks/use-current-user"
 import { ArrowRight } from "lucide-react"
 
 // tab config drives mode switch and explicit source_type badge
@@ -18,6 +19,7 @@ const TABS = [
 
 export function UploadPage() {
   const navigate = useNavigate()
+  const { user, checked } = useCurrentUser()
   const [mode, setMode] = useState("pdf")
   const [file, setFile] = useState(null)
   const [text, setText] = useState("")
@@ -98,7 +100,11 @@ export function UploadPage() {
           <p className="mt-3 text-base text-[#737373] max-w-md mx-auto leading-relaxed">Transform dense academic PDFs into clear, verified summaries with interactive charts.</p>
           <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link to="/agents"><Button size="lg">Add to Claude Code</Button></Link>
-            <Link to="/login"><Button variant="outline" size="lg">Sign in</Button></Link>
+            {user ? (
+              <Link to="/account"><Button variant="outline" size="lg">{user.email}</Button></Link>
+            ) : checked ? (
+              <Link to="/login"><Button variant="outline" size="lg">Sign in</Button></Link>
+            ) : null}
           </div>
         </div>
 
@@ -155,7 +161,11 @@ export function UploadPage() {
           )}
         </div>
 
-        <p className="mt-4 text-center text-xs text-[#737373]">Free to run. Add your own model key on the <Link to="/account">account page</Link> to analyse a paper.</p>
+        {user ? (
+          <p className="mt-4 text-center text-xs text-[#737373]">Free to run. Add your own model key on the <Link to="/account">account page</Link> to analyse a paper.</p>
+        ) : (
+          <p className="mt-4 text-center text-xs text-[#737373]">Free to run. <Link to="/login">Sign in</Link>, then add your own model key on the account page to analyse a paper.</p>
+        )}
       </div>
     </div>
   )

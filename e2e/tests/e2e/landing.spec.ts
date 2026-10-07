@@ -15,6 +15,28 @@ test.describe('Landing / Upload Page', () => {
     await expect(page.locator('a[href="/login"]')).toBeVisible()
   })
 
+  // The header used to render a hardcoded Sign in link, so a signed-in user
+  // was told to sign in on the page they were already signed in to.
+  test('shows the account link instead of Sign in once signed in', async ({ page }) => {
+    const email = `e2e-header-${Date.now()}@test.com`
+    const signup = await page.request.post('/api/auth/signup', {
+      data: { email, password: 'Str0ng!Passphrase' },
+    })
+    expect(signup.ok()).toBeTruthy()
+
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator(`a[href="/account"]`)).toContainText(email)
+    await expect(page.locator('a[href="/login"]')).toHaveCount(0)
+  })
+
+  test('shows Sign in to an anonymous visitor', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('a[href="/login"]')).toBeVisible()
+    await expect(page.locator('a[href="/account"]')).toHaveCount(0)
+  })
+
   test('shows PDF/Paste/DOI/URL tab selector', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
