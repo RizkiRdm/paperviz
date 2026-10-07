@@ -11,7 +11,7 @@ Install:
 - npm
 - `curl`
 
-You also need a Google Gemini API key. The HTTP server validates Google OAuth and Stripe environment variables at startup, so local configuration needs non-empty values for those variables too. Placeholders are enough for booting the server, but real integrations require real credentials.
+The web server needs exactly one secret: `CREDENTIAL_ENCRYPTION_KEY`. It refuses to boot without it. You do not need a model provider key for the server — PaperViz holds no vendor account, and users supply their own model key through the UI. (The separate `cmd/mcp` process, which runs on your own machine, reads `GEMINI_API_KEY`.)
 
 ## 2. Get source and install dependencies
 
@@ -199,9 +199,9 @@ get_evidence
 
 It does **not** call `RunPipelineAndPersist`, Gemini, claim verification, or chart generation. No queue exists to advance that document later. Use the web ingestion path when you need the complete processing pipeline.
 
-### Why `/agents` is not the local MCP setup
+### What `/agents` gives you
 
-`frontend/src/pages/agents-page.jsx` currently generates remote configuration using `@anthropic-ai/mcp-remote` and `https://paperviz.com/api/mcp`. The current `internal/handlers/router.go` does not register `/api/mcp`. For this repository, configure an MCP client to launch the local stdio binary instead, or deploy a compatible remote transport before using that page's generated configuration.
+`frontend/src/pages/agents-page.jsx` publishes a stdio configuration block that launches the local `paperviz-mcp` binary against your own database. There is no hosted MCP endpoint — `internal/handlers/router.go` registers no `/api/mcp` route — so remote-only clients such as ChatGPT cannot connect. The page says so explicitly rather than handing you a URL that will not resolve.
 
 ## 8. Build production-style local binary
 
@@ -256,7 +256,7 @@ BASE_URL=http://localhost:8080 npm --prefix e2e test
 | Symptom | Meaning | Action |
 |---|---|---|
 | `GEMINI_API_KEY environment variable is required` | Required key missing | Export a real key before starting |
-| Google or Stripe variable required | Fail-loud startup validation | Add non-empty local values; use real credentials for those flows |
+| `CREDENTIAL_ENCRYPTION_KEY` missing | Fail-loud startup validation | `export CREDENTIAL_ENCRYPTION_KEY=$(openssl rand -base64 32)` |
 | `failed to load migrations` | Server started outside expected layout or migration file missing | Run from repository root or correct working directory |
 | `failed to open database` | SQLite path or permissions invalid | Check `DATABASE_PATH` and directory permissions |
 | `/healthz` returns `db_unreachable` | Database ping or query failed | Check database file, filesystem, and server logs |

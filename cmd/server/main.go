@@ -8,11 +8,16 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"paperviz/internal/app/credentials"
 	"paperviz/internal/external"
@@ -20,6 +25,10 @@ import (
 	"paperviz/internal/repository"
 	"paperviz/internal/services"
 )
+
+// shutdownGrace bounds how long a SIGTERM drain may take before connections
+// are force-closed.
+const shutdownGrace = 15 * time.Second
 
 func main() {
 	logFile := os.Getenv("LOG_FILE")
@@ -56,9 +65,17 @@ func main() {
 		port = "8080"
 	}
 
-	migrations, err := repository.LoadMigrations("migrations")
+	// Migrations are read from disk at startup, so the directory has to be
+	// reachable. It defaults to "migrations" next to the binary's working
+	// directory; the container image sets MIGRATIONS_DIR=/app/migrations.
+	migrationsDir := os.Getenv("MIGRATIONS_DIR")
+	if migrationsDir == "" {
+		migrationsDir = "migrations"
+	}
+
+	migrations, err := repository.LoadMigrations(migrationsDir)
 	if err != nil {
-		slog.Error("failed to load migrations", "error", err)
+		slog.Error("failed to load migrations", "dir", migrationsDir, "error", err)
 		os.Exit(1)
 	}
 
@@ -108,9 +125,43 @@ func main() {
 
 	router := handlers.NewRouter(db, resolver, staticDir)
 
-	slog.Info("paperviz server starting", "port", port, "database_path", dbPath)
-	if err := http.ListenAndServe(":"+port, router); err != nil {
-		slog.Error("server stopped", "error", err)
-		os.Exit(1)
+	// Shut down on SIGINT/SIGTERM so a container stop drains in-flight
+	// requests instead of cutting them off. ListenAndServe's own error is
+	// only fatal when it is not the result of our own Shutdown call.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	slog.Info("paperviz server starting", "port", port, "database_path", dbPath, "static_dir", staticDir, "migrations_dir", migrationsDir)
+
+	serveErr := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serveErr <- err
+			return
+		}
+		serveErr <- nil
+	}()
+
+	select {
+	case err := <-serveErr:
+		if err != nil {
+			slog.Error("server stopped", "error", err)
+			os.Exit(1)
+		}
+	case <-ctx.Done():
+		slog.Info("shutdown signal received, draining connections")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			slog.Error("graceful shutdown failed, closing connections", "error", err)
+			_ = srv.Close()
+		}
+		slog.Info("server stopped cleanly")
 	}
 }

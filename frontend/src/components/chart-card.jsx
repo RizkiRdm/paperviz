@@ -195,15 +195,15 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
                       ? "bg-[#fef3c7] text-[#92400e]"
                       : "bg-[#fef2f2] text-[#991b1b]"
                 }`}>
-                  {groundingStatus === "verified" ? "Verified" : groundingStatus === "partial" ? "Partial" : "Unsupported"}
+                  {groundingStatus === "verified" ? "Grounded in source" : groundingStatus === "partial" ? "Partly interpreted" : "Not grounded"}
                 </span>
               </TooltipTrigger>
               <TooltipContent>
                 {groundingStatus === "verified"
-                  ? "Data grounded in source evidence"
+                  ? "Every plotted value was extracted from the paper's own text or tables"
                   : groundingStatus === "partial"
-                    ? "Partially grounded — some values interpreted from image"
-                    : "Not grounded — chart data could not be extracted from source"}
+                    ? "Some values were interpreted from a figure image rather than read from text"
+                    : "Chart data could not be grounded in the source, so it is not plotted"}
               </TooltipContent>
             </Tooltip>
             <Tooltip>

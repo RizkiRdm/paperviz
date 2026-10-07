@@ -10,7 +10,7 @@
 
 ## Product Summary
 
-PaperViz transforms academic papers into simplified explanations, verified claims, structured research objects, and evidence-grounded figures.
+PaperViz transforms academic papers into structured, evidence-grounded research context: claims checked against the original, figures grounded in extracted values, and source locations for both.
 
 The product is moving toward an agent-first model in which AI clients use PaperViz as a structured research-data tool. The web application remains necessary for authentication, API-key and billing management, and manual paper ingestion.
 
@@ -79,16 +79,16 @@ PaperViz treats research output as structured, inspectable data:
 | Evidence-grounded charts | Implemented | Deterministic extraction, dataset construction, and grounding |
 | Structured research objects | Implemented | Claims, evidence, tables, methods, results, citations, relationships |
 | Email/password authentication | Implemented | Signup, login, session, logout |
-| Google OAuth | Implemented in source | Provider configuration required for live use |
+| Google OAuth | Removed 2026-09-26 | Email + password only |
 | API-key management | Implemented | Retrieve and regenerate user key |
-| Stripe billing | Implemented in source | Checkout, portal, webhook; provider configuration required |
+| Stripe billing | Removed 2026-09-26 | No payment surface; product is free |
 | Account and usage surfaces | Implemented | `/account`, account summary, usage |
 | Annotations and collections | Implemented | Per-user ownership enforced |
 | Research export | Implemented | Structured context; excludes full source and simplified text |
 | Ephemeral sharing | Implemented | Document and figure share tokens |
 | Local MCP server | Implemented | Five stdio tools sharing SQLite |
 | Full MCP processing | Gap | `ingest_document` does not start the LLM pipeline |
-| Remote MCP transport | Gap | `/agents` config targets `/api/mcp`, absent from current router |
+| Remote MCP transport | Not built | `/agents` publishes stdio config; no HTTP MCP transport exists |
 | User-scoped MCP search | Gap | Search is global and stateless |
 | Agent-scale concurrency | Target | Current one-connection SQLite and process-local controls are limiting |
 
@@ -145,10 +145,10 @@ PaperViz treats research output as structured, inspectable data:
 
 1. Email/password authentication must use secure session cookies.
 2. Passwords must meet complexity requirements.
-3. Google OAuth must validate state to prevent CSRF.
+3. (Removed with Google OAuth on 2026-09-26 — no OAuth flow remains.)
 4. Authentication endpoints must be rate limited.
 5. Users must be able to retrieve and regenerate API keys.
-6. Stripe checkout, portal, and webhook routes must exist.
+6. (Removed with Stripe billing on 2026-09-26 — no payment routes exist.)
 7. Required integration configuration must fail loudly at startup.
 
 ### MCP
@@ -215,7 +215,7 @@ This flow remains partial until remote MCP transport and MCP processing behavior
 - No uploaded PDF bytes on disk.
 - No SSRF through URL import.
 - No cross-user annotation or collection access.
-- No unverified OAuth callback.
+- No unverified OAuth callback. (Moot: no OAuth flow remains.)
 - No unscoped destructive MCP operation.
 
 ### Reliability
@@ -265,7 +265,7 @@ These are targets, not current verified measurements:
 ### P2: product hardening
 
 - Measure real processing latency and agent-tool latency.
-- Validate OAuth, Stripe, and remote MCP with live provider configuration.
+- Validate MCP end to end against the local stdio server. (OAuth, Stripe, and remote MCP were all removed or never built.)
 - Decide whether `/account` should retain document-management UI or remain account-only.
 
 ## Acceptance Scenarios

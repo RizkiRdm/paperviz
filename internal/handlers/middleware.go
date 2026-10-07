@@ -114,17 +114,18 @@ func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 	})
 }
 
-// usageLimitResponse is the wire format returned when monthly paper limit is reached.
+// usageLimitResponse is the wire format returned when the per-fingerprint
+// submission cap is reached. There is no plan, tier, or upgrade path here:
+// PaperViz is free and BYOK, so this is abuse protection on an unauthenticated
+// endpoint, not a quota sold to a paying customer.
 type usageLimitResponse struct {
 	Error      string `json:"error"`
-	Tier       string `json:"tier"`
 	PapersUsed int    `json:"papers_used"`
 	Limit      int    `json:"limit"`
-	UpgradeCTA string `json:"upgrade_cta"`
 }
 
 // UsageLimitMiddleware rejects document creation requests when the
-// fingerprint's monthly paper count exceeds the tier limit.
+// fingerprint's submission count exceeds the cap.
 func (m *AuthMiddleware) UsageLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fp := GetFingerprint(r)
@@ -138,11 +139,9 @@ func (m *AuthMiddleware) UsageLimitMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusTooManyRequests)
 			json.NewEncoder(w).Encode(usageLimitResponse{
-				Error:      "monthly limit reached",
-				Tier:       "free",
+				Error:      "submission limit reached for this device",
 				PapersUsed: papersUsed,
 				Limit:      services.LimitFree,
-				UpgradeCTA: "Upgrade to Pro for more papers",
 			})
 			return
 		}

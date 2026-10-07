@@ -11,7 +11,7 @@ export function VerificationBadge({ onClick, disabled, ...props }) {
       className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] px-3 py-1 text-xs font-medium text-[#16a34a] border border-[#bbf7d0] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#16a34a]/40 disabled:cursor-not-allowed disabled:opacity-60 enabled:hover:bg-[#d1fae5] enabled:cursor-pointer"
     >
       <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-      Verified
+      Claims checked
     </button>
   )
 }
@@ -68,11 +68,11 @@ export function WarningBanner({ detail }) {
       <AlertTriangle className="h-5 w-5 shrink-0 text-[#ea580c]" />
       <div>
         <p className="font-medium text-[#ea580c]">
-          This simplification could not be fully verified
+          This summary did not match the original on every claim
         </p>
         <p className="mt-1 text-[#737373] text-xs">
           {detail ||
-            "Our automatic check found a possible difference between the original and simplified text. Please compare against the original before relying on this version."}
+            "Our automatic check found a possible difference between the original and the summary. Compare the two before relying on this version."}
         </p>
       </div>
     </div>

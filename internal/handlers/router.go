@@ -130,8 +130,6 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 	r.Post("/share-referrals", shareHandler.TrackReferral)
 
 	r.With(authMiddleware.RequireAuth).Get("/analytics", analyticsHandler.GetSummary)
-	r.Post("/api/analytics/pricing-view", analyticsHandler.TrackPricingView)
-	r.Post("/api/analytics/upgrade-intent", analyticsHandler.TrackUpgradeIntent)
 	r.Get("/api/usage", usageHandler.GetUsage)
 
 	authHandler := NewAuthHandler(db)

@@ -16,6 +16,35 @@ const TABS = [
   { id: "url", label: "URL", source: "url" },
 ]
 
+// Differentiator pills use the DESIGN.md Hero Feature Pill pattern: one accent
+// per pill, 9999px radius, no border.
+const PILL_FEATURES = [
+  { label: "Evidence-grounded", accent: "text-[#ea580c]" },
+  { label: "Structured", accent: "text-[#7c3aed]" },
+  { label: "Traceable", accent: "text-[#16a34a]" },
+]
+
+// Understand → Inspect → Trace → Reuse is the actual pipeline order the result
+// page exposes, not a slogan.
+const WORKFLOW = [
+  {
+    step: "Understand",
+    body: "The paper is split into chapters and rewritten at your chosen reading level.",
+  },
+  {
+    step: "Inspect",
+    body: "Every claim is checked against the original. A mismatch is shown, not hidden.",
+  },
+  {
+    step: "Trace",
+    body: "Figures plot values extracted from the paper's own text and tables, with page references.",
+  },
+  {
+    step: "Reuse",
+    body: "Export the structured result, or open it from an AI agent over MCP.",
+  },
+]
+
 export function UploadPage() {
   const navigate = useNavigate()
   const [mode, setMode] = useState("pdf")
@@ -94,15 +123,45 @@ export function UploadPage() {
             <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-[#0a0a0a] text-white font-mono text-xs font-bold">PV</div>
             <span className="font-mono text-sm font-semibold tracking-tight text-[#0a0a0a]">PaperViz</span>
           </Link>
-          <h1 className="font-satoshi text-4xl sm:text-5xl font-medium tracking-tight text-[#0a0a0a] leading-tight">Papers, in plain language.</h1>
-          <p className="mt-3 text-base text-[#737373] max-w-md mx-auto leading-relaxed">Transform dense academic PDFs into clear, verified summaries with interactive charts.</p>
-          <div className="mt-5 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link to="/agents"><Button size="lg">Add to Claude Code</Button></Link>
+          <h1 className="font-satoshi text-4xl sm:text-5xl font-medium tracking-tight text-[#0a0a0a] leading-tight">
+            Turn research papers into evidence you can inspect.
+          </h1>
+          <p className="mt-3 text-base text-[#737373] max-w-md mx-auto leading-relaxed">
+            PaperViz extracts claims, supporting evidence, and figures from research
+            papers so you can understand, trace, and reuse the underlying research
+            context.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            {PILL_FEATURES.map((f) => (
+              <span key={f.label} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-[#171717]">
+                <span className={`h-1.5 w-1.5 rounded-full ${f.accent.replace("text-", "bg-")}`} aria-hidden="true" />
+                {f.label}
+              </span>
+            ))}
+          </div>
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a href="#ingest"><Button size="lg">Analyse a paper</Button></a>
             <Link to="/login"><Button variant="outline" size="lg">Sign in</Button></Link>
           </div>
+          <p className="mt-4 text-xs text-[#737373]">
+            Free to use. Bring your own AI API key — PaperViz holds no model
+            account and bills you nothing.
+          </p>
         </div>
 
-        <div className="rounded-[12px] border border-[#e5e5e5] bg-white p-4 sm:p-6">
+        <ol className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {WORKFLOW.map((w, i) => (
+            <li key={w.step} className="rounded-[12px] border border-[#e5e5e5] bg-white p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-mono text-[11px] text-[#2563eb]">{String(i + 1).padStart(2, "0")}</span>
+                <h2 className="text-sm font-medium text-[#0a0a0a]">{w.step}</h2>
+              </div>
+              <p className="text-xs leading-relaxed text-[#737373]">{w.body}</p>
+            </li>
+          ))}
+        </ol>
+
+        <div id="ingest" className="rounded-[12px] border border-[#e5e5e5] bg-white p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex gap-1 rounded-full border border-[#e5e5e5] bg-white p-1" role="tablist" aria-label="Ingest source">
               {TABS.map((t) => (
@@ -155,7 +214,20 @@ export function UploadPage() {
           )}
         </div>
 
-        <p className="mt-4 text-center text-xs text-[#737373]">Free to run. Add your own model key on the <Link to="/account">account page</Link> to analyse a paper.</p>
+        <div className="mt-4 flex flex-col items-center gap-2 text-center">
+          <p className="text-xs text-[#737373]">
+            Free to use. Add your own model key on the{" "}
+            <Link to="/account" className="text-[#2563eb] hover:underline">account page</Link>{" "}
+            to analyse a paper — model spend goes to your provider, not to us.
+          </p>
+          <p className="text-xs text-[#737373]">
+            Already using an AI agent?{" "}
+            <Link to="/agents" className="text-[#2563eb] hover:underline">
+              Connect the local MCP server
+            </Link>{" "}
+            to read the same research context.
+          </p>
+        </div>
       </div>
     </div>
   )

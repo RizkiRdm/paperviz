@@ -27,12 +27,12 @@ container:
 container-run:
 	@test -n "$(PORT)" || PORT=8080; \
 	test -n "$(DB_PATH)" || DB_PATH=/data/paperviz.db; \
+	test -n "$(CREDENTIAL_ENCRYPTION_KEY)" || (echo "CREDENTIAL_ENCRYPTION_KEY is required (openssl rand -base64 32)" && exit 1); \
 	podman run -d \
 		--name paperviz \
 		-p $$PORT:8080 \
 		-v paperviz-data:/data \
-		-e GEMINI_API_KEY="$(GEMINI_API_KEY)" \
-		-e GEMINI_MODEL="$(GEMINI_MODEL)" \
+		-e CREDENTIAL_ENCRYPTION_KEY="$(CREDENTIAL_ENCRYPTION_KEY)" \
 		-e DATABASE_PATH="$$DB_PATH" \
 		$(if $(IMAGE),$(IMAGE),paperviz):$(if $(TAG),$(TAG),latest)
 	@echo "PaperViz running on http://localhost:$$PORT"

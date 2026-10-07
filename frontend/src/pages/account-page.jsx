@@ -336,11 +336,14 @@ export function AccountPage() {
           </div>
 
           <div className="rounded-[12px] border border-[#e5e5e5] bg-white p-6">
-            <h2 className="text-sm font-medium text-[#0a0a0a] mb-4">Usage This Month</h2>
-            <p className="text-3xl font-mono font-medium text-[#0a0a0a]">
-              {usage?.count ?? 0}
+            <h2 className="text-sm font-medium text-[#0a0a0a] mb-1">Papers submitted this month</h2>
+            <p className="text-xs text-[#737373] mb-4">
+              A per-device guard against automated bulk uploads. It is not a plan
+              limit, and PaperViz has no paid tiers.
             </p>
-            <p className="text-xs text-[#737373] mt-1">papers analyzed</p>
+            <p className="text-3xl font-mono font-medium text-[#0a0a0a]">
+              {usage?.papers_used ?? 0}
+            </p>
           </div>
 
           {credError && (

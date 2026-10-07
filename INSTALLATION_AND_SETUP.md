@@ -104,7 +104,7 @@ The repository ships `cmd/mcp` as a local stdio server. It requires `GEMINI_API_
 Current MCP limitations:
 
 - `ingest_document` stores text but does not start the full processing pipeline;
-- `/agents` generates remote configuration for `/api/mcp`, but no such route exists in the current HTTP router;
+- `/agents` publishes a local stdio configuration; there is no hosted MCP endpoint;
 - MCP tools are stateless and global, not scoped to a REST user's library.
 
 See [`docs/getting-started.md`](docs/getting-started.md#7-run-mcp-locally) for local MCP details.

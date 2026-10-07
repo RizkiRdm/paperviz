@@ -41,6 +41,9 @@ graphify-out/
 !.opencode/context/project-intelligence/
 .playwright-mcp/
 .playwright-cli/
+.hermes/
+.posthog/
+skills-lock.json
 
 # AI agent planning/memory (not project source)
 memory/
@@ -49,6 +52,14 @@ goals/
 # E2E test artifacts
 e2e/node_modules/
 e2e/tests/e2e-results/
+
+# Diagram QA scratch — visual-check renders are throwaway diff artifacts. The
+# source paperviz-*.html diagrams are tracked.
+docs/diagrams/*.visual-check.*
+
+# Unreferenced screenshot in the served frontend asset dir. It would ship into
+# dist/ for no consumer; keep it local until something links it.
+frontend/public/PaperViz Research App UI Showcase.png
 
 # Generated reports
 # report/

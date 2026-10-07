@@ -73,8 +73,8 @@ Rules:
 
 1. open JSONL log file;
 2. configure structured `slog` output to stdout and file;
-3. require Gemini, Google OAuth, Stripe, and frontend URL environment variables;
-4. resolve Gemini model, database path, static directory, and port;
+3. require `CREDENTIAL_ENCRYPTION_KEY` (no model vendor credential exists on this side — keys are per user);
+4. resolve database path, static directory, migrations directory, and port;
 5. load all registered migrations;
 6. open SQLite and apply pending migrations;
 7. delete expired sessions;
@@ -125,7 +125,7 @@ MCP tools are deterministic. They do not call Gemini. `ingest_document` validate
 
 ### Remote transport mismatch
 
-`frontend/src/pages/agents-page.jsx` generates configuration for `https://paperviz.com/api/mcp` through `mcp-remote`. The HTTP router does not register `/api/mcp`. The repository's implemented agent transport is local stdio. Treat the `/agents` page as unverified for production remote MCP use until a compatible transport endpoint exists and is tested.
+`frontend/src/pages/agents-page.jsx` publishes a local stdio configuration block that launches `cmd/mcp` against the user's own database. There is no HTTP MCP transport: the router registers no `/api/mcp` route, and hosting one would require auth and per-user scoping that MCP does not have. The stdio path is the supported agent transport.
 
 ## 6. Document Processing
 

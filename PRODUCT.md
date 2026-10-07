@@ -4,7 +4,7 @@
 
 ## Product Statement
 
-PaperViz converts academic papers into simplified explanations, verified claims, structured research objects, and evidence-grounded figures. It is being shaped into an agent-first research tool, while the web application remains the complete manual-ingestion surface and the home for authentication, API keys, and billing.
+PaperViz turns research papers into structured, evidence-grounded research context that humans and AI agents can inspect and reuse. The web application is the complete ingestion surface and the home for authentication and model keys. The product is free to use and BYOK: the server holds no model account and bills no one.
 
 ## Users
 
@@ -26,7 +26,7 @@ People use the web application to:
 - choose Simplified or ELI5 reading level;
 - inspect processing, verification, and figure status;
 - annotate, organize, export, or share research context;
-- authenticate, manage an API key, and manage billing.
+- authenticate and manage a model API key.
 
 ### End user
 
@@ -99,11 +99,13 @@ MCP is additive to REST. It shares data and domain semantics but does not duplic
 
 ### Human and agent support
 
-- email/password and Google authentication;
-- session cookies and API keys;
-- Stripe checkout, portal, and webhook handling;
+- email and password authentication with session cookies;
+- PaperViz service API keys, stored as SHA-256 digests;
+- BYOK model credentials for Gemini, Anthropic, and OpenAI, encrypted at rest;
 - usage and account summaries;
 - local stdio MCP server.
+
+Google OAuth and Stripe billing were removed on 2026-09-26. PaperViz holds no third-party account of any kind, so it has no payment surface to maintain.
 
 ## Trust and Integrity Principles
 
@@ -119,7 +121,7 @@ The agent-first direction is not complete:
 
 - `ingest_document` stores pasted text but does not start the full LLM pipeline;
 - MCP-created documents can remain in `processing` state;
-- `/agents` generates remote configuration for `/api/mcp`, but the current HTTP router does not register that transport;
+- there is no hosted MCP endpoint; `/agents` publishes a local stdio configuration instead;
 - MCP search is global and stateless, not scoped to an authenticated user's library;
 - current deployment architecture is one Go process plus one SQLite database, not a horizontally scaled system.
 

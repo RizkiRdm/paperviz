@@ -29,11 +29,12 @@ PaperViz supports two authentication modes:
 
 ## Usage Limits
 
-| Tier | Monthly Paper Limit |
-|------|---------------------|
-| Free | 5 papers |
-| Pro | Higher limit |
-| Research | Highest limit |
+PaperViz is free and BYOK; there are no plans or paid tiers. The only cap is a
+per-device guard against bulk uploads on the unauthenticated creation endpoint.
+
+| Scope | Limit |
+|-------|-------|
+| Per IP fingerprint | 5 papers per month |
 
 Limits reset on the 1st of each month.
 
@@ -495,6 +496,9 @@ Get current usage stats for this fingerprint.
 }
 ```
 
+`tier` is always `free`. It is retained for wire compatibility and carries no
+entitlement; PaperViz has no paid tiers.
+
 ---
 
 ### Collections
@@ -631,20 +635,6 @@ Remove document from collection. **Requires auth.**
 
 #### GET /analytics
 Get aggregate analytics summary. **Requires auth.**
-
----
-
-#### POST /api/analytics/pricing-view
-Track pricing page view event. **No auth required.**
-
-**Response:** 204 No Content
-
----
-
-#### POST /api/analytics/upgrade-intent
-Track upgrade CTA click. **No auth required.**
-
-**Response:** 204 No Content
 
 ---
 

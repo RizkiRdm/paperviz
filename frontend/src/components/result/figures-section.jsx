@@ -7,7 +7,7 @@ function failureCopy(category) {
     case "EXTRACTION_ERROR": return "We couldn't extract chart data from the source."
     case "DATASET_ERROR": return "Chart source data was incomplete."
     case "CHART_SELECTION_ERROR": return "No suitable chart type for the extracted data."
-    case "GROUNDING_ERROR": return "Chart failed grounding checks — not rendered to avoid misleading you."
+    case "GROUNDING_ERROR": return "This figure could not be grounded in the paper, so it was not plotted."
     case "SCHEMA_ERROR": return "Chart specification was invalid."
     case "RENDER_ERROR": return "Chart couldn't be rendered."
     default: return null

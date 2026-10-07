@@ -21,15 +21,18 @@ info:
 
     Rate limits are enforced per IP fingerprint (SHA256 of IP + User-Agent + Accept-Language).
 
-    ## Usage Limits
+    ## Submission Limits
 
-    | Tier | Monthly Paper Limit |
-    |------|---------------------|
-    | Free | 5 papers |
-    | Pro | Higher limit |
-    | Research | Highest limit |
+    PaperViz is free and BYOK; there are no plans or paid tiers. The only
+    submission cap is a per-device guard against automated bulk uploads on the
+    unauthenticated creation endpoint.
 
-    Limits reset on the 1st of each month.
+    | Scope | Limit |
+    |-------|-------|
+    | Per IP fingerprint | 5 papers per month |
+
+    Counts reset on the 1st of each month. Hitting the cap returns 429 with
+    `{"error": "submission limit reached for this device", "papers_used": N, "limit": 5}`.
 
     ## Error Format
 
@@ -59,7 +62,7 @@ info:
     | `name_required` | 400 | Collection name is empty |
     | `document_id_required` | 400 | Document ID is empty |
     | `title_required` | 400 | Title is empty |
-    | `monthly limit reached` | 429 | Paper limit reached for tier |
+    | `submission limit reached for this device` | 429 | Per-device submission cap reached |
     | `document_ids_must_be_2_to_10` | 400 | Comparison requires 2-10 docs |
     | `document_not_found` | 404 | Document for comparison not found |
     | `extraction_failed` | 500 | Paper summary extraction failed |
@@ -417,7 +420,7 @@ paths:
                   value:
                     error: "invalid_reading_level"
         "429":
-          description: "Rate limit exceeded or monthly limit reached"
+          description: "Rate limit exceeded or per-device submission limit reached"
           content:
             application/json:
               schema:
@@ -427,10 +430,12 @@ paths:
                   summary: "Rate limit exceeded"
                   value:
                     error: "rate_limit_exceeded"
-                monthly_limit:
-                  summary: "Monthly limit reached"
+                submission_limit:
+                  summary: "Per-device submission limit reached"
                   value:
-                    error: "monthly limit reached"
+                    error: "submission limit reached for this device"
+                    papers_used: 5
+                    limit: 5
 
     get:
       operationId: listDocuments
@@ -1055,26 +1060,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-
-  /api/analytics/pricing-view:
-    post:
-      operationId: trackPricingView
-      summary: "Track pricing page view"
-      description: "Record a pricing page view event. No authentication required."
-      tags: ["Analytics"]
-      responses:
-        "204":
-          description: "Pricing view tracked"
-
-  /api/analytics/upgrade-intent:
-    post:
-      operationId: trackUpgradeIntent
-      summary: "Track upgrade CTA click"
-      description: "Record an upgrade intent event. No authentication required."
-      tags: ["Analytics"]
-      responses:
-        "204":
-          description: "Upgrade intent tracked"
 
   /api/usage:
     get:

@@ -92,7 +92,7 @@ Available operations:
 
 ### Agent-flow gap
 
-MCP ingestion does not start simplification, verification, or figure generation. A document created only through MCP can remain in `processing` state. The `/agents` page also generates a remote `/api/mcp` configuration that is not registered by the current HTTP router.
+MCP ingestion does not start simplification, verification, or figure generation. A document created only through MCP can remain in `processing` state. The `/agents` page publishes a local stdio configuration; no hosted MCP endpoint exists.
 
 The local stdio server is implemented. The full remote agent-first journey is not yet end-to-end complete.
 
@@ -145,7 +145,7 @@ Source: `internal/handlers/router.go`.
 | User management | title, save, delete, list, stats |
 | Research context | annotations, collections, export |
 | Sharing | document/figure token generation, revocation, visibility, public views |
-| Identity | signup, login, logout, session, Google OAuth, API key |
+| Identity | signup, login, logout, session, API key |
 | Billing | checkout, portal, webhook |
 | Usage and analytics | usage, account analytics, referral and upgrade events |
 

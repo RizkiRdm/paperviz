@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -14,6 +15,17 @@ import (
 // any pending migrations. Migration tracking uses a schema_migrations table
 // to ensure each migration runs exactly once, in order.
 func Open(dbPath string, migrations map[int]string) (*sql.DB, error) {
+	// SQLite creates the file but not its parent directory. In production the
+	// path points at a mounted volume (DATABASE_PATH=/data/paperviz.db) owned by
+	// root while the process runs unprivileged, so the directory has to exist
+	// and be writable before sql.Open, or the first query fails with
+	// "unable to open database file".
+	if dir := filepath.Dir(dbPath); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, fmt.Errorf("create database directory %s: %w", dir, err)
+		}
+	}
+
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)

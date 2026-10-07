@@ -37,16 +37,19 @@ jobs:
         working-directory: e2e
         run: npx playwright install chromium --with-deps
 
+      - name: Generate credential encryption key
+        run: echo "CREDENTIAL_ENCRYPTION_KEY=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+
       - name: Start backend server
         env:
-          GEMINI_API_KEY: test-key-not-real
-          GOOGLE_CLIENT_ID: test-client-id
-          GOOGLE_CLIENT_SECRET: test-client-secret
-          GOOGLE_REDIRECT_URL: http://localhost:8080/api/auth/google/callback
-          STRIPE_SECRET_KEY: test-stripe-key
-          STRIPE_WEBHOOK_SECRET: test-webhook-secret
-          FRONTEND_URL: http://localhost:8080
+          # The server refuses to boot without this. It encrypts stored BYOK
+          # credentials, so it is required even though this run has no users.
+          # There is deliberately no GEMINI_API_KEY / GOOGLE_* / STRIPE_* here:
+          # PaperViz holds no model vendor account and those integrations were
+          # removed on 2026-09-26.
           DATABASE_PATH: /tmp/paperviz-e2e-e2e-yml.db
+          MIGRATIONS_DIR: migrations
+          STATIC_DIR: frontend/dist
           PORT: 8080
         run: |
           go run ./cmd/server &

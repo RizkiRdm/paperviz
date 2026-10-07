@@ -5,14 +5,35 @@ test.describe('Landing / Upload Page', () => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
     await expect(page).toHaveTitle(/PaperViz/)
-    await expect(page.locator('h1')).toContainText('Papers, in plain language')
+    await expect(page.locator('h1')).toContainText('evidence you can inspect')
   })
 
-  test('shows two CTAs: Add to Claude Code and Sign in', async ({ page }) => {
+  test('states the free + bring-your-own-key positioning', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
-    await expect(page.locator('a[href="/agents"]')).toBeVisible()
+    await expect(page.locator('body')).toContainText('Free to use')
+    await expect(page.locator('body')).toContainText('Bring your own AI API key')
+  })
+
+  test('shows no freemium or verified-research claims', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    const body = (await page.locator('body').innerText()).toLowerCase()
+    for (const banned of ['upgrade', 'pricing', 'pro plan', 'research plan', 'subscription', 'billing']) {
+      expect(body, `landing page must not mention "${banned}"`).not.toContain(banned)
+    }
+  })
+
+  test('leads with the evidence workflow, not agent access', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    for (const step of ['Understand', 'Inspect', 'Trace', 'Reuse']) {
+      await expect(page.locator('body')).toContainText(step)
+    }
+    // Primary CTA is the paper workflow; the MCP link is secondary.
+    await expect(page.locator('a[href="#ingest"]')).toBeVisible()
     await expect(page.locator('a[href="/login"]')).toBeVisible()
+    await expect(page.locator('a[href="/agents"]')).toBeVisible()
   })
 
   test('shows PDF/Paste/DOI/URL tab selector', async ({ page }) => {

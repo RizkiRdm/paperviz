@@ -58,9 +58,8 @@ HTTP transport and cross-cutting web concerns.
 | `documents_create.go` | Multipart PDF/text intake and async pipeline start |
 | `documents.go` | Document read model, research objects, comparison, relationships |
 | `import.go` | DOI and URL ingestion |
-| `auth.go` | Signup, login, logout, session, Google OAuth |
+| `auth.go` | Signup, login, logout, session |
 | `apikey.go` | API-key retrieval and regeneration |
-| `billing.go` | Stripe checkout, portal, webhook |
 | `account.go` | Account summary |
 | `annotations.go` | Per-user annotation CRUD |
 | `export.go` | Research-context export |
@@ -248,8 +247,6 @@ All routes below are registered in `internal/handlers/router.go`.
 | `POST /api/auth/login` | Public + rate limit | Authenticate and create session |
 | `POST /api/auth/logout` | Public | Clear session |
 | `GET /api/auth/me` | Public + rate limit | Current user/session state |
-| `GET /api/auth/google/login` | Public | Begin Google OAuth |
-| `GET /api/auth/google/callback` | Public | Complete Google OAuth |
 | `GET /api/auth/apikey` | Required | Get current API key |
 | `POST /api/auth/apikey/regenerate` | Required | Regenerate API key |
 
@@ -257,9 +254,7 @@ All routes below are registered in `internal/handlers/router.go`.
 
 | Method and path | Auth | Purpose |
 |---|---|---|
-| `POST /api/billing/checkout` | Required | Create Stripe checkout session |
 | `POST /api/billing/portal` | Required | Create customer portal session |
-| `POST /api/billing/webhook` | Stripe signature | Process billing events |
 | `GET /api/account/summary` | Required | Account summary |
 
 ### User-owned research context
@@ -407,9 +402,9 @@ BASE_URL=http://localhost:8080 npm --prefix e2e test
 | 014 | `014_structured_research_objects.sql` | Tables, methods, results, citations, claims |
 | 015 | `015_evidence_graph.sql` | Claim-evidence and paper relationships |
 | 016 | `016_annotations.sql` | User annotations |
-| 017 | `017_oauth_columns.sql` | OAuth identity |
+| 017 | `017_oauth_columns.sql` | OAuth identity (columns dropped again in 021) |
 | 018 | `018_api_key_column.sql` | User API key |
-| 019 | `019_billing_columns.sql` | Stripe customer and subscription state |
+| 019 | `019_billing_columns.sql` | Stripe state (columns dropped again in 021) |
 
 ## Test locations
 
@@ -434,10 +429,10 @@ BASE_URL=http://localhost:8080 npm --prefix e2e test
 
 | Mismatch | Evidence | Consequence |
 |---|---|---|
-| `/agents` config expects remote `/api/mcp` | `frontend/src/pages/agents-page.jsx` versus `internal/handlers/router.go` | Generated remote config cannot connect to current server |
+| No HTTP MCP transport exists | `internal/handlers/router.go` registers no `/api/mcp` route | Agent access is stdio-only, by design |
 | MCP ingest does not run pipeline | `internal/mcp/tools.go` calls `ValidateAndInsert` only | MCP-created document can remain `processing` |
 | Lowercase architecture file is a compatibility pointer | `docs/architecture.md` | Keep redirects current; use uppercase document for contracts |
-| SEO files and screenshots include removed routes | `frontend/public/`, `assets/` | Must not be used as current navigation proof |
+| Archived screenshots include removed routes | `assets/` | Must not be used as current navigation proof |
 
 ## Change verification points
 

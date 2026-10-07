@@ -1,6 +1,6 @@
 # PaperViz
 
-PaperViz turns academic papers into simplified explanations, verified claims, and evidence-grounded figures. It is designed for AI agents that need structured research data, with a web app for account management and manual paper upload.
+PaperViz turns research papers into structured, evidence-grounded research context you can inspect and reuse: claims checked against the original, figures plotted only from values extracted from the paper, and source locations for both. The web app handles accounts and manual uploads; a local MCP server exposes the same data to AI agents.
 
 PaperViz runs on infrastructure and credentials it owns, and nothing else. There is no Google OAuth account, no Stripe account, and no model vendor account: users bring their own model key, which is encrypted at rest. Model spend belongs to the user, so the service is free to run without metering anyone's wallet.
 
@@ -179,6 +179,73 @@ npm --prefix frontend run build
 CGO_ENABLED=0 go build -o server ./cmd/server
 ```
 
+## Deployment
+
+The production runtime is one Go binary that serves both the JSON API and the
+built React assets. SQLite is the only datastore; there is no external service
+to provision.
+
+### Container image
+
+`build/Containerfile` is the full-stack production image. It bakes in
+`frontend/dist` and `migrations/`, runs as the unprivileged `paperviz` user, and
+sets `DATABASE_PATH`, `STATIC_DIR`, and `MIGRATIONS_DIR` to in-image paths.
+
+```bash
+podman build -t paperviz:latest -f build/Containerfile .
+```
+
+`build/Containerfile.backend` is API-only (no frontend assets) and
+`build/Containerfile.frontend` is an nginx image for split deployments. The full
+stack needs only the first one.
+
+### Required environment
+
+`CREDENTIAL_ENCRYPTION_KEY` is the only secret, and the server refuses to boot
+without it. PaperViz holds no model account, so there is no provider key to
+supply — users bring their own through the UI.
+
+```bash
+export CREDENTIAL_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+```
+
+### Persistent database
+
+Point `DATABASE_PATH` at a mounted volume. The parent directory is created at
+startup if it does not exist, and the image ships `/data` owned by the runtime
+user so a fresh volume works without extra setup.
+
+```bash
+podman volume create paperviz-data
+podman run -d --name paperviz \
+  -p 8080:8080 \
+  -v paperviz-data:/data \
+  -e CREDENTIAL_ENCRYPTION_KEY="$CREDENTIAL_ENCRYPTION_KEY" \
+  -e DATABASE_PATH=/data/paperviz.db \
+  paperviz:latest
+```
+
+Or via the Makefile, which fails fast if the key is unset:
+
+```bash
+make container IMAGE=paperviz TAG=latest
+make container-run IMAGE=paperviz TAG=latest CREDENTIAL_ENCRYPTION_KEY="$CREDENTIAL_ENCRYPTION_KEY"
+```
+
+### Health and shutdown
+
+`GET /healthz` returns `{"status":"ok"}` when SQLite answers a query and 503
+`db_unreachable` when it does not, so it is a real readiness probe rather than a
+liveness ping.
+
+The process handles `SIGINT`/`SIGTERM` and drains in-flight requests for up to
+15 seconds before closing connections, so a container stop does not truncate
+responses.
+
+Schema changes are applied at startup by `internal/repository.Open`. Migrations
+run in order and are recorded in `schema_migrations`, so restarts are
+idempotent. The data itself is ephemeral — documents expire after 7 days.
+
 ## Repository Map
 
 ```text
@@ -230,10 +297,10 @@ Start with [`docs/README.md`](docs/README.md) for reading paths and source-of-tr
 - Model keys work for Gemini, Anthropic Claude, and OpenAI. Provider protocol comes from `github.com/zendev-sh/goai`; retry, concurrency, and JSON recovery are PaperViz's own.
 - Service API keys are returned exactly once, at issue time, and stored only as a SHA-256 digest. A lost key cannot be recovered, only replaced.
 - There is no self-service password reset. Use `go run ./cmd/admin reset-password <email>`, which also revokes that account's live sessions.
-- `/agents` currently generates remote MCP configuration for `https://paperviz.com/api/mcp`, but the current server router does not expose that HTTP MCP transport. The repository ships a local stdio MCP entrypoint.
+- There is no hosted MCP endpoint. `/agents` publishes a local stdio configuration that launches `cmd/mcp` against your own database, so remote-only clients cannot connect.
 - MCP search is global and stateless; it is not scoped to an authenticated user's library.
 - SQLite uses one open connection, and the architecture is designed for a single low-concurrency instance rather than horizontal scaling.
-- Some public static SEO pages and screenshot assets predate the current route cuts. Product navigation follows `frontend/src/App.jsx`, not those artifacts.
+- Archived screenshots under `assets/` predate the current route cuts. Product navigation follows `frontend/src/App.jsx`, not those artifacts.
 
 ## Contributing Rules
 

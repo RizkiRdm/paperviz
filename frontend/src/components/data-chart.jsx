@@ -166,15 +166,15 @@ export default function DataChart({ chartData, title, provenance }) {
                       ? "bg-[#fef3c7] text-[#92400e]"
                       : "bg-[#fef2f2] text-[#991b1b]"
                 }`}>
-                  {groundingStatus === "verified" ? "Verified" : groundingStatus === "partial" ? "Partial" : "Unsupported"}
+                  {groundingStatus === "verified" ? "Grounded in source" : groundingStatus === "partial" ? "Partly interpreted" : "Not grounded"}
                 </span>
               </TooltipTrigger>
               <TooltipContent>
                 {groundingStatus === "verified"
-                  ? "Data grounded in source evidence"
+                  ? "Every plotted value was extracted from the paper's own text or tables"
                   : groundingStatus === "partial"
-                    ? "Partially grounded — some values may be interpreted"
-                    : "Not fully grounded in source evidence"}
+                    ? "Some values were interpreted rather than read from the source text"
+                    : "Chart data could not be grounded in the source"}
               </TooltipContent>
             </Tooltip>
           )}

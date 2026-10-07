@@ -17,11 +17,11 @@ PaperViz addresses this by treating research output as structured, inspectable d
 
 PaperViz is moving toward an agent-first product:
 
-1. A person signs in, manages billing, and obtains an API key.
+1. A person signs in, adds their own model key, and obtains a PaperViz service API key.
 2. An AI agent uses PaperViz tools to ingest and retrieve research data.
 3. The web application remains available as a manual escape hatch for people who want to upload or paste a paper directly.
 
-The intended agent experience is not fully realized in the current repository. The code currently ships a local stdio MCP server with five deterministic tools, while the `/agents` page generates configuration for a remote HTTP MCP endpoint that is not registered in the HTTP router. MCP ingestion also does not start the full LLM pipeline. These gaps are documented in [Current implementation reality](#current-implementation-reality).
+The intended agent experience is not fully realized in the current repository. The code ships a local stdio MCP server with five deterministic tools, and the `/agents` page publishes that stdio configuration — there is no hosted HTTP MCP endpoint. MCP ingestion also does not start the full LLM pipeline. These gaps are documented in [Current implementation reality](#current-implementation-reality).
 
 ## Users and Outcomes
 
@@ -44,7 +44,7 @@ A person may need to:
 - choose Simplified or ELI5 output;
 - inspect verification and figure-grounding status;
 - annotate, organize, export, or share research context;
-- manage authentication, API keys, and billing.
+- manage authentication and model API keys.
 
 ### Student or researcher
 
@@ -60,7 +60,7 @@ The React application calls the Go HTTP API. Web and DOI/URL ingestion start the
 intake → simplify → verify claims → build evidence → plan figures → persist → poll result
 ```
 
-The HTTP server also serves the built React application, authentication, account management, billing, collections, annotations, sharing, exports, usage, and structured research endpoints.
+The HTTP server also serves the built React application, authentication, account management, collections, annotations, sharing, exports, usage, and structured research endpoints.
 
 ### MCP
 
@@ -211,7 +211,7 @@ The following distinctions matter when reading plans or older documents:
 | DOI/URL ingestion | Fetches source and starts full asynchronous processing pipeline |
 | MCP ingestion | Stores pasted text only; does not start processing pipeline |
 | MCP transport | Local stdio binary in this repository |
-| `/agents` generated config | Points to remote `https://paperviz.com/api/mcp`; no matching route exists in current HTTP router |
+| `/agents` generated config | Publishes a local stdio block; no hosted MCP endpoint exists |
 | MCP user scope | Stateless and global; not tied to REST session ownership |
 | Figure grounding | Deterministic validation before chart persistence/rendering |
 | Raw PDF persistence | Prohibited and not implemented |

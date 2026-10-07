@@ -1,5 +1,6 @@
-# Backend-only image — Go binary serving API + embedded frontend
-# Used for: production deployment, API server, full-stack single-binary
+# Backend-only image — Go binary serving the JSON API alone, with no frontend
+# assets. Used for API-only and CI jobs. For the full-stack production image
+# use build/Containerfile, which also bakes in frontend/dist.
 FROM docker.io/golang:1.25-alpine AS builder
 WORKDIR /build
 COPY go.mod go.sum ./
@@ -11,7 +12,11 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata
 RUN adduser -D -h /app paperviz
 COPY --from=builder /server /app/server
+# Migrations are read from disk at startup, not embedded in the binary.
+COPY --from=builder /build/migrations /app/migrations
+RUN mkdir -p /data && chown paperviz:paperviz /data
 WORKDIR /app
 USER paperviz
+ENV MIGRATIONS_DIR=/app/migrations
 EXPOSE 8080
 CMD ["/app/server"]

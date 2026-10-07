@@ -174,7 +174,6 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Task/chunk docs: `docs/`
 - Cost model: historical analysis removed; current cost controls are documented in `docs/DATA_PIPELINE.md`
 - Pricing strategy: historical experiment removed; current billing routes are in `internal/handlers/billing.go`
-- Conversion tracking: `internal/handlers/analytics.go` (`TrackPricingView`, `TrackUpgradeIntent`)
 - Structured Research API docs: `docs/structured-research-api.md`
 - Canonical Research Output Contract: `docs/canonical-research-output-contract.md`
 - OpenAPI spec: `docs/openapi.yaml`

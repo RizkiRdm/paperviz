@@ -21,7 +21,17 @@ RUN apk add --no-cache ca-certificates tzdata
 RUN adduser -D -h /app paperviz
 COPY --from=backend /server /app/server
 COPY --from=frontend /build/dist /app/frontend/dist
+# Migrations are read from disk at startup, not embedded. Without this the
+# server exits before binding a port.
+COPY --from=backend /build/migrations /app/migrations
+# SQLite lives on a mounted volume. Create it up front and hand it to the
+# non-root runtime user, otherwise opening DATABASE_PATH=/data/paperviz.db
+# fails on permissions.
+RUN mkdir -p /data && chown paperviz:paperviz /data
 WORKDIR /app
 USER paperviz
+ENV DATABASE_PATH=/data/paperviz.db \
+    STATIC_DIR=/app/frontend/dist \
+    MIGRATIONS_DIR=/app/migrations
 EXPOSE 8080
 CMD ["/app/server"]
