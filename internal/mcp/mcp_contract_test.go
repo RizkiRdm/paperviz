@@ -1,32 +1,61 @@
 package mcp
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
+	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
+
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"paperviz/internal/repository"
 )
 
-// newTestDB opens an in-memory SQLite with all migrations for contract tests.
+// loadMigrations reads every numbered migration in dir, keyed by version.
+// The whole set is loaded rather than a hand-picked subset so a schema change
+// cannot leave the MCP test path silently running against an older schema than
+// production.
+func loadMigrations(t *testing.T) map[int]string {
+	t.Helper()
+	dir := filepath.Join("..", "..", "migrations")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read migrations dir: %v", err)
+	}
+
+	migrations := make(map[int]string)
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".sql") {
+			continue
+		}
+		version, err := strconv.Atoi(strings.SplitN(name, "_", 2)[0])
+		if err != nil {
+			t.Errorf("migration %q has no numeric version prefix", name)
+			continue
+		}
+		sqlStr, err := repository.ReadMigration(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatalf("read migration %s: %v", name, err)
+		}
+		migrations[version] = sqlStr
+	}
+
+	if len(migrations) == 0 {
+		t.Fatal("no migrations found")
+	}
+	return migrations
+}
+
+// newTestDB opens an in-memory SQLite with all migrations applied.
 func newTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	migrations := make(map[int]string)
-	for v, file := range map[int]string{
-		1: "001_init.sql", 2: "002_users.sql", 3: "003_chapters.sql",
-		4: "004_chapter_charts.sql", 5: "005_evidence.sql", 6: "006_document_title.sql",
-		7: "007_saved_papers.sql", 8: "008_research_collections.sql",
-		9: "009_share_tokens.sql", 10: "010_document_share.sql",
-		11: "011_share_referrals.sql", 12: "012_usage_analytics.sql",
-	} {
-		sqlStr, err := repository.ReadMigration(filepath.Join("..", "..", "migrations", file))
-		if err != nil {
-			t.Fatalf("read migration %s: %v", file, err)
-		}
-		migrations[v] = sqlStr
-	}
-	db, err := repository.Open(":memory:", migrations)
+	db, err := repository.Open(":memory:", loadMigrations(t))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -34,14 +63,89 @@ func newTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-// newTestServer builds a minimal MCPServer with a real DB and noop rate limiter.
+// newTestServer builds an MCPServer through the production constructor.
+//
+// It deliberately calls NewMCPServer rather than hand-building the struct:
+// registerTools is where a bad tool definition panics, and hand-building
+// skipped it, which is how a server that could not boot shipped with a green
+// test suite.
 func newTestServer(t *testing.T) *MCPServer {
 	t.Helper()
-	db := newTestDB(t)
-	return &MCPServer{
-		db:          db,
-		apiKey:      "test-key",
-		rateLimiter: NewRateLimiter(),
+	return NewMCPServer(newTestDB(t), nil, "test-key")
+}
+
+// TestMCPHandshake_ListsLockedTools connects a real client to the server over
+// in-memory transports and completes initialize + tools/list.
+//
+// This is the check that was missing. Every other test here calls a handler
+// directly, so none of them executed registerTools — which is where a malformed
+// tool definition panics, and how a server that could not boot shipped with a
+// green suite. Going through a client session also asserts the advertised JSON
+// Schemas are valid, which a direct handler call cannot.
+func TestMCPHandshake_ListsLockedTools(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	srv := newTestServer(t)
+
+	clientT, serverT := sdk.NewInMemoryTransports()
+	serverSession, err := srv.Server().Connect(ctx, serverT, nil)
+	if err != nil {
+		t.Fatalf("connect server: %v", err)
+	}
+	t.Cleanup(func() { serverSession.Close() })
+
+	client := sdk.NewClient(&sdk.Implementation{Name: "contract-test", Version: "0.0.1"}, nil)
+	clientSession, err := client.Connect(ctx, clientT, nil)
+	if err != nil {
+		t.Fatalf("connect client: %v", err)
+	}
+	t.Cleanup(func() { clientSession.Close() })
+
+	if got := clientSession.InitializeResult().ServerInfo.Name; got != "paperviz" {
+		t.Errorf("server name = %q, want %q", got, "paperviz")
+	}
+
+	result, err := clientSession.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatalf("tools/list: %v", err)
+	}
+
+	want := map[string]bool{
+		"ingest_document":  false,
+		"search_documents": false,
+		"get_document":     false,
+		"get_figures":      false,
+		"get_evidence":     false,
+	}
+
+	got := make(map[string]int, len(result.Tools))
+	for _, tool := range result.Tools {
+		got[tool.Name]++
+		if _, ok := want[tool.Name]; !ok {
+			t.Errorf("unexpected tool advertised: %q", tool.Name)
+			continue
+		}
+		if tool.Description == "" {
+			t.Errorf("tool %q has no description", tool.Name)
+		}
+		if tool.InputSchema == nil {
+			t.Errorf("tool %q has no input schema", tool.Name)
+		}
+	}
+
+	for name, count := range got {
+		if count != 1 {
+			t.Errorf("tool %q advertised %d times, want 1", name, count)
+		}
+	}
+	for name := range want {
+		if got[name] == 0 {
+			t.Errorf("expected tool %q to be advertised", name)
+		}
+	}
+	if len(result.Tools) != len(want) {
+		t.Errorf("advertised %d tools, want exactly %d", len(result.Tools), len(want))
 	}
 }
 
