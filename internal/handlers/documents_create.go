@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"errors"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"time"
 
@@ -23,10 +25,28 @@ type createDocumentResponse struct {
 
 // Create handles POST /api/documents via Service.Create.
 func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
+	// Reject a declared oversize body before parsing. The parse error for an
+	// oversized upload is whatever the multipart reader happened to hit first
+	// ("bufio: buffer full" in practice), which is indistinguishable from a
+	// malformed body, so the size verdict has to come from the length.
+	if r.ContentLength > maxUploadBytes {
+		writeError(w, http.StatusBadRequest, "file_too_large")
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes+1<<20)
 
 	if err := r.ParseMultipartForm(maxUploadBytes); err != nil {
-		writeError(w, http.StatusBadRequest, "file_too_large")
+		var tooLarge *http.MaxBytesError
+		switch {
+		case errors.As(err, &tooLarge), errors.Is(err, multipart.ErrMessageTooLarge):
+			writeError(w, http.StatusBadRequest, "file_too_large")
+		case errors.Is(err, http.ErrNotMultipart):
+			writeError(w, http.StatusBadRequest, "invalid_content_type")
+		default:
+			slog.Warn("multipart parse failed", "error", err)
+			writeError(w, http.StatusBadRequest, "invalid_request")
+		}
 		return
 	}
 

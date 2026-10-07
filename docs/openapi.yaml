@@ -51,9 +51,12 @@ info:
     | `email_taken` | 409 | Email already registered |
     | `invalid_email` | 400 | Malformed email address |
     | `password_too_short` | 400 | Password < 8 characters |
+    | `password_too_weak` | 400 | Password lacks upper, lower, digit, or symbol |
     | `file_too_large` | 400 | Upload exceeds 20 MiB |
     | `missing_input` | 400 | Neither file nor text provided |
     | `invalid_file_type` | 400 | Uploaded file is not a valid PDF |
+    | `invalid_content_type` | 400 | Body is not multipart/form-data |
+    | `invalid_request` | 400 | Malformed multipart body |
     | `invalid_reading_level` | 400 | Must be "simplified" or "eli5" |
     | `no_text_layer` | 422 | PDF has no extractable text |
     | `name_required` | 400 | Collection name is empty |
@@ -412,6 +415,14 @@ paths:
                   summary: "Invalid file type"
                   value:
                     error: "invalid_file_type"
+                invalid_content_type:
+                  summary: "Body is not multipart/form-data"
+                  value:
+                    error: "invalid_content_type"
+                invalid_request:
+                  summary: "Malformed multipart body"
+                  value:
+                    error: "invalid_request"
                 invalid_reading_level:
                   summary: "Invalid reading level"
                   value:
