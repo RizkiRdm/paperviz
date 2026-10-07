@@ -22,7 +22,11 @@
 | `compare_papers` (prev `compare_papers`) | Not implemented | Removed in Chunk 11 MCP lock to 5 tools; no demand signal |
 | `analyze_paper` / `get_summary` / `get_claims` (legacy names) | Not implemented | Renamed/merged into `ingest_document` / `get_document` / `get_evidence` in Chunk 11; old names in this doc were drift |
 
-Former doc listed `analyze_paper`, `get_summary`, `get_claims`, `compare_papers` — none exist in `internal/mcp/tools.go` as of 2026-09-21. This table now matches the 5 registered tools (`grep -c "Name:" internal/mcp/tools.go` == 5).
+Former doc listed `analyze_paper`, `get_summary`, `get_claims`, `compare_papers` — none exist in `internal/mcp/tools.go` as of 2026-09-21. This table matches the 5 registered tools.
+
+**How the count is verified:** `scripts/mcp-handshake-check.sh` builds `cmd/mcp`, runs a real `initialize` + `tools/list` handshake over stdio, and asserts exactly those 5 tool names. It runs in CI on every push.
+
+Do **not** verify this table with `grep -c "Name:" internal/mcp/tools.go`. That check passes on a server that panics before serving a single tool — which is exactly what happened until 2026-10-08, when a malformed `jsonschema` struct tag took down the entire agent surface while 641 tests stayed green. A grep counts text; the handshake proves the server boots.
 
 ## Operations Intentionally Unavailable to Agents
 

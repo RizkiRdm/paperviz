@@ -172,5 +172,5 @@ git push origin main --tags
 - `go test ./...` — backend test suite
 - `go vet ./...` — vet must be clean
 - `gofmt -l .` — formatting check, must return empty
-- `grep -c "Name:" internal/mcp/tools.go` — actual MCP tool count, cross-check against `docs/mcp-parity.md` table row count
+- `scripts/mcp-handshake-check.sh` — boots `cmd/mcp`, runs a real `initialize` + `tools/list` over stdio, asserts the 5 tool names. **This is the MCP tool count check.** Never `grep -c "Name:" internal/mcp/tools.go`: that passes on a server that panics before serving any tool, which is how the agent surface shipped broken with a green suite.
 - `npm --prefix frontend run lint && npm --prefix frontend run build` — frontend gate (`oxlint`, then `vite build`)
