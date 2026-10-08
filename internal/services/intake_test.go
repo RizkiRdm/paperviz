@@ -8,29 +8,8 @@ import (
 )
 
 func TestValidateAndInsert(t *testing.T) {
-	migrations := make(map[int]string)
-	for v, file := range map[int]string{
-		1:  "001_init.sql",
-		2:  "002_users.sql",
-		3:  "003_chapters.sql",
-		4:  "004_chapter_charts.sql",
-		5:  "005_evidence.sql",
-		6:  "006_document_title.sql",
-		7:  "007_saved_papers.sql",
-		8:  "008_research_collections.sql",
-		9:  "009_share_tokens.sql",
-		10: "010_document_share.sql",
-		11: "011_share_referrals.sql",
-		12: "012_usage_analytics.sql",
-	} {
-		sqlStr, err := repository.ReadMigration(filepath.Join("..", "..", "migrations", file))
-		if err != nil {
-			t.Fatalf("read migration %s: %v", file, err)
-		}
-		migrations[v] = sqlStr
-	}
 
-	db, err := repository.Open(":memory:", migrations)
+	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

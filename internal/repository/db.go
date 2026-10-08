@@ -3,17 +3,15 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"os"
-	"sort"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
 
-// Open opens (creating if needed) the SQLite database at path and applies
-// any pending migrations. Migration tracking uses a schema_migrations table
-// to ensure each migration runs exactly once, in order.
-func Open(dbPath string, migrations map[int]string) (*sql.DB, error) {
+// Open opens (creating if needed) the SQLite database at path and brings it up
+// to date with the migrations found in migrationsDir.
+func Open(dbPath string, migrationsDir string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
@@ -22,6 +20,14 @@ func Open(dbPath string, migrations map[int]string) (*sql.DB, error) {
 	// SQLite allows only one writer at a time; a single connection avoids
 	// SQLITE_BUSY errors under the low-concurrency MVP load this is designed for.
 	db.SetMaxOpenConns(1)
+
+	// A ":memory:" database lives inside its connection, so the pool must never
+	// retire that connection or the schema disappears. MaxIdleConns(1) holds it
+	// and a zero lifetime means "never expire".
+	if isMemoryPath(dbPath) {
+		db.SetMaxIdleConns(1)
+		db.SetConnMaxLifetime(0)
+	}
 
 	// WAL mode + synchronous=NORMAL: write-ahead logging avoids the fsync
 	// overhead of rollback journals on every GET poll (which calls TouchLastAccessed
@@ -44,72 +50,23 @@ func Open(dbPath string, migrations map[int]string) (*sql.DB, error) {
 		return nil, fmt.Errorf("set busy timeout: %w", err)
 	}
 
-	// Ensure schema_migrations table exists
-	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-		version INTEGER PRIMARY KEY,
-		applied_at INTEGER NOT NULL
-	)`); err != nil {
+	if err := Migrate(db, migrationsDir); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("create schema_migrations: %w", err)
-	}
-
-	// Get applied migrations
-	applied := make(map[int]bool)
-	rows, err := db.Query(`SELECT version FROM schema_migrations`)
-	if err != nil {
-		db.Close()
-		return nil, fmt.Errorf("query schema_migrations: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var version int
-		if err := rows.Scan(&version); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("scan schema_migrations: %w", err)
-		}
-		applied[version] = true
-	}
-	if err := rows.Err(); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("iterate schema_migrations: %w", err)
-	}
-
-	// Sort migration versions
-	versions := make([]int, 0, len(migrations))
-	for v := range migrations {
-		versions = append(versions, v)
-	}
-	sort.Ints(versions)
-
-	// Apply pending migrations
-	for _, version := range versions {
-		if applied[version] {
-			continue
-		}
-
-		migrationSQL := migrations[version]
-		if _, err := db.Exec(migrationSQL); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("apply migration %d: %w", version, err)
-		}
-
-		if _, err := db.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, version, unixNow()); err != nil {
-			db.Close()
-			return nil, fmt.Errorf("record migration %d: %w", version, err)
-		}
+		return nil, err
 	}
 
 	return db, nil
 }
 
-// ReadMigration loads a migration SQL file from disk.
-func ReadMigration(path string) (string, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("read migration %s: %w", path, err)
+// isMemoryPath reports whether dbPath names a private in-memory database.
+// Such a database belongs to a single connection, which drives the pool
+// settings above.
+func isMemoryPath(dbPath string) bool {
+	base := dbPath
+	if i := strings.IndexByte(base, '?'); i >= 0 {
+		base = base[:i]
 	}
-	return string(b), nil
+	return base == ":memory:" || strings.HasPrefix(base, "file::memory:") || strings.Contains(base, "mode=memory")
 }
 
 // unixNow returns the current Unix timestamp in seconds.

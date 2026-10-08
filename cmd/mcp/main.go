@@ -43,12 +43,7 @@ func main() {
 		log.Fatal("PAPERVIZ_API_KEY environment variable is required")
 	}
 
-	migrations, err := repository.LoadMigrations(migrationsDir)
-	if err != nil {
-		log.Fatalf("failed to load migrations: %v", err)
-	}
-
-	db, err := repository.Open(dbPath, migrations)
+	db, err := repository.Open(dbPath, migrationsDir)
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
 	}

@@ -2,21 +2,12 @@ package repository
 
 import (
 	"database/sql"
-	"path/filepath"
 	"testing"
 )
 
 func openAnnotationTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db := openTestDB(t)
-	annotationsSQL, err := ReadMigration(filepath.Join("..", "..", "migrations", "016_annotations.sql"))
-	if err != nil {
-		t.Fatalf("read annotations migration: %v", err)
-	}
-	if _, err := db.Exec(annotationsSQL); err != nil {
-		t.Fatalf("run annotations migration: %v", err)
-	}
-	return db
+	return openTestDB(t)
 }
 
 // TestAnnotationRepo_Insert verifies that a single annotation can be inserted without error.

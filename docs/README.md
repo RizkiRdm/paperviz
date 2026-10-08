@@ -146,7 +146,7 @@ Useful verification points:
 - Frontend routes: `frontend/src/App.jsx`
 - MCP tools: `internal/mcp/tools.go`
 - Environment variables: `.env.example` and both `cmd/*/main.go` entrypoints
-- Migration inventory: `internal/repository/migrations.go`
+- Migration inventory: `migrations/` on disk (read by `internal/repository/migrate.go`)
 - Architecture state: `docs/PROJECT_STATE.md`
 
 ## Documentation Maintenance Rule

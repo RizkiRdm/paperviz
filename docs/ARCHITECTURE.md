@@ -160,17 +160,28 @@ Detailed processing semantics live in [`DATA_PIPELINE.md`](DATA_PIPELINE.md).
 
 ### Migrations
 
-PaperViz uses 19 ordered SQL files under `migrations/`. `internal/repository/migrations.go` is the single registration point used by both server and MCP.
+PaperViz uses 21 ordered migration pairs under `migrations/`, applied by
+`github.com/golang-migrate/migrate/v4` through `internal/repository/migrate.go`.
+The server, the MCP binary, and the admin CLI all call `repository.Open`, which
+configures the connection and then migrates.
 
 Migration policy:
 
-- add a new numbered SQL file;
-- register it in `migrationPaths`;
+- add `{version}_{title}.up.sql` **and** its matching `.down.sql`;
 - update repository code and tests;
+- run `go test ./internal/repository/` — `TestEveryMigrationHasADownFile`
+  fails on an unmatched pair, and `TestMigrateDownRoundTrip` proves the whole
+  chain still applies and rolls back;
 - delete disposable local SQLite files;
 - restart against a fresh schema when required by current project policy.
 
-There is no incremental migration runner or migration rollback system.
+The filesystem is the only migration inventory. There is no Go-side list to
+keep in sync; the hand-maintained map this replaced drifted once and shipped
+migrations 18-19 missing on deploy.
+
+Rollback exists: `repository.Down`, `DownTo`, and `DownAll` step the schema
+backwards. It is a development and recovery tool, not an automatic production
+policy — document data is ephemeral by design.
 
 ### SQLite
 
@@ -181,8 +192,12 @@ There is no incremental migration runner or migration rollback system.
 - `synchronous=NORMAL`;
 - foreign keys;
 - five-second busy timeout;
-- `schema_migrations` tracking;
-- ordered pending migration application.
+- `schema_migrations` tracking, owned by golang-migrate;
+- ordered migration application at startup.
+
+For an in-memory database the pool additionally pins one idle connection with no
+lifetime: a `:memory:` database lives inside its connection, so retiring it would
+discard the schema.
 
 One connection favors low-concurrency correctness. It limits read concurrency and agent-scale throughput.
 

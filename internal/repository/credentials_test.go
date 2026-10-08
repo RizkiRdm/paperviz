@@ -7,23 +7,10 @@ import (
 	"testing"
 )
 
-// openCredentialTestDB loads only the migrations this package needs: documents
-// and users, then the credentials table.
+// openCredentialTestDB opens an in-memory database with every migration applied.
 func openCredentialTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	migrations := make(map[int]string)
-	for v, file := range map[int]string{
-		1:  "001_init.sql",
-		2:  "002_users.sql",
-		20: "020_user_credentials.sql",
-	} {
-		sqlStr, err := ReadMigration(filepath.Join("..", "..", "migrations", file))
-		if err != nil {
-			t.Fatalf("read migration %s: %v", file, err)
-		}
-		migrations[v] = sqlStr
-	}
-	db, err := Open(":memory:", migrations)
+	db, err := Open(":memory:", filepath.Join("..", "..", "migrations"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

@@ -20,19 +20,7 @@ const testModelKey = "AIzaSyD-SUPER-SECRET-USER-KEY-9999"
 
 func openCredentialHandlerDB(t *testing.T) *sql.DB {
 	t.Helper()
-	migrations := make(map[int]string)
-	for v, file := range map[int]string{
-		1:  "001_init.sql",
-		2:  "002_users.sql",
-		20: "020_user_credentials.sql",
-	} {
-		sqlStr, err := repository.ReadMigration(filepath.Join("..", "..", "migrations", file))
-		if err != nil {
-			t.Fatalf("read migration %s: %v", file, err)
-		}
-		migrations[v] = sqlStr
-	}
-	db, err := repository.Open(":memory:", migrations)
+	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

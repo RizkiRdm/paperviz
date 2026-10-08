@@ -17,11 +17,7 @@ import (
 // document read needs.
 func newOwnershipRouterDB(t *testing.T) *sql.DB {
 	t.Helper()
-	migrations, err := repository.LoadMigrations(filepath.Join("..", "..", "migrations"))
-	if err != nil {
-		t.Fatalf("load migrations: %v", err)
-	}
-	db, err := repository.Open(":memory:", migrations)
+	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

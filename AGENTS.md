@@ -54,11 +54,25 @@ Rules:
 - **Landing page minimal.** Single above-the-fold section with 2 CTAs: "Add to Claude Code" and "Sign in".
 
 ## DB Reset Protocol
+Schema is owned by `github.com/golang-migrate/migrate/v4`. Migrations are
+`{version}_{title}.up.sql` / `.down.sql` pairs under `migrations/`, discovered
+from disk — there is no Go-side list to register a new migration in.
+
 When schema changes (new column/table):
 1. `kill` server process
 2. `rm paperviz.db paperviz.db-wal paperviz.db-shm paperviz.db-journal` (all present)
 3. `make dev` — fresh DB, fresh schema, fresh WAL
-4. Data ephemeral (7-day expiry). No migration runner yet.
+4. Data ephemeral (7-day expiry)
+
+Step 2 is required after any schema change, because `schema_migrations` is now
+golang-migrate's own table (`version`, `dirty`) and is incompatible with the
+hand-rolled table this replaced.
+
+Adding a migration: write BOTH `.up.sql` and `.down.sql`, then run
+`go test ./internal/repository/`. `TestEveryMigrationHasADownFile` fails on an
+unmatched pair and `TestMigrateDownRoundTrip` proves the full chain applies and
+rolls back. An `.up.sql` with no `.down.sql` applies cleanly, so nothing else
+will catch the asymmetry.
 
 ## Security & Hardening (Round 2 — applied July 2026)
 1. A1: Removed `slog.Info("gemini debug", ...)` from `gemini.go:174` — was leaking model name + URL on every call.

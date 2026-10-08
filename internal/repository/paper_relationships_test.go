@@ -1,18 +1,11 @@
 package repository
 
 import (
-	"database/sql"
-	"path/filepath"
 	"testing"
 )
 
 func TestPaperRelationshipRepo(t *testing.T) {
 	db := openTestDB(t)
-
-	// Insert migration 015 for paper_relationships table
-	if err := execMigration(db, 15, "015_evidence_graph.sql"); err != nil {
-		t.Fatalf("apply migration 015: %v", err)
-	}
 
 	// Create two source documents for testing
 	docID1, err := NewID()
@@ -172,30 +165,4 @@ func TestPaperRelationshipRepo(t *testing.T) {
 			t.Errorf("got err=%v, want ErrNotFound", err)
 		}
 	})
-}
-
-// execMigration applies a single migration by version number
-func execMigration(db *sql.DB, version int, filename string) error {
-	sqlStr, err := ReadMigration(filepath.Join("..", "..", "migrations", filename))
-	if err != nil {
-		return err
-	}
-	// Check if already applied
-	var count int
-	err = db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = ?", version).Scan(&count)
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return nil // Already applied
-	}
-	// Apply migration
-	if _, err := db.Exec(sqlStr); err != nil {
-		return err
-	}
-	// Record migration
-	if _, err := db.Exec("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)", version, unixNow()); err != nil {
-		return err
-	}
-	return nil
 }

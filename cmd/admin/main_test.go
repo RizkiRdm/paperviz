@@ -23,11 +23,7 @@ func newAdminTestDB(t *testing.T) *sql.DB {
 	t.Setenv("DATABASE_PATH", dbPath)
 	t.Setenv("MIGRATIONS_DIR", filepath.Join("..", "..", "migrations"))
 
-	migrations, err := repository.LoadMigrations(filepath.Join("..", "..", "migrations"))
-	if err != nil {
-		t.Fatalf("load migrations: %v", err)
-	}
-	db, err := repository.Open(dbPath, migrations)
+	db, err := repository.Open(dbPath, filepath.Join("..", "..", "migrations"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

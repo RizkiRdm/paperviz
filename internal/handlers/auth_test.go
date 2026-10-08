@@ -15,20 +15,7 @@ import (
 // newAuthTestDB opens an in-memory SQLite with the migrations needed by auth handlers.
 func newAuthTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	migrations := make(map[int]string)
-	for v, file := range map[int]string{
-		1:  "001_init.sql",
-		2:  "002_users.sql",
-		16: "016_annotations.sql",
-		17: "017_oauth_columns.sql",
-	} {
-		sqlStr, err := repository.ReadMigration(filepath.Join("..", "..", "migrations", file))
-		if err != nil {
-			t.Fatalf("read migration %s: %v", file, err)
-		}
-		migrations[v] = sqlStr
-	}
-	db, err := repository.Open(":memory:", migrations)
+	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

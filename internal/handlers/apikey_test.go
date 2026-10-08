@@ -15,24 +15,11 @@ import (
 
 func openApiKeyTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	migrations := make(map[int]string)
-	// 021 drops the oauth and billing columns, so 017 and 019 must be loaded
-	// first: a DROP cannot succeed on a column that was never created.
-	for v, file := range map[int]string{
-		1:  "001_init.sql",
-		2:  "002_users.sql",
-		17: "017_oauth_columns.sql",
-		18: "018_api_key_column.sql",
-		19: "019_billing_columns.sql",
-		21: "021_drop_oauth_billing.sql",
-	} {
-		sqlStr, err := repository.ReadMigration(filepath.Join("..", "..", "migrations", file))
-		if err != nil {
-			t.Fatalf("read migration %s: %v", file, err)
-		}
-		migrations[v] = sqlStr
-	}
-	db, err := repository.Open(":memory:", migrations)
+	// The whole migration directory is applied. This used to hand-pick 001,
+	// 002, 017, 018, 019, 021 and needed a comment explaining that a DROP
+	// cannot succeed on a column that was never created. Ordering is now the
+	// library's problem, not each test's.
+	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

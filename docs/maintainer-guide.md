@@ -107,21 +107,35 @@ Current special case: `ingest_document` does not start the full processing pipel
 
 ### Change schema
 
-PaperViz uses a single flat migration sequence. There is no migration runner for incremental schema evolution.
+PaperViz uses golang-migrate over a single flat migration sequence. Migration
+files are discovered from disk, so there is no list to register.
 
-1. Add the next numbered SQL file under `migrations/`.
-2. Register it in `internal/repository/migrations.go`.
+1. Add `migrations/{version}_{title}.up.sql`.
+2. Add the matching `migrations/{version}_{title}.down.sql`. An `.up.sql` with
+   no `.down.sql` applies cleanly, so the asymmetry is invisible until someone
+   needs the rollback.
 3. Update repository code and tests.
-4. Update schema descriptions in relevant docs.
-5. Stop the running server.
-6. Delete local SQLite files only after confirming data can be discarded:
+4. Run the migration tests — they check pairing and prove the full chain still
+   applies and rolls back:
+
+```bash
+go test ./internal/repository/
+```
+
+5. Update schema descriptions in relevant docs.
+6. Stop the running server.
+7. Delete local SQLite files only after confirming data can be discarded:
 
 ```bash
 rm -f paperviz.db paperviz.db-wal paperviz.db-shm paperviz.db-journal
 ```
 
-7. Restart the server and verify `/healthz`.
-8. Exercise the changed query against the fresh schema.
+The deletion is required because `schema_migrations` changed shape when
+golang-migrate took over, and is not backward compatible with the previous
+hand-rolled table.
+
+8. Restart the server and verify `/healthz`.
+9. Exercise the changed query against the fresh schema.
 
 Do not commit database files or real user data.
 

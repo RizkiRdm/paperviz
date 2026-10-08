@@ -56,13 +56,15 @@ func main() {
 		port = "8080"
 	}
 
-	migrations, err := repository.LoadMigrations("migrations")
-	if err != nil {
-		slog.Error("failed to load migrations", "error", err)
-		os.Exit(1)
+	// Migrations are read from disk at startup, so the directory has to be
+	// reachable. It defaults to "migrations" next to the binary's working
+	// directory; the container image sets MIGRATIONS_DIR=/app/migrations.
+	migrationsDir := os.Getenv("MIGRATIONS_DIR")
+	if migrationsDir == "" {
+		migrationsDir = "migrations"
 	}
 
-	db, err := repository.Open(dbPath, migrations)
+	db, err := repository.Open(dbPath, migrationsDir)
 	if err != nil {
 		slog.Error("failed to open database", "error", err)
 		os.Exit(1)

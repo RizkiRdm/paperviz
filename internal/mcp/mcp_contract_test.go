@@ -4,10 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -16,46 +13,10 @@ import (
 	"paperviz/internal/repository"
 )
 
-// loadMigrations reads every numbered migration in dir, keyed by version.
-// The whole set is loaded rather than a hand-picked subset so a schema change
-// cannot leave the MCP test path silently running against an older schema than
-// production.
-func loadMigrations(t *testing.T) map[int]string {
-	t.Helper()
-	dir := filepath.Join("..", "..", "migrations")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read migrations dir: %v", err)
-	}
-
-	migrations := make(map[int]string)
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".sql") {
-			continue
-		}
-		version, err := strconv.Atoi(strings.SplitN(name, "_", 2)[0])
-		if err != nil {
-			t.Errorf("migration %q has no numeric version prefix", name)
-			continue
-		}
-		sqlStr, err := repository.ReadMigration(filepath.Join(dir, name))
-		if err != nil {
-			t.Fatalf("read migration %s: %v", name, err)
-		}
-		migrations[version] = sqlStr
-	}
-
-	if len(migrations) == 0 {
-		t.Fatal("no migrations found")
-	}
-	return migrations
-}
-
-// newTestDB opens an in-memory SQLite with all migrations applied.
+// newTestDB opens an in-memory SQLite with every migration applied.
 func newTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := repository.Open(":memory:", loadMigrations(t))
+	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}

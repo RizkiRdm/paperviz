@@ -88,11 +88,7 @@ func openDB() (*sql.DB, func(), error) {
 		migrationsDir = "migrations"
 	}
 
-	migrations, err := repository.LoadMigrations(migrationsDir)
-	if err != nil {
-		return nil, nil, fmt.Errorf("load migrations: %w", err)
-	}
-	db, err := repository.Open(dbPath, migrations)
+	db, err := repository.Open(dbPath, migrationsDir)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open database: %w", err)
 	}

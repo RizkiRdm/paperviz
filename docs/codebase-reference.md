@@ -11,7 +11,7 @@ Technical map of PaperViz as implemented on 2026-09-25. For concepts and product
 | React SPA | `frontend/src/main.jsx` | Mount React application |
 | Route table | `frontend/src/App.jsx` | Define browser routes and compatibility redirects |
 
-Both Go entrypoints call `repository.LoadMigrations` and `repository.Open`, preventing server/MCP migration drift.
+All three Go entrypoints call `repository.Open`, which configures the connection and applies migrations. golang-migrate reads the migration directory, so there is no list to keep in sync.
 
 ## Top-level structure
 
@@ -121,8 +121,8 @@ Infrastructure files:
 
 | File | Responsibility |
 |---|---|
-| `db.go` | Open SQLite, configure pragmas, apply pending migrations |
-| `migrations.go` | Register and load all 19 migration files |
+| `db.go` | Open SQLite, configure pragmas, apply migrations |
+| `migrate.go` | golang-migrate wiring: Migrate, Down, DownTo, DownAll, Version |
 | `id.go` | Generate document and related IDs |
 
 SQLite pragmas:
@@ -447,7 +447,7 @@ BASE_URL=http://localhost:8080 npm --prefix e2e test
 | REST route | `internal/handlers/router.go` |
 | MCP tool | `internal/mcp/tools.go` and contract test |
 | Runtime env | `.env.example` and both `cmd/*/main.go` |
-| Migration | `migrations/` and `internal/repository/migrations.go` |
+| Migration | `migrations/` and `internal/repository/migrate.go` |
 | Pipeline | `internal/services/pipeline*.go`, stages, and data-pipeline doc |
 | Design token | `DESIGN.md` and frontend styles |
 | Current status | `docs/PROJECT_STATE.md` |
