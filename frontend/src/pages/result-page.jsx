@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { WarningBanner, ErrorBanner, ClaimComparisonPanel } from "@/components/ui/status-banners"
 import { useDocumentPoll } from "@/hooks/use-document-poll"
+import { capture } from "@/lib/analytics"
 import { generateDocumentShare, updateDocumentVisibility } from "@/lib/api"
 import { RefreshCw } from "lucide-react"
 import { NotFoundPage } from "@/pages/not-found-page"
@@ -43,6 +44,23 @@ export function ResultPage() {
   const copyTimerRef = useRef(null)
 
   useEffect(() => () => clearTimeout(copyTimerRef.current), [])
+
+  // Fires paper_analysed once per document. This page re-renders on every poll
+  // tick and every state change, so a capture in render would fire repeatedly.
+  useEffect(() => {
+    if (!doc || doc.status === "processing") return
+    if (doc.status === "failed") return
+    capture("paper_analysed", {
+      document_id: doc.id,
+      source_type: doc.source_type,
+      reading_level: doc.reading_level,
+      chart_count: doc.charts?.length ?? 0,
+      verification_failed: doc.status === "verification_failed",
+    })
+    // Intentionally keyed on identity and status only. Including doc itself
+    // would re-fire on every poll tick that returns an equal document.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc?.id, doc?.status])
   useEffect(() => {
     const hasChapters = doc?.chapters && doc.chapters.length > 1
     if (hasChapters && activeChapter === -1) setActiveChapter(0)
@@ -141,6 +159,11 @@ export function ResultPage() {
   }
 
 const STAGE_LABELS = { simplifying: "Reading document...", verifying: "Preparing evidence...", generating_charts: "Rebuilding figures...", extracting_structure: "Extracting structure...", completing: "Completing..." }
+
+// Fires paper_analysed once per document, not once per render. The result page
+// re-renders on every poll and on every state change, and an analytics event
+// that fires per render is noise.
+
 
   if (!doc || doc.status === "processing") {
     const stageLabel = doc?.processing_stage ? STAGE_LABELS[doc.processing_stage] || doc.processing_stage : null

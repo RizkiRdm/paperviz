@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
+import { capture } from "@/lib/analytics"
 
 const PROVIDERS = [
   { value: "gemini", label: "Google Gemini" },
@@ -127,6 +128,7 @@ export function AccountPage() {
         throw new Error(body.error || `credentials ${res.status}`)
       }
       setApiKeyInput("")
+      capture("api_key_added", { provider })
       await loadCredentials()
     } catch (err) {
       console.error("Save credential failed", err)

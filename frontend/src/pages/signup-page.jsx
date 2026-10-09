@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { useAuthSubmit } from "@/hooks/use-auth-submit"
+import { capture, identify } from "@/lib/analytics"
 
 const ERROR_MESSAGES = {
   email_taken: "An account with this email already exists.",
@@ -26,7 +27,13 @@ export function SignupPage() {
       return
     }
     const ok = await submit({ email, password })
-    if (ok) navigate("/account")
+    if (ok) {
+      // The account id is not in the signup response body, so identify by
+      // email and let the server-side event carry the stable id later.
+      identify(email)
+      capture("signup_completed")
+      navigate("/account")
+    }
   }
 
   return (
