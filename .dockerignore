@@ -1,0 +1,52 @@
+# Build context hygiene. `COPY . .` in the build stage would otherwise pull
+# real secrets and local state into the image build.
+
+# Secrets — never in an image layer
+.env
+.env.*
+!.env.example
+
+# Runtime data (SQLite + WAL sidecars)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Logs
+*.jsonl
+
+# Dependencies and build output — the image builds its own
+frontend/node_modules/
+frontend/dist/
+e2e/node_modules/
+
+# Compiled binaries — the image builds its own
+/server
+/mcp
+/paperviz
+/cmd/server/server
+
+# VCS and tooling
+.git/
+.gitignore
+.codegraph/
+graphify-out/
+.playwright-cli/
+.playwright-mcp/
+
+# Agent tooling workspace (not project source)
+.agents/
+.claude/
+.codex/
+.gemini/
+.impeccable/
+.omo/
+.opencode/
+memory/
+goals/
+report/
+
+# Docs and media not needed to compile or serve
+docs/diagrams/
+assets/
+test_docs/
