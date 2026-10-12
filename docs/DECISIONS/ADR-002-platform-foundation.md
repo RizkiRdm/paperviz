@@ -94,6 +94,8 @@ nothing over Render's free plan for a repo-backed web service.
   verified live; CSP PostHog entries verified by test
 - Render — `chore/golang-migrate` fast-forward merged to `main`, branch
   deleted, origin updated
+- CSP PostHog origins — fixed after verification found `connect-src 'self'`
+  silently dropping every event; now covered by a test
 
 ## Follow-up
 
