@@ -6,6 +6,7 @@ import { useParams, Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ExternalLink, BarChart2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
+import { authFetch } from "@/lib/auth"
 
 const READING_LEVEL_LABELS = {
   simplified: "Simplified",
@@ -39,7 +40,7 @@ export function SharePaperPage() {
     let cancelled = false
     async function fetchPaper() {
       try {
-        const res = await fetch(`/share/doc/${shareToken}`)
+        const res = await authFetch(`/share/doc/${shareToken}`)
         if (!res.ok) {
           if (!cancelled) setError("not_found")
           return

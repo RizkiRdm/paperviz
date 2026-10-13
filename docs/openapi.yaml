@@ -7,10 +7,12 @@ info:
 
     ## Authentication
 
-    PaperViz uses session-based authentication via an httpOnly cookie (`session_token`, 7-day expiry).
-    - **Signup/Login** creates a session cookie
-    - **No API keys** — cookie-based authentication only
-    - **Protected endpoints** require a valid session cookie
+    PaperViz delegates authentication to Clerk. Clients send the Clerk session
+    token as a bearer credential; the server verifies its signature against
+    Clerk's JWKS on every request.
+    - **Signup, sign-in, and password recovery** are Clerk-hosted, not REST endpoints here
+    - **No API keys** — Clerk session tokens only
+    - **Protected endpoints** require a valid `Authorization: Bearer <token>` header
 
     ## Rate Limits
 
@@ -80,125 +82,9 @@ servers:
     description: Production
 
 security:
-  - sessionCookie: []
+  - clerkSessionToken: []
 
 paths:
-  /api/auth/signup:
-    post:
-      operationId: signup
-      summary: "Create a new user account"
-      description: "Register with email and password. Creates a session cookie (httpOnly, 7-day expiry) on success."
-      tags: ["Authentication"]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SignupRequest"
-            examples:
-              basic:
-                summary: "Basic signup"
-                value:
-                  email: "user@example.com"
-                  password: "securepass123"
-      responses:
-        "201":
-          description: "Account created, session cookie set"
-          headers:
-            Set-Cookie:
-              schema:
-                type: string
-                example: "session_token=abc123; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthUser"
-        "400":
-          description: "Invalid request"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                invalid_email:
-                  summary: "Invalid email"
-                  value:
-                    error: "invalid_email"
-                password_too_short:
-                  summary: "Password too short"
-                  value:
-                    error: "password_too_short"
-        "409":
-          description: "Email already taken"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /api/auth/login:
-    post:
-      operationId: login
-      summary: "Authenticate an existing user"
-      description: "Login with email and password. Creates a session cookie (httpOnly, 7-day expiry) on success."
-      tags: ["Authentication"]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LoginRequest"
-            examples:
-              basic:
-                summary: "Basic login"
-                value:
-                  email: "user@example.com"
-                  password: "securepass123"
-      responses:
-        "200":
-          description: "Login successful, session cookie set"
-          headers:
-            Set-Cookie:
-              schema:
-                type: string
-                example: "session_token=abc123; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AuthUser"
-        "400":
-          description: "Invalid request"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: "Invalid credentials"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /api/auth/logout:
-    post:
-      operationId: logout
-      summary: "End current session"
-      description: "Clears the session cookie and invalidates the session."
-      tags: ["Authentication"]
-      security:
-        - sessionCookie: []
-      responses:
-        "200":
-          description: "Session ended"
-          headers:
-            Set-Cookie:
-              schema:
-                type: string
-                example: "session_token=; Path=/; Max-Age=0"
-          content:
-            application/json:
-              schema:
-                type: object
-
   /api/auth/me:
     get:
       operationId: getMe
@@ -206,7 +92,7 @@ paths:
       description: "Returns the user associated with the current session cookie."
       tags: ["Authentication"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       responses:
         "200":
           description: "Current user info"
@@ -234,7 +120,7 @@ paths:
         characters, is stored alongside it for display.
       tags: ["Credentials"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       requestBody:
         required: true
         content:
@@ -279,7 +165,7 @@ paths:
       description: "Returns metadata only. Ciphertext and plaintext keys are never included."
       tags: ["Credentials"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       responses:
         "200":
           description: "Credential list"
@@ -303,7 +189,7 @@ paths:
       description: "Scoped to the authenticated user. An unknown or unowned id is a no-op."
       tags: ["Credentials"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -333,7 +219,7 @@ paths:
         default; the database enforces at most one default per user.
       tags: ["Credentials"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -449,7 +335,7 @@ paths:
       description: "Returns paginated list of documents owned by the current user. Requires authentication."
       tags: ["Documents"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: limit
           in: query
@@ -528,7 +414,7 @@ paths:
       description: "Returns aggregate counts for the authenticated user's documents."
       tags: ["Documents"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       responses:
         "200":
           description: "Document statistics"
@@ -578,7 +464,7 @@ paths:
       description: "Change the title of an existing document. Requires authentication and ownership."
       tags: ["Documents"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -626,7 +512,7 @@ paths:
       description: "Permanently delete a document and all associated data. Requires authentication and ownership."
       tags: ["Documents"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -664,7 +550,7 @@ paths:
       description: "Bookmark or unbookmark a document. Requires authentication and ownership."
       tags: ["Documents"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -747,7 +633,7 @@ paths:
       description: "Create a shareable token for a specific chart figure. Requires authentication and document ownership."
       tags: ["Sharing"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -791,7 +677,7 @@ paths:
       description: "Remove the share token for a specific chart. Requires authentication and document ownership."
       tags: ["Sharing"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -826,7 +712,7 @@ paths:
       description: "Create a shareable token for the full document. Requires authentication and document ownership."
       tags: ["Sharing"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -859,7 +745,7 @@ paths:
       description: "Remove the share token for a document. Requires authentication and document ownership."
       tags: ["Sharing"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -889,7 +775,7 @@ paths:
       description: "Change visibility between `public` and `unlisted`. Requires authentication and document ownership."
       tags: ["Sharing"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -1052,7 +938,7 @@ paths:
       description: "Returns aggregate usage analytics for the authenticated user. Requires authentication."
       tags: ["Analytics"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       responses:
         "200":
           description: "Analytics summary"
@@ -1108,7 +994,7 @@ paths:
       description: "Create a named grouping of papers. Requires authentication."
       tags: ["Collections"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       requestBody:
         required: true
         content:
@@ -1141,7 +1027,7 @@ paths:
       description: "Returns all collections owned by the authenticated user. Requires authentication."
       tags: ["Collections"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       responses:
         "200":
           description: "Collection list"
@@ -1163,7 +1049,7 @@ paths:
       description: "Returns a collection with its linked documents. Requires authentication and ownership."
       tags: ["Collections"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -1196,7 +1082,7 @@ paths:
       description: "Change the name of a collection. Requires authentication and ownership."
       tags: ["Collections"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -1244,7 +1130,7 @@ paths:
       description: "Permanently delete a collection. Documents are not deleted. Requires authentication and ownership."
       tags: ["Collections"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -1282,7 +1168,7 @@ paths:
       description: "Link a document to a collection. Requires authentication and collection ownership."
       tags: ["Collections"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -1332,7 +1218,7 @@ paths:
       description: "Unlink a document from a collection. Requires authentication and collection ownership."
       tags: ["Collections"]
       security:
-        - sessionCookie: []
+        - clerkSessionToken: []
       parameters:
         - name: id
           in: path
@@ -1370,35 +1256,14 @@ paths:
 
 components:
   securitySchemes:
-    sessionCookie:
-      type: apiKey
-      in: cookie
-      name: session_token
-      description: "httpOnly session cookie set by `/api/auth/login` or `/api/auth/signup`. Expires after 7 days."
+    clerkSessionToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Clerk session token, verified against Clerk's JWKS on every request."
 
   schemas:
     # ── Auth ──────────────────────────────────────────────────────
-    SignupRequest:
-      type: object
-      required: ["email", "password"]
-      properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          minLength: 8
-
-    LoginRequest:
-      type: object
-      required: ["email", "password"]
-      properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-
     AuthUser:
       type: object
       properties:

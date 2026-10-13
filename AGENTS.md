@@ -49,7 +49,9 @@ Rules:
 
 ## Agent-First Pivot (Chunk 11)
 - **Agent-first direction locked.** PaperViz becomes agent-first, Context7-style. Human touches the product for 3 things only — auth, model-key management, and an optional manual-upload escape hatch. The MCP server is the actual product surface.
-- **OAuth and Stripe are gone (2026-09-26).** Both existed only to satisfy a third-party account, which is a single point of catastrophic failure for a solo maintainer. Auth is email+password with `cmd/admin` recovery; model access is BYOK. See `.omo/plans/byok_auth_billing_removal.md`. Do not reintroduce either without an explicit owner decision.
+- **Stripe is gone and stays gone (2026-09-26).** It existed only to satisfy a third-party billing account. PaperViz charges nobody; model spend is the user's own via BYOK. Do not reintroduce billing without an explicit owner decision.
+- **Clerk owns authentication (2026-10-13).** This reversed the same decision for the auth half. Signup, sign-in, sessions, and password recovery all live in Clerk; `users.id` is the Clerk subject and the `users` table remains PaperViz's own profile store. Local credential paths are deleted, not disabled: `/api/auth/signup` and `/api/auth/login` return 404 and the `sessions` table is dropped (migration 022). **Never add a local credential path back** — a second credential store is one Clerk cannot revoke, which is exactly the failure the migration closed, and a test asserts those 404s. Full reasoning and the accepted SaaS-lock-in risk: `docs/DECISIONS/ADR-003-clerk-auth.md`.
+- **Model keys never touch Clerk.** BYOK credentials are encrypted at rest with `CREDENTIAL_ENCRYPTION_KEY` and resolved per request. Clerk sees identity only.
 - **Page cuts complete.** Removed `/dashboard`, `/pricing`, `/compare`, `/compare-research-papers`, `/research-paper-summarizer`, `/figure-explanation`, `/explain/:slug`. Kept `/`, `/agents`, `/login`, `/signup`, `/account`, `/upload`.
 - **Landing page minimal.** Single above-the-fold section with 2 CTAs: "Add to Claude Code" and "Sign in".
 
@@ -103,8 +105,8 @@ will catch the asymmetry.
     - Frontend: grounding status badge, provenance display, validation on render
     - Core principle: AI may transform evidence, but must never manufacture evidence
 13. H1: OAuth state parameter was hardcoded string — CSRF vulnerability. Fixed: random nonce generated via crypto/rand, stored in httpOnly cookie (10min TTL), validated in callback. **Obsolete as of 2026-09-26: Google OAuth was removed, so this fix no longer has code to apply to. Kept for the audit trail; H2/H3 numbering depends on it.**
-14. H2: hasMinComplexity function existed but was never called — weak passwords allowed. Fixed: added check after length validation, returns password_too_weak. (`internal/handlers/auth.go` Signup)
-15. H3: Logout cookie missing Secure flag — cookie mismatch on HTTPS. Fixed: added Secure: true. (`internal/handlers/auth.go` Logout)
+14. H2: hasMinComplexity function existed but was never called — weak passwords allowed. Fixed: added check after length validation. **Obsolete as of 2026-10-13:** local password handling was removed with the Clerk migration; Clerk owns password policy. Kept for the audit trail; H2/H3 numbering depends on it.
+15. H3: Logout cookie missing Secure flag — cookie mismatch on HTTPS. Fixed: added Secure: true. **Obsolete as of 2026-10-13:** `session_token` cookies and `/api/auth/logout` were removed with the Clerk migration.
 
 ## Security & Hardening (Round 3 — BYOK, applied 2026-09-26)
 Plan: `.omo/plans/byok_auth_billing_removal.md`. Threats addressed: (a) key theft, (c) mass signup, (d) database theft.

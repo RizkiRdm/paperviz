@@ -3,6 +3,7 @@ import { lazy, Suspense, useState, useRef, useEffect, useMemo } from "react"
 import { Image as ImageIcon, BookMarked, ChevronDown, Share2, Copy, Check } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { authFetch } from "@/lib/auth"
 
 const LazyDataChart = lazy(() => import("./data-chart"))
 
@@ -134,7 +135,7 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
     setSharing(true)
     setShareError(null)
     try {
-      const res = await fetch(`/api/documents/${documentId}/charts/${chart.id}/share`, {
+      const res = await authFetch(`/api/documents/${documentId}/charts/${chart.id}/share`, {
         method: "POST",
       })
       if (!res.ok) throw new Error(`share failed (${res.status})`)

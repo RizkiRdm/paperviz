@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/clerk/clerk-sdk-go/v2"
+
 	"paperviz/internal/app/credentials"
 	"paperviz/internal/external"
 	"paperviz/internal/handlers"
@@ -90,6 +92,17 @@ func main() {
 	}
 
 	tr := external.NewTransport()
+
+	// CLERK_SECRET_KEY fails loud for the same reason: a wrong or missing key
+	// does not disable one feature, it makes every authenticated request fail
+	// while healthz still reports ok. Booting in that state would look healthy
+	// and lock every user out.
+	clerkSecretKey := os.Getenv("CLERK_SECRET_KEY")
+	if clerkSecretKey == "" {
+		slog.Error("CLERK_SECRET_KEY environment variable is required")
+		os.Exit(1)
+	}
+	clerk.SetKey(clerkSecretKey)
 
 	// CREDENTIAL_ENCRYPTION_KEY fails loud, unlike the peripheral integrations
 	// that used to be required here. A wrong key does not disable a feature:

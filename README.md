@@ -2,7 +2,7 @@
 
 PaperViz turns academic papers into simplified explanations, verified claims, and evidence-grounded figures. It is designed for AI agents that need structured research data, with a web app for account management and manual paper upload.
 
-PaperViz runs on infrastructure and credentials it owns, and nothing else. There is no Google OAuth account, no Stripe account, and no model vendor account: users bring their own model key, which is encrypted at rest. Model spend belongs to the user, so the service is free to run without metering anyone's wallet.
+PaperViz holds no model vendor account and no billing account: users bring their own model key, which is encrypted at rest, and model spend belongs to the user. Authentication is handled by Clerk, which makes PaperViz's identity a SaaS dependency — a trade documented in [`ADR-003`](docs/DECISIONS/ADR-003-clerk-auth.md), along with the lock-in risk it accepts.
 
 > **Current architecture note:** the web ingestion path runs the full LLM-backed processing pipeline using the requesting user's own model key. The repository's MCP server currently exposes five deterministic data tools over stdio; its `ingest_document` tool stores text but does not start the LLM pipeline. See [Current limitations](#current-limitations) before relying on the agent workflow.
 
@@ -99,8 +99,12 @@ The production runtime is one Go binary serving both API routes and built fronte
 - Node.js 24
 - npm
 
-No vendor account is needed. The one secret the server needs is
-`CREDENTIAL_ENCRYPTION_KEY`, which you generate yourself:
+You need a Clerk application (free tier, no payment method required). PaperViz
+holds no model vendor account.
+
+Two secrets come from Clerk: `CLERK_SECRET_KEY` for the server and
+`VITE_CLERK_PUBLISHABLE_KEY` for the frontend. You also generate
+`CREDENTIAL_ENCRYPTION_KEY` yourself:
 
 ```bash
 openssl rand -base64 32
@@ -229,7 +233,7 @@ Start with [`docs/README.md`](docs/README.md) for reading paths and source-of-tr
 - Analysing a paper requires an account with a model key configured. Because the server holds no model credential of its own, there is no anonymous or free-tier path to a processed document: uploads without a usable key fail with `missing_credential`.
 - Model keys work for Gemini, Anthropic Claude, and OpenAI. Provider protocol comes from `github.com/zendev-sh/goai`; retry, concurrency, and JSON recovery are PaperViz's own.
 - Service API keys are returned exactly once, at issue time, and stored only as a SHA-256 digest. A lost key cannot be recovered, only replaced.
-- There is no self-service password reset. Use `go run ./cmd/admin reset-password <email>`, which also revokes that account's live sessions.
+- Password recovery is Clerk's self-service flow. To cut off a compromised account from the CLI, use `go run ./cmd/admin revoke-sessions <email>`.
 - `/agents` currently generates remote MCP configuration for `https://paperviz.com/api/mcp`, but the current server router does not expose that HTTP MCP transport. The repository ships a local stdio MCP entrypoint.
 - MCP search is global and stateless; it is not scoped to an authenticated user's library.
 - SQLite uses one open connection, and the architecture is designed for a single low-concurrency instance rather than horizontal scaling.

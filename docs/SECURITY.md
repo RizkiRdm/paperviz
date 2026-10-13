@@ -26,17 +26,14 @@ Covers authentication, authorization, input validation, file handling, rate limi
 
 ### Method
 
-* **Email + password**: `POST /api/auth/signup`, `POST /api/auth/login`. `isValidEmail` (3–254 chars, contains `@` and `.`); password ≥8 chars and `hasMinComplexity` requires upper + lower + digit + special (`!unicode.IsLetter && !IsDigit && !IsSpace`). `password_too_weak` on failure.
-* **Google OAuth**: `GET /api/auth/google/login` → redirect with random `state` (32-byte `crypto/rand` hex, stored in `oauth_state` cookie `HttpOnly; Secure; SameSite=Lax; MaxAge=600`), `GET /api/auth/google/callback` validates `state` cookie vs query, clears cookie, exchanges code via `oauth2/google`, fetches `https://www.googleapis.com/oauth2/v2/userinfo`, `UpsertByOAuth` (sentinel `password_hash="oauth-only"` when empty, `ON CONFLICT(email) DO UPDATE`).
+* **Clerk** owns signup, sign-in, session lifecycle, and password recovery. PaperViz has no local credential path: `/api/auth/signup` and `/api/auth/login` do not exist and a test asserts they return 404. See `docs/DECISIONS/ADR-003-clerk-auth.md`.
 
 ### Session / Token Strategy
 
-* `generateSessionToken`: 32 random bytes → 64-char hex (`crypto/rand`).
-* `sessions` table: `token PK, user_id, expires_at (7 days)`. `SessionRepo.Get` checks expiry.
-* Cookie: `session_token` `HttpOnly; Secure; SameSite=Lax; MaxAge=7d; Path=/`. Logout clears with `Secure: true` and deletes row.
-* **Login invalidation**: `Login` creates new session *then* `DeleteByUserID(userID)` (best-effort, non-fatal if fails). No global logout-all on password change (no password-change endpoint).
-* **Expiry cleanup**: `DeleteExpired()` on server startup (`cmd/server/main.go:121`). No periodic sweeper.
-* `PasswordVersion int64` field added to `User` struct (reserved, not yet enforced).
+* Clients send `Authorization: Bearer <clerk session token>`.
+* `clerkhttp.WithHeaderAuthorization()` verifies the signature against Clerk's JWKS, caches keys, and re-fetches on rotation. A missing or unverifiable token yields 401; there is no fallback identity.
+* `users.id` holds the Clerk subject. The local profile row is provisioned on the first authenticated request, not at signup, because Clerk owns the signup flow.
+* The `sessions` table, `session_token` cookie, and bcrypt password handling were removed in migration 022 — a local session is a bearer token Clerk cannot revoke.
 
 ### Credential Storage
 
@@ -113,7 +110,8 @@ No RBAC. Single `user` role. Access controlled by resource ownership.
 | `CREDENTIAL_ENCRYPTION_KEY` | AES-256-GCM key for stored user model keys | env, `os.Getenv`; never persisted |
 | `GEMINI_API_KEY` | Provider calls from the local MCP process | env, `cmd/mcp` only |
 | `PAPERVIZ_API_KEY` | MCP per-key auth | env (MCP) |
-| `session_token` cookie | Session | `HttpOnly; Secure; SameSite=Lax` |
+| `CLERK_SECRET_KEY` | Verifies session tokens, resolves account email | env, `os.Getenv`; never persisted |
+| `VITE_CLERK_PUBLISHABLE_KEY` | Clerk browser SDK | env, frontend build; safe to expose |
 
 *User model keys* are the other secret class. They are supplied by the user through the web UI, stored as AES-256-GCM ciphertext with AAD bound to `user_id|provider|model`, and returned only as `key_hint` (last 4 characters). The server holds no model vendor credential of its own, so no server-side key may be introduced — a user with no credential gets `missing_credential`, which is the correct answer.
 
@@ -130,7 +128,6 @@ No RBAC. Single `user` role. Access controlled by resource ownership.
 | Scope | Endpoints | Limit |
 |-------|-----------|-------|
 | Document create | `POST /api/documents`, `POST /api/import/doi|url` | `1 req/30s, burst 2` (`rateLimitDocumentCreate`) |
-| Auth | `POST /api/auth/signup|login`, `GET /api/auth/me` | `5 req/60s, burst 3` (`rateLimitAuth`) |
 | MCP (per-key) | `ingest_document 5/min; read/search 30/min` | token bucket (`internal/mcp/ratelimit.go`) |
 
 *Only POST wrapped for documents; GET unrestricted. No user-based limiter beyond IP.

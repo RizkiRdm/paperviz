@@ -244,9 +244,6 @@ All routes below are registered in `internal/handlers/router.go`.
 
 | Method and path | Auth | Purpose |
 |---|---|---|
-| `POST /api/auth/signup` | Public + rate limit | Create account and session |
-| `POST /api/auth/login` | Public + rate limit | Authenticate and create session |
-| `POST /api/auth/logout` | Public | Clear session |
 | `GET /api/auth/me` | Public + rate limit | Current user/session state |
 | `GET /api/auth/google/login` | Public | Begin Google OAuth |
 | `GET /api/auth/google/callback` | Public | Complete Google OAuth |

@@ -13,6 +13,7 @@ import { EvidenceSection } from "@/components/result/evidence-section"
 import { FiguresSection } from "@/components/result/figures-section"
 import { SourceSection } from "@/components/result/source-section"
 import { ResultActions, ResultOverlays, ShareDialog } from "@/components/result/result-actions"
+import { authFetch } from "@/lib/auth"
 
 const COPY_FEEDBACK_MS = 2000
 
@@ -69,7 +70,7 @@ export function ResultPage() {
   useEffect(() => {
     async function fetchCollections() {
       try {
-        const res = await fetch("/api/collections")
+        const res = await authFetch("/api/collections")
         if (res.ok) {
           const data = await res.json()
           setCollections(data.collections || [])
@@ -208,7 +209,7 @@ const STAGE_LABELS = { simplifying: "Reading document...", verifying: "Preparing
 
   async function handleAddToCollection(colId) {
     try {
-      const res = await fetch(`/api/collections/${colId}/documents`, {
+      const res = await authFetch(`/api/collections/${colId}/documents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ document_id: documentId }),

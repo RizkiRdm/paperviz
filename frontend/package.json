@@ -11,6 +11,7 @@
     "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.10",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-slot": "^1.3.0",
     "@radix-ui/react-toggle-group": "^1.1.15",

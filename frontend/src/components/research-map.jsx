@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { Network, ChevronDown, ChevronRight, ArrowRight } from "lucide-react"
+import { authFetch } from "@/lib/auth"
 
 const RELATIONSHIP_TYPE_CONFIG = {
   supporting: {
@@ -57,7 +58,7 @@ export function ResearchMap({ documentId }) {
     let cancelled = false
     async function fetchResearchMap() {
       try {
-        const res = await fetch(`/api/documents/${documentId}/research-map`)
+        const res = await authFetch(`/api/documents/${documentId}/research-map`)
         if (!res.ok) throw new Error("failed")
         const json = await res.json()
         if (!cancelled) {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { authFetch } from "@/lib/auth"
 
 // useCurrentUser resolves the signed-in user once per mount. A 401 is the
 // anonymous case, not an error, so it resolves to null rather than throwing.
@@ -8,7 +9,7 @@ export function useCurrentUser() {
 
   useEffect(() => {
     let cancelled = false
-    fetch("/api/auth/me")
+    authFetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!cancelled) setUser(data)

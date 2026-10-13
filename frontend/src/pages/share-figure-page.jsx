@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useParams, Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ExternalLink } from "lucide-react"
+import { authFetch } from "@/lib/auth"
 
 const READING_LEVEL_LABELS = {
   simplified: "Simplified",
@@ -18,7 +19,7 @@ export function ShareFigurePage() {
     let cancelled = false
     async function fetchFigure() {
       try {
-        const res = await fetch(`/share/fig/${shareToken}`)
+        const res = await authFetch(`/share/fig/${shareToken}`)
         if (!res.ok) {
           if (!cancelled) setError("not_found")
           return

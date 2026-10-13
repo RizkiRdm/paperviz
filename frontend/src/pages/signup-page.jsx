@@ -1,40 +1,109 @@
+import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { useSignUp, useClerk } from "@clerk/clerk-react"
 import { Button } from "@/components/ui/button"
-import { useAuthSubmit } from "@/hooks/use-auth-submit"
+import { clerkErrorMessage } from "@/lib/auth"
 import { capture, identify } from "@/lib/analytics"
 
-const ERROR_MESSAGES = {
-  email_taken: "An account with this email already exists.",
-  invalid_email: "Please enter a valid email address.",
-  password_too_short: "Password must be at least 8 characters.",
-  password_too_weak:
-    "Password needs an uppercase letter, a lowercase letter, a number, and a symbol.",
-  internal_error: "Something went wrong. Please try again.",
-}
+const STEP_EMAIL = "email"
+const STEP_PASSWORD = "password"
+const STEP_CODE = "code"
+
+const INPUT_CLASS =
+  "w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb]"
+
+const LABEL_CLASS = "block text-xs font-medium text-[#737373] mb-1.5"
 
 export function SignupPage() {
   const navigate = useNavigate()
-  const { error, isSubmitting, submit, setError } = useAuthSubmit("/api/auth/signup", ERROR_MESSAGES)
+  const { signUp, isLoaded } = useSignUp()
+  const { setActive } = useClerk()
 
-  async function handleSubmit(e) {
+  const [step, setStep] = useState(STEP_EMAIL)
+  const [email, setEmail] = useState("")
+  const [error, setError] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // activateSession turns a finished signup into a live session, then records
+  // the conversion. Clerk returns a session id that only exists once every
+  // required step is done.
+  async function activateSession(signUpResource) {
+    await setActive({ session: signUpResource.session?.id })
+    identify(email)
+    capture("signup_completed")
+    navigate("/account")
+  }
+
+  async function submitEmail(e) {
     e.preventDefault()
-    setError(null)
-    const form = e.currentTarget
-    const email = form.email.value.trim()
-    const password = form.password.value
-    if (!email || !password) {
-      setError("Please fill in all fields.")
+    const value = e.currentTarget.email.value.trim()
+    if (!value) {
+      setError("Please enter your email address.")
       return
     }
-    const ok = await submit({ email, password })
-    if (ok) {
-      // The account id is not in the signup response body, so identify by
-      // email and let the server-side event carry the stable id later.
-      identify(email)
-      capture("signup_completed")
-      navigate("/account")
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      await signUp.attemptEmailAddress({ email: value })
+      setEmail(value)
+      setStep(STEP_PASSWORD)
+    } catch (err) {
+      if (import.meta.env.DEV) console.error("signup email step failed", err)
+      setError(clerkErrorMessage(err?.errors, "Please enter your email address."))
+    } finally {
+      setIsSubmitting(false)
     }
   }
+
+  async function submitPassword(e) {
+    e.preventDefault()
+    const password = e.currentTarget.password.value
+    if (!password) {
+      setError("Please choose a password.")
+      return
+    }
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      const attempt = await signUp.attemptPassword({ password })
+      if (attempt.status === "needs_email_verification") {
+        setStep(STEP_CODE)
+        return
+      }
+      await activateSession(signUp)
+    } catch (err) {
+      if (import.meta.env.DEV) console.error("signup password step failed", err)
+      setError(clerkErrorMessage(err?.errors, "Please choose a password."))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function submitCode(e) {
+    e.preventDefault()
+    const code = e.currentTarget.code.value.trim()
+    if (!code) {
+      setError("Enter the code from your email.")
+      return
+    }
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      const attempt = await signUp.attemptEmailVerification({ code })
+      if (attempt.status === "complete") {
+        await activateSession(signUp)
+        return
+      }
+      setError(clerkErrorMessage(attempt.error, "That code was not accepted."))
+    } catch (err) {
+      if (import.meta.env.DEV) console.error("signup verification step failed", err)
+      setError(clerkErrorMessage(err?.errors, "That code was not accepted."))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const disabled = isSubmitting || !isLoaded
 
   return (
     <div className="min-h-screen bg-white bg-dotted-grid flex items-center justify-center px-6">
@@ -46,54 +115,80 @@ export function SignupPage() {
             </div>
             <span className="font-mono text-sm font-semibold tracking-tight text-[#0a0a0a]">PaperViz</span>
           </Link>
-          <h1 className="font-satoshi text-2xl font-medium text-[#0a0a0a]">Create your account</h1>
-          <p className="mt-1 text-sm text-[#737373]">Get started with PaperViz</p>
+          <h1 className="font-satoshi text-2xl font-medium text-[#0a0a0a]">
+            {step === STEP_CODE ? "Check your email" : "Create your account"}
+          </h1>
+          <p className="mt-1 text-sm text-[#737373]">
+            {step === STEP_CODE
+              ? `We sent a code to ${email}`
+              : "Get started with PaperViz"}
+          </p>
         </div>
 
         <div className="rounded-[12px] border border-[#e5e5e5] bg-white p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-xs font-medium text-[#737373] mb-1.5">Email</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                className="w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb]"
-                placeholder="you@example.com"
-                autoComplete="email"
-                disabled={isSubmitting}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-xs font-medium text-[#737373] mb-1.5">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                className="w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb]"
-                placeholder="At least 8 characters"
-                autoComplete="new-password"
-                disabled={isSubmitting}
-              />
-            </div>
-
-            {error && (
-              <div className="rounded-[6px] bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-                {error}
+          {step === STEP_EMAIL && (
+            <form onSubmit={submitEmail} className="space-y-4">
+              <div>
+                <label htmlFor="email" className={LABEL_CLASS}>Email</label>
+                <input id="email" name="email" type="email" className={INPUT_CLASS}
+                  placeholder="you@example.com" autoComplete="email" disabled={disabled} />
               </div>
-            )}
+              {error && <ErrorNote message={error} />}
+              <Button type="submit" disabled={disabled} className="w-full">
+                {isSubmitting ? "Continuing..." : "Continue"}
+              </Button>
+            </form>
+          )}
 
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? "Creating account..." : "Sign up"}
-            </Button>
-          </form>
+          {step === STEP_PASSWORD && (
+            <form onSubmit={submitPassword} className="space-y-4">
+              <div>
+                <label htmlFor="password" className={LABEL_CLASS}>Password</label>
+                <input id="password" name="password" type="password" className={INPUT_CLASS}
+                  placeholder="At least 8 characters" autoComplete="new-password" disabled={disabled} />
+              </div>
+              {error && <ErrorNote message={error} />}
+              <Button type="submit" disabled={disabled} className="w-full">
+                {isSubmitting ? "Creating account..." : "Create account"}
+              </Button>
+              <button type="button" onClick={() => { setStep(STEP_EMAIL); setError(null) }}
+                className="w-full text-xs text-[#737373] hover:text-[#171717]">
+                Use a different email
+              </button>
+            </form>
+          )}
 
-          <p className="mt-4 text-center text-xs text-[#737373]">
-            Already have an account?{" "}
-            <Link to="/login" className="text-[#2563eb] hover:underline">Sign in</Link>
-          </p>
+          {step === STEP_CODE && (
+            <form onSubmit={submitCode} className="space-y-4">
+              <div>
+                <label htmlFor="code" className={LABEL_CLASS}>Verification code</label>
+                <input id="code" name="code" type="text" inputMode="numeric" className={INPUT_CLASS}
+                  placeholder="123456" autoComplete="one-time-code" disabled={disabled} />
+              </div>
+              {error && <ErrorNote message={error} />}
+              <Button type="submit" disabled={disabled} className="w-full">
+                {isSubmitting ? "Verifying..." : "Verify"}
+              </Button>
+            </form>
+          )}
+
+          {step !== STEP_CODE && (
+            <p className="mt-4 text-center text-xs text-[#737373]">
+              Already have an account?{" "}
+              <Link to="/login" className="text-[#2563eb] hover:underline">Sign in</Link>
+            </p>
+          )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ErrorNote keeps the inline error treatment identical across all three steps.
+function ErrorNote({ message }) {
+  return (
+    <div className="rounded-[6px] bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+      {message}
     </div>
   )
 }

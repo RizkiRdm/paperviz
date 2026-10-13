@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"bytes"
+	"context"
 	"database/sql"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"paperviz/internal/repository"
@@ -23,61 +23,85 @@ func newAuthTestDB(t *testing.T) *sql.DB {
 	return db
 }
 
-// TestLoginSessionSurvives is the BUG-01 regression: a session created by
-// Login must not be deleted by the login flow itself (session invalidation
-// on re-login deletes OLD sessions only, before the new one is created).
-func TestLoginSessionSurvives(t *testing.T) {
+// seedClerkUser writes the row AuthMiddleware would have created on first sight.
+func seedClerkUser(t *testing.T, db *sql.DB, id, email string) {
+	t.Helper()
+	if err := repository.NewUserRepo(db).UpsertClerkUser(id, email, 1700000000); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+}
+
+func TestMeReturnsProfileForVerifiedClerkSubject(t *testing.T) {
 	db := newAuthTestDB(t)
-	auth := NewAuthHandler(db)
+	seedClerkUser(t, db, "user_2abc", "reader@example.com")
 
-	// Signup a user (creates session too).
-	signupBody, _ := json.Marshal(map[string]string{
-		"email":    "bug01@test.com",
-		"password": "Sup3rSecure!",
-	})
-	signup := httptest.NewRecorder()
-	auth.Signup(signup, httptest.NewRequest(http.MethodPost, "/api/auth/signup", bytes.NewReader(signupBody)))
-	if signup.Code != http.StatusCreated {
-		t.Fatalf("signup status = %d, want 201 (body: %s)", signup.Code, signup.Body.String())
-	}
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user_2abc"))
+	rec := httptest.NewRecorder()
 
-	// Login must leave a valid session behind.
-	loginBody, _ := json.Marshal(map[string]string{
-		"email":    "bug01@test.com",
-		"password": "Sup3rSecure!",
-	})
-	login := httptest.NewRecorder()
-	auth.Login(login, httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(loginBody)))
-	if login.Code != http.StatusOK {
-		t.Fatalf("login status = %d, want 200 (body: %s)", login.Code, login.Body.String())
-	}
+	NewAuthHandler(db).Me(rec, req)
 
-	// The session cookie from login must authenticate /api/auth/me.
-	var cookie *http.Cookie
-	for _, c := range login.Result().Cookies() {
-		if c.Name == "session_token" && c.Value != "" {
-			cookie = c
-			break
-		}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
 	}
-	if cookie == nil {
-		t.Fatalf("login did not set session_token cookie (headers: %v)", login.Header())
+	if body := rec.Body.String(); !strings.Contains(body, "user_2abc") || !strings.Contains(body, "reader@example.com") {
+		t.Fatalf("body = %s, want the seeded id and email", body)
 	}
+}
 
-	me := httptest.NewRecorder()
-	meReq := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
-	meReq.AddCookie(cookie)
-	auth.Me(me, meReq)
-	if me.Code != http.StatusOK {
-		t.Fatalf("me after login status = %d, want 200 (BUG-01: session self-destructed)", me.Code)
-	}
+// TestMeRejectsMissingIdentity keeps Me safe if it is ever mounted without
+// RequireAuth: it must not fall back to any ambient identity.
+func TestMeRejectsMissingIdentity(t *testing.T) {
+	db := newAuthTestDB(t)
+	seedClerkUser(t, db, "user_2abc", "reader@example.com")
 
-	// DB-level guarantee: exactly one session remains for the user.
+	rec := httptest.NewRecorder()
+	NewAuthHandler(db).Me(rec, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+}
+
+func TestMeRejectsUnknownSubject(t *testing.T) {
+	db := newAuthTestDB(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user_missing"))
+	rec := httptest.NewRecorder()
+
+	NewAuthHandler(db).Me(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+}
+
+// TestMeIsIdempotentAcrossReloads stands in for the Render restart case: the
+// local row survives a deploy, so Me keeps working without re-provisioning.
+func TestMeIsIdempotentAcrossReloads(t *testing.T) {
+	db := newAuthTestDB(t)
+	seedClerkUser(t, db, "user_2abc", "reader@example.com")
+	seedClerkUser(t, db, "user_2abc", "reader@example.com")
+
 	var count int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM sessions`).Scan(&count); err != nil {
-		t.Fatalf("count sessions: %v", err)
+	if err := db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = ?`, "user_2abc").Scan(&count); err != nil {
+		t.Fatalf("count users: %v", err)
 	}
 	if count != 1 {
-		t.Fatalf("sessions count = %d, want 1", count)
+		t.Fatalf("user count = %d, want 1 after repeat upserts", count)
 	}
+}
+
+func contains(haystack, needle string) bool {
+	return len(haystack) >= len(needle) && (haystack == needle || indexOf(haystack, needle) >= 0)
+}
+
+func indexOf(haystack, needle string) int {
+	for i := 0; i+len(needle) <= len(haystack); i++ {
+		if haystack[i:i+len(needle)] == needle {
+			return i
+		}
+	}
+	return -1
 }

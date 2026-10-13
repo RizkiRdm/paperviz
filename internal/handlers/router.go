@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	clerkhttp "github.com/clerk/clerk-sdk-go/v2/http"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
@@ -97,6 +98,11 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 	// duration, and request ID — structured JSON output via slog.
 	r.Use(slogRequestLogger)
 
+	// Verifies the Clerk token and writes claims to the request context. It
+	// passes through when no token is present, so AuthMiddleware alone decides
+	// whether a missing identity is fatal.
+	r.Use(clerkhttp.WithHeaderAuthorization())
+
 	r.Get("/healthz", healthzHandler(db))
 
 	docHandler := NewDocumentHandlerWithImages(db, provider, ChartImageStore())
@@ -160,10 +166,7 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 	apiKeyHandler := NewApiKeyHandler(db)
 	accountHandler := NewAccountHandler(db)
 	r.Route("/api/auth", func(r chi.Router) {
-		r.With(rateLimitAuth).Post("/signup", authHandler.Signup)
-		r.With(rateLimitAuth).Post("/login", authHandler.Login)
-		r.Post("/logout", authHandler.Logout)
-		r.With(rateLimitAuth).Get("/me", authHandler.Me)
+		r.With(authMiddleware.RequireAuth).Get("/me", authHandler.Me)
 		r.With(authMiddleware.RequireAuth).Get("/apikey", apiKeyHandler.GetApiKey)
 		r.With(authMiddleware.RequireAuth).Post("/apikey", apiKeyHandler.CreateApiKey)
 		r.With(authMiddleware.RequireAuth).Post("/apikey/regenerate", apiKeyHandler.RegenerateApiKey)

@@ -26,18 +26,21 @@ test.describe('API Endpoints', () => {
     expect(response.status()).toBe(401)
   })
 
-  test('POST /api/auth/signup accepts valid payload', async ({ request }) => {
+  // Clerk owns signup and login. These endpoints must stay absent: a local
+  // credential path is one Clerk cannot revoke, which is the exact failure the
+  // Clerk migration closed.
+  test('POST /api/auth/signup does not exist', async ({ request }) => {
     const response = await request.post('/api/auth/signup', {
       data: { email: `test-${Date.now()}@example.com`, password: 'TestPassword123!' }
     })
-    expect([200, 201, 409]).toContain(response.status())
+    expect(response.status()).toBe(404)
   })
 
-  test('POST /api/auth/login rejects invalid credentials', async ({ request }) => {
+  test('POST /api/auth/login does not exist', async ({ request }) => {
     const response = await request.post('/api/auth/login', {
       data: { email: 'nonexistent@example.com', password: 'wrongpassword' }
     })
-    expect([400, 401, 403]).toContain(response.status())
+    expect(response.status()).toBe(404)
   })
 
   test('GET /healthz returns 200', async ({ request }) => {

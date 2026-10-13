@@ -1,31 +1,47 @@
+import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { useSignIn } from "@clerk/clerk-react"
 import { Button } from "@/components/ui/button"
-import { useAuthSubmit } from "@/hooks/use-auth-submit"
-
-const ERROR_MESSAGES = {
-  invalid_credentials: "Invalid email or password.",
-  invalid_request: "Please fill in all fields.",
-  invalid_email: "Please enter a valid email address.",
-  password_too_short: "Password must be at least 8 characters.",
-  internal_error: "Something went wrong. Please try again.",
-}
+import { clerkErrorMessage } from "@/lib/auth"
 
 export function LoginPage() {
   const navigate = useNavigate()
-  const { error, isSubmitting, submit, setError } = useAuthSubmit("/api/auth/login", ERROR_MESSAGES)
+  const { signIn, isLoaded } = useSignIn()
+  const [error, setError] = useState(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setError(null)
     const form = e.currentTarget
     const email = form.email.value.trim()
     const password = form.password.value
     if (!email || !password) {
-      setError(ERROR_MESSAGES.invalid_request)
+      setError("Please fill in all fields.")
       return
     }
-    const ok = await submit({ email, password })
-    if (ok) navigate("/account")
+
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      const attempt = await signIn.attemptFirstFactor({
+        strategy: "password",
+        emailAddress: email,
+        password,
+      })
+      if (attempt.status === "complete") {
+        navigate("/account")
+        return
+      }
+      // Password sign-in completed but the session is not active yet, which
+      // means Clerk wants another factor. PaperViz enables no second factor,
+      // so this is reported rather than left on a dead button.
+      setError(clerkErrorMessage(attempt.error, "Sign-in needs an extra step this page does not support."))
+    } catch (err) {
+      if (import.meta.env.DEV) console.error("login failed", err)
+      setError("Something went wrong. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -53,7 +69,7 @@ export function LoginPage() {
                 className="w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb]"
                 placeholder="you@example.com"
                 autoComplete="email"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isLoaded}
               />
             </div>
             <div>
@@ -63,9 +79,9 @@ export function LoginPage() {
                 name="password"
                 type="password"
                 className="w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb]"
-                placeholder="At least 8 characters"
+                placeholder="Your password"
                 autoComplete="current-password"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isLoaded}
               />
             </div>
 
@@ -75,7 +91,7 @@ export function LoginPage() {
               </div>
             )}
 
-            <Button type="submit" disabled={isSubmitting} className="w-full">
+            <Button type="submit" disabled={isSubmitting || !isLoaded} className="w-full">
               {isSubmitting ? "Signing in..." : "Sign in"}
             </Button>
           </form>

@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { useClerk } from "@clerk/clerk-react"
 import { Button } from "@/components/ui/button"
 import { capture } from "@/lib/analytics"
+import { authFetch } from "@/lib/auth"
 
 const PROVIDERS = [
   { value: "gemini", label: "Google Gemini" },
@@ -27,15 +29,19 @@ export function AccountPage() {
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
 
+  const { signOut } = useClerk()
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState(null)
+
   const loadCredentials = useCallback(async () => {
-    const res = await fetch("/api/credentials")
+    const res = await authFetch("/api/credentials")
     if (!res.ok) throw new Error(`credentials ${res.status}`)
     setCredentials(await res.json())
   }, [])
 
   useEffect(() => {
     let cancelled = false
-    fetch("/api/auth/me")
+    authFetch("/api/auth/me")
       .then((res) => {
         if (!res.ok) {
           navigate("/login")
@@ -47,9 +53,9 @@ export function AccountPage() {
         if (!userData || cancelled) return
         setUser(userData)
         const [keyRes, usageRes, credRes] = await Promise.all([
-          fetch("/api/auth/apikey"),
-          fetch("/api/usage"),
-          fetch("/api/credentials"),
+          authFetch("/api/auth/apikey"),
+          authFetch("/api/usage"),
+          authFetch("/api/credentials"),
         ])
         if (cancelled) return
         if (keyRes.ok) setKeyConfigured((await keyRes.json()).configured === true)
@@ -68,6 +74,17 @@ export function AccountPage() {
     }
   }, [navigate])
 
+  async function handleSignOut() {
+    setIsSigningOut(true)
+    try {
+      await signOut({ redirectUrl: "/login" })
+    } catch (err) {
+      console.error("Sign out failed", err)
+      setSignOutError("Could not sign out. Retry.")
+      setIsSigningOut(false)
+    }
+  }
+
   async function copyToClipboard() {
     try {
       await navigator.clipboard.writeText(revealedKey)
@@ -85,7 +102,7 @@ export function AccountPage() {
     setBusy(true)
     setCredError(null)
     try {
-      const res = await fetch(
+      const res = await authFetch(
         regenerate ? "/api/auth/apikey/regenerate" : "/api/auth/apikey",
         { method: "POST" },
       )
@@ -114,7 +131,7 @@ export function AccountPage() {
     setSavingCred(true)
     setCredError(null)
     try {
-      const res = await fetch("/api/credentials", {
+      const res = await authFetch("/api/credentials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -141,7 +158,7 @@ export function AccountPage() {
   async function makeDefault(id) {
     setCredError(null)
     try {
-      const res = await fetch(`/api/credentials/${id}/default`, { method: "POST" })
+      const res = await authFetch(`/api/credentials/${id}/default`, { method: "POST" })
       if (!res.ok) throw new Error(`default ${res.status}`)
       await loadCredentials()
     } catch (err) {
@@ -153,7 +170,7 @@ export function AccountPage() {
   async function removeCredential(id) {
     setCredError(null)
     try {
-      const res = await fetch(`/api/credentials/${id}`, { method: "DELETE" })
+      const res = await authFetch(`/api/credentials/${id}`, { method: "DELETE" })
       if (!res.ok) throw new Error(`delete ${res.status}`)
       await loadCredentials()
     } catch (err) {
@@ -362,6 +379,22 @@ export function AccountPage() {
             <Link to="/agents" className="text-sm text-[#2563eb] hover:underline">
               Get started with PaperViz →
             </Link>
+          </div>
+
+          <div className="text-center">
+            {signOutError && (
+              <div className="rounded-[6px] bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+                {signOutError}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+              className="text-xs text-[#737373] hover:text-[#171717] disabled:opacity-50"
+            >
+              {isSigningOut ? "Signing out..." : "Sign out"}
+            </button>
           </div>
         </div>
       </div>

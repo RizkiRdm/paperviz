@@ -1,5 +1,6 @@
 // Usage display — shows current tier, papers used, limit, and a color-coded progress bar.
 import { useState, useEffect } from "react"
+import { authFetch } from "@/lib/auth"
 
 export default function UsageDisplay() {
   const [usage, setUsage] = useState(null)
@@ -9,7 +10,7 @@ export default function UsageDisplay() {
   useEffect(() => {
     async function fetchUsage() {
       try {
-        const res = await fetch("/api/usage")
+        const res = await authFetch("/api/usage")
         if (!res.ok) throw new Error("Failed to fetch usage")
         const data = await res.json()
         setUsage(data)

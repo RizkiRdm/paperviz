@@ -9,6 +9,8 @@
 // error contract ({ "error": "<snake_case_code>" }) instead of a generic
 // "something went wrong."
 
+import { authFetch } from "@/lib/auth"
+
 export class ApiError extends Error {
   constructor(code, status) {
     super(code)
@@ -47,7 +49,7 @@ export async function createDocument({ file, text, readingLevel }) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
   try {
-    const response = await fetch("/api/documents", {
+    const response = await authFetch("/api/documents", {
       method: "POST",
       body: formData,
       signal: controller.signal,
@@ -68,7 +70,7 @@ export async function importByDOI(doi) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
   try {
-    const response = await fetch("/api/import/doi", {
+    const response = await authFetch("/api/import/doi", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ doi }),
@@ -88,7 +90,7 @@ export async function importByURL(url) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
   try {
-    const response = await fetch("/api/import/url", {
+    const response = await authFetch("/api/import/url", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
@@ -112,7 +114,7 @@ export async function getDocument(id) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
   try {
-    const response = await fetch(`/api/documents/${id}`, {
+    const response = await authFetch(`/api/documents/${id}`, {
       signal: controller.signal
     })
     clearTimeout(timeoutId)
@@ -131,7 +133,7 @@ export async function generateDocumentShare(documentId) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
   try {
-    const response = await fetch(`/api/documents/${documentId}/share`, {
+    const response = await authFetch(`/api/documents/${documentId}/share`, {
       method: "POST",
       signal: controller.signal,
     })
@@ -150,7 +152,7 @@ export async function revokeDocumentShare(documentId) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
   try {
-    const response = await fetch(`/api/documents/${documentId}/share`, {
+    const response = await authFetch(`/api/documents/${documentId}/share`, {
       method: "DELETE",
       signal: controller.signal,
     })
@@ -168,7 +170,7 @@ export async function updateDocumentVisibility(documentId, visibility) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
   try {
-    const response = await fetch(`/api/documents/${documentId}/visibility`, {
+    const response = await authFetch(`/api/documents/${documentId}/visibility`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ visibility }),
@@ -200,14 +202,14 @@ export async function trackReferral(ref) {
 
 // listAnnotations returns the current user's annotations for a document.
 export async function listAnnotations(documentId) {
-  const response = await fetch(`/api/documents/${documentId}/annotations`)
+  const response = await authFetch(`/api/documents/${documentId}/annotations`)
   if (!response.ok) throw await parseErrorResponse(response)
   return response.json()
 }
 
 // createAnnotation adds a new annotation to a document.
 export async function createAnnotation(documentId, { targetType, targetId, content }) {
-  const response = await fetch(`/api/documents/${documentId}/annotations`, {
+  const response = await authFetch(`/api/documents/${documentId}/annotations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ target_type: targetType, target_id: targetId, content }),
@@ -218,7 +220,7 @@ export async function createAnnotation(documentId, { targetType, targetId, conte
 
 // updateAnnotation changes the content of an existing annotation.
 export async function updateAnnotation(documentId, annotationId, content) {
-  const response = await fetch(`/api/documents/${documentId}/annotations/${annotationId}`, {
+  const response = await authFetch(`/api/documents/${documentId}/annotations/${annotationId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),
@@ -229,7 +231,7 @@ export async function updateAnnotation(documentId, annotationId, content) {
 
 // deleteAnnotation removes an annotation.
 export async function deleteAnnotation(documentId, annotationId) {
-  const response = await fetch(`/api/documents/${documentId}/annotations/${annotationId}`, {
+  const response = await authFetch(`/api/documents/${documentId}/annotations/${annotationId}`, {
     method: "DELETE",
   })
   if (!response.ok) throw await parseErrorResponse(response)
@@ -240,7 +242,7 @@ export async function listCollections() {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
   try {
-    const response = await fetch("/api/collections", {
+    const response = await authFetch("/api/collections", {
       signal: controller.signal,
     })
     if (!response.ok) {
@@ -257,7 +259,7 @@ export async function createCollection(name) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
   try {
-    const response = await fetch("/api/collections", {
+    const response = await authFetch("/api/collections", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
@@ -277,7 +279,7 @@ export async function getCollection(id) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), POLL_TIMEOUT_MS)
   try {
-    const response = await fetch(`/api/collections/${id}`, {
+    const response = await authFetch(`/api/collections/${id}`, {
       signal: controller.signal,
     })
     if (!response.ok) {
@@ -294,7 +296,7 @@ export async function addDocumentToCollection(collectionId, documentId) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
   try {
-    const response = await fetch(`/api/collections/${collectionId}/documents`, {
+    const response = await authFetch(`/api/collections/${collectionId}/documents`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ document_id: documentId }),
@@ -314,7 +316,7 @@ export async function removeDocumentFromCollection(collectionId, docId) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), CREATE_TIMEOUT_MS)
   try {
-    const response = await fetch(`/api/collections/${collectionId}/documents/${docId}`, {
+    const response = await authFetch(`/api/collections/${collectionId}/documents/${docId}`, {
       method: "DELETE",
       signal: controller.signal,
     })
@@ -329,7 +331,7 @@ export async function removeDocumentFromCollection(collectionId, docId) {
 
 // exportResearchContext downloads the full research context as JSON.
 export async function exportResearchContext(documentId) {
-  const response = await fetch(`/api/documents/${documentId}/export`)
+  const response = await authFetch(`/api/documents/${documentId}/export`)
   if (!response.ok) throw await parseErrorResponse(response)
   const data = await response.json()
   // Trigger download
