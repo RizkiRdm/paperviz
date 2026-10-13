@@ -86,11 +86,6 @@ func main() {
 	}
 	defer db.Close()
 
-	sessionRepo := repository.NewSessionRepo(db)
-	if _, err := sessionRepo.DeleteExpired(); err != nil {
-		slog.Error("failed to delete expired sessions on startup", "error", err)
-	}
-
 	tr := external.NewTransport()
 
 	// CLERK_SECRET_KEY fails loud for the same reason: a wrong or missing key
