@@ -64,6 +64,19 @@ func main() {
 		migrationsDir = "migrations"
 	}
 
+	// Chart images go to external object storage when configured, keeping them
+	// out of the SQLite file. Unconfigured is supported and falls back to the
+	// database column.
+	images, err := external.ChartImageStoreFromEnv()
+	if err != nil {
+		slog.Error("chart image storage misconfigured; images will stay in the database", "error", err)
+		images = nil
+	}
+	if images != nil {
+		services.SetChartImageStore(images)
+		slog.Info("chart images will be stored externally")
+	}
+
 	db, err := repository.Open(dbPath, migrationsDir)
 	if err != nil {
 		slog.Error("failed to open database", "error", err)

@@ -1,4 +1,4 @@
-package handlers
+package services
 
 import "testing"
 
@@ -19,8 +19,8 @@ func TestDetectImageMIME(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := detectImageMIME(tt.data); got != tt.want {
-				t.Errorf("detectImageMIME(%q) = %q, want %q", tt.name, got, tt.want)
+			if got := DetectImageMIME(tt.data); got != tt.want {
+				t.Errorf("DetectImageMIME(%q) = %q, want %q", tt.name, got, tt.want)
 			}
 		})
 	}

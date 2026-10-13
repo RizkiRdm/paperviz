@@ -2,15 +2,18 @@ package handlers
 
 import (
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
 	"paperviz/internal/app/credentials"
+	"paperviz/internal/external"
 	"paperviz/internal/services"
 )
 
@@ -54,6 +57,25 @@ func spaNotFound(staticDir string, fileServer http.Handler) http.HandlerFunc {
 // SPA. staticDir is the frontend's built assets directory (frontend/dist),
 // served directly by this Go binary — no separate frontend server in
 // production, per ARCHITECTURE.md's "single binary" architecture style.
+// chartImageStore caches the process-wide store built from the environment.
+// It is resolved once: the answer cannot change without a redeploy, and reading
+// three environment variables per request would be needless work on the image
+// path.
+var chartImageStore = sync.OnceValue(func() external.ChartImageStore {
+	store, err := external.ChartImageStoreFromEnv()
+	if err != nil {
+		slog.Error("chart image storage misconfigured; falling back to the database column", "error", err)
+		return nil
+	}
+	if store == nil {
+		slog.Info("chart image storage not configured; images stay in the database column")
+	}
+	return store
+})
+
+// ChartImageStore returns the configured chart-image store, or nil.
+func ChartImageStore() external.ChartImageStore { return chartImageStore() }
+
 func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) http.Handler {
 	r := chi.NewRouter()
 
@@ -77,7 +99,7 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 
 	r.Get("/healthz", healthzHandler(db))
 
-	docHandler := NewDocumentHandler(db, provider)
+	docHandler := NewDocumentHandlerWithImages(db, provider, ChartImageStore())
 	importHandler := NewImportHandler(db, provider, services.NewPaperFetcher())
 	authMiddleware := NewAuthMiddleware(db)
 	shareHandler := NewShareHandler(db)

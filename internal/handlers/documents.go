@@ -35,10 +35,19 @@ import (
 type DocumentHandler struct {
 	db       *sql.DB
 	provider *credentials.Resolver
+	// images is nil when external chart-image storage is unconfigured, which
+	// is a supported deployment that keeps images in the database column.
+	images external.ChartImageStore
 }
 
 func NewDocumentHandler(db *sql.DB, provider *credentials.Resolver) *DocumentHandler {
 	return &DocumentHandler{db: db, provider: provider}
+}
+
+// NewDocumentHandlerWithImages builds a handler backed by external chart-image
+// storage. A nil store is valid and selects the database column.
+func NewDocumentHandlerWithImages(db *sql.DB, provider *credentials.Resolver, images external.ChartImageStore) *DocumentHandler {
+	return &DocumentHandler{db: db, provider: provider, images: images}
 }
 
 // resolveClient builds a model client for the requesting user and writes the
@@ -367,12 +376,36 @@ func (h *DocumentHandler) GetChartImage(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
-	if len(chart.ImageBlob) == 0 {
+	// Prefer external storage; fall back to the database column when no store
+	// is configured, which keeps local development and unconfigured
+	// deployments working without a second code path.
+	image := chart.ImageBlob
+	mime := ""
+	if h.images != nil {
+		blob, contentType, err := h.images.Get(r.Context(), chartImageKey(docID, chartID))
+		switch {
+		case err == nil:
+			image, mime = blob, contentType
+		case errors.Is(err, external.ErrImageNotFound):
+			writeError(w, http.StatusNotFound, "not_found")
+			return
+		default:
+			// Do not silently fall back to the column on a transport error: a
+			// storage outage must not look like a working empty result.
+			slog.Error("chart image fetch failed", "chart_id", chartID, "error", err)
+			writeError(w, http.StatusInternalServerError, "internal_error")
+			return
+		}
+	}
+
+	if len(image) == 0 {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
 	}
 
-	mime := detectImageMIME(chart.ImageBlob)
+	if mime == "" {
+		mime = services.DetectImageMIME(image)
+	}
 	if mime == "" {
 		slog.Error("chart image has unrecognized format", "chart_id", chartID)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -382,9 +415,15 @@ func (h *DocumentHandler) GetChartImage(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(chart.ImageBlob); err != nil {
+	if _, err := w.Write(image); err != nil {
 		slog.Error("write chart image failed", "chart_id", chartID, "error", err)
 	}
+}
+
+// chartImageKey namespaces objects per document so a chart id from one document
+// can never address another document's image.
+func chartImageKey(documentID, chartID string) string {
+	return documentID + "/" + chartID + ".img"
 }
 
 type compareRequest struct {

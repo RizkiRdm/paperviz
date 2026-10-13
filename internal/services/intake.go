@@ -126,6 +126,17 @@ func RunPipelineAndPersist(db *sql.DB, gemini *external.LLM, documentID string, 
 }
 
 // savePipelineResult persists pipeline output in single transaction (persistence stage).
+// chartImages is the optional external chart-image store. nil means images stay
+// in the database column, which is the supported unconfigured deployment.
+//
+// Set once at startup via SetChartImageStore. Declared as a package variable
+// because savePipelineResult runs on the pipeline goroutine, whose signature
+// predates external storage and is not worth churning for an optional feature.
+var chartImages external.ChartImageStore
+
+// SetChartImageStore configures external chart-image storage for the process.
+func SetChartImageStore(store external.ChartImageStore) { chartImages = store }
+
 func savePipelineResult(db *sql.DB, documentID string, output PipelineOutput) error {
 	tx, err := db.Begin()
 	if err != nil {
@@ -234,12 +245,21 @@ func savePipelineResult(db *sql.DB, documentID string, output PipelineOutput) er
 				chapterIDPtr = &id
 			}
 		}
+		// With external storage the bytes live in object storage and the column
+		// stays empty, so a SQLite file is not sized by its figures.
+		imageBlob := c.ImageBlob
+		if chartImages != nil && len(c.ImageBlob) > 0 {
+			if _, err := chartImages.Put(context.Background(), documentID+"/"+chartID+".img", c.ImageBlob, DetectImageMIME(c.ImageBlob)); err != nil {
+				return fmt.Errorf("upload chart image: %w", err)
+			}
+			imageBlob = nil
+		}
 		if err := chartRepo.Insert(repository.Chart{
 			ID:           chartID,
 			DocumentID:   documentID,
 			SourceMethod: c.SourceMethod,
 			ChartData:    chartDataPtr,
-			ImageBlob:    c.ImageBlob,
+			ImageBlob:    imageBlob,
 			Annotation:   annotationPtr,
 			PageNumber:   &pageNum,
 			DisplayOrder: c.DisplayOrder,

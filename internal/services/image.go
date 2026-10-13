@@ -1,9 +1,9 @@
-package handlers
+package services
 
-// detectImageMIME sniffs a binary blob's magic bytes and returns the
+// DetectImageMIME sniffs a binary blob's magic bytes and returns the
 // corresponding image Content-Type. Empty string means the blob is not a
 // recognized image format.
-func detectImageMIME(b []byte) string {
+func DetectImageMIME(b []byte) string {
 	switch {
 	case len(b) >= 8 && b[0] == 0x89 && string(b[1:4]) == "PNG":
 		return "image/png"
