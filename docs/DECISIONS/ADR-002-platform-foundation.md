@@ -14,7 +14,7 @@ model vendor.
 | Compute | Render, Docker web service, free plan. Repo-connected Git auto-deploy from `main`. |
 | Edge / TLS | Render-managed TLS on `*.onrender.com`. Single origin — no CORS, no reverse proxy. |
 | Asset delivery | Served by the Go binary from the same origin as the API. No static-site split. |
-| Storage | Local SQLite on the container filesystem. 21 golang-migrate schema migrations. |
+| Storage | Supabase Storage (private bucket `chart-images`) for chart images; SQLite for everything else. 21 golang-migrate schema migrations. |
 | Migrations | `github.com/golang-migrate/migrate/v4` + its `database/sqlite` driver. Filesystem-discovered up/down pairs. |
 | Analytics | PostHog, client-side, three events. |
 | Alerting | Not yet chosen. Deferred — no budget or on-call. |
@@ -77,6 +77,13 @@ plus shared CORS-proxied auth, which widens CSRF surface, adds a cross-origin
 credential leak, and supplies no benefit a render-managed CDN cannot already
 give a low-traffic beta.
 
+### Cloudflare R2 — dropped
+
+R2 is usage-metered, so Cloudflare requires a payment method before the bucket
+can be enabled, even inside its permanent 10 GB free allowance. It accepts
+PayPal and some wallets, but not DANA, so it is unreachable here. Replaced with
+Supabase Storage, whose free tier activates without a payment method.
+
 ### Cloudflare Tunnel — dropped
 
 Tunnel would host the app on the owner's machine: paid bandwidth, a public IP
@@ -104,4 +111,10 @@ nothing over Render's free plan for a repo-backed web service.
 - PostHog events are the durable signal; local documents are not.
 - `connect-src` must include `https://us.i.posthog.com` — analytics surface
   silently otherwise.
+- Chart images read from Supabase Storage with the secret key. Supabase
+  answers a missing object with 400 and a not-found body, not 404, so the
+  client inspects the body rather than trusting the status code.
+- Unsetting `SUPABASE_PROJECT_REF` reverts chart images to the
+  `charts.image_blob` column. That is a supported configuration, not a
+  failure mode.
 - Add a custom domain only if DNS routing needs to survive a Render move.
