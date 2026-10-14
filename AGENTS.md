@@ -183,6 +183,15 @@ git push origin main --tags
 - [DO] Keep `docs/mcp-parity.md` and `goals/chunk-7-4-mcp/plan.md` in sync with `internal/mcp/tools.go`. Docs listing unimplemented tools is worse than no docs — it misleads the next agent session.
 - [DO] Prefer one canonical route per feature. `/compare` and `/compare-research-papers` rendering the same component was route debt, not intentional design — don't introduce a second copy again.
 
+## Deploy Protocol (Render)
+Service `srv-db4ir7vavr4c73fdg45g` → `https://paperviz-z4ne.onrender.com`.
+
+- **Never `PUT` a partial env-var list.** `PUT /v1/services/{id}/env-vars` is a full replace, not a merge. Sending only the new vars silently deletes every other one. GET the current list, merge, PUT the whole set. This actually happened: a 2-var PUT wiped 6 vars and the next deploy died on `CREDENTIAL_ENCRYPTION_KEY environment variable is required`.
+- Auth token for the REST API: `awk '/^    key:/{print $2}' ~/.render/cli.yaml` (Render CLI v2.28.0 has no env-var subcommand). Needs `Authorization: Bearer` **and** `accept: application/json`.
+- Deploy non-interactively: `render deploys create srv-db4ir7vavr4c73fdg45g --confirm`. Without `--confirm` the CLI prompts and dies on EOF in a non-TTY.
+- **`VITE_*` vars are build-time.** Vite inlines them during `npm run build` in Containerfile stage 1, so they need an `ARG` in `build/Containerfile` and must exist *during the build*, not just at runtime. Setting the env var alone ships a bundle with no publishable key.
+- After every deploy, curl `/healthz` plus one protected route (`/api/collections` → 401) and `/api/auth/me` (→ 401). A 200 on `/healthz` alone does not prove auth wired.
+
 ## Verification Commands
 - `go build ./cmd/server ./cmd/mcp ./cmd/admin` — all three binaries compile
 - `go test ./...` — backend test suite
