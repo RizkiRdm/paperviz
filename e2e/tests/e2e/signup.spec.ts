@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('Signup Page', () => {
-  test('loads with signup form', async ({ page }) => {
+  // Email and password are submitted in one call (signUp.create), so both
+  // fields exist on first paint.
+  test('loads with email and password fields', async ({ page }) => {
     await page.goto('/signup')
     await page.waitForLoadState('networkidle')
     await expect(page.locator('#email')).toBeVisible()
     await expect(page.locator('#password')).toBeVisible()
-    await expect(page.locator('button[type="submit"]')).toContainText('Sign up')
+    await expect(page.locator('button[type="submit"]')).toContainText('Create account')
   })
 
   // PaperViz holds no Google account, so the OAuth affordance must stay gone.
@@ -28,7 +30,7 @@ test.describe('Signup Page', () => {
     await page.goto('/signup')
     await page.waitForLoadState('networkidle')
     await page.locator('button[type="submit"]').click()
-    await expect(page.locator('text=Please fill in all fields')).toBeVisible()
+    await expect(page.locator('text=Please enter your email address')).toBeVisible()
   })
 
   test('PV logo links back to home', async ({ page }) => {

@@ -33,7 +33,7 @@ npm --prefix e2e exec -- playwright install chromium
 ## 3. Create local configuration
 
 ```bash
-cp .env.example .env
+cp .env.example .env.development
 ```
 
 A minimal bootable local file looks like this:
@@ -60,15 +60,16 @@ Notes:
 - Users bring their own model key through the web UI, so no model credential belongs in this file.
 - To run the local MCP server, export `GEMINI_API_KEY` in that process only. `cmd/mcp` calls the provider directly from your machine.
 - The server reads process environment variables directly; it does not load `.env` itself.
-- Never commit `.env` or real credentials.
+- Never commit `.env.development` or real credentials. `.env.example` is the only tracked env file.
+- Production has no env file. Render's env vars are the single production source of truth.
 
 ## 4. Start backend
 
-Export `.env` into the current shell:
+Export `.env.development` into the current shell:
 
 ```bash
 set -a
-source .env
+source .env.development
 set +a
 ```
 
@@ -214,7 +215,7 @@ Run it with the same environment used for development:
 
 ```bash
 set -a
-source .env
+source .env.development
 set +a
 ./server
 ```

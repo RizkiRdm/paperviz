@@ -5,7 +5,7 @@ tmp_dir = "tmp"
 [build]
   cmd = "go build -o ./tmp/server ./cmd/server"
   entrypoint = "tmp/server"
-  full_bin = "bash -c 'export $(grep -v \"^#\" .env | xargs) && tmp/server'"
+  full_bin = "bash -c 'export $(grep -v \"^#\" ${ENV_FILE:-.env.development} | xargs) && tmp/server'"
   include_ext = ["go"]
   exclude_dir = ["frontend", "tmp", "vendor", "migrations"]
   exclude_regex = ["_test.go"]

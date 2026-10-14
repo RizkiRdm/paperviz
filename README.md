@@ -120,10 +120,10 @@ The server validates required environment variables at startup. See
 ### 1. Configure
 
 ```bash
-cp .env.example .env
+cp .env.example .env.development
 ```
 
-Edit `.env`. At minimum, provide non-empty values for every variable marked required in that file.
+Edit `.env.development`. At minimum, provide non-empty values for every variable marked required in that file.
 
 ### 2. Install dependencies
 
@@ -134,11 +134,11 @@ npm --prefix frontend ci
 
 ### 3. Start backend
 
-PaperViz does not load `.env` inside the Go process. Export it before starting the server:
+PaperViz does not load `.env.development` inside the Go process. Export it before starting the server:
 
 ```bash
 set -a
-source .env
+source .env.development
 set +a
 go run ./cmd/server
 ```
@@ -174,7 +174,7 @@ make build
 make run
 ```
 
-`make build` installs frontend dependencies when needed, creates `frontend/dist`, and builds `./server`. `make run` rebuilds and starts that binary with variables exported from `.env`.
+`make build` installs frontend dependencies when needed, creates `frontend/dist`, and builds `./server`. `make run` rebuilds and starts that binary with variables exported from `.env.development` (`ENV_FILE=` to override).
 
 For explicit builds:
 

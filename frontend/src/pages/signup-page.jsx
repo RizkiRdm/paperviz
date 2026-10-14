@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button"
 import { clerkErrorMessage } from "@/lib/auth"
 import { capture, identify } from "@/lib/analytics"
 
-const STEP_EMAIL = "email"
-const STEP_PASSWORD = "password"
+const STEP_DETAILS = "details"
 const STEP_CODE = "code"
 
 const INPUT_CLASS =
@@ -19,7 +18,7 @@ export function SignupPage() {
   const { signUp, isLoaded } = useSignUp()
   const { setActive } = useClerk()
 
-  const [step, setStep] = useState(STEP_EMAIL)
+  const [step, setStep] = useState(STEP_DETAILS)
   const [email, setEmail] = useState("")
   const [error, setError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -34,30 +33,18 @@ export function SignupPage() {
     navigate("/account")
   }
 
-  async function submitEmail(e) {
+  // signUp.create is the only creation entry point on the resource: it takes
+  // emailAddress + password together and returns a status. The older
+  // attemptEmailAddress / attemptPassword pair does not exist on the resource,
+  // so splitting signup across those steps fails for every user.
+  async function submitDetails(e) {
     e.preventDefault()
     const value = e.currentTarget.email.value.trim()
+    const password = e.currentTarget.password.value
     if (!value) {
       setError("Please enter your email address.")
       return
     }
-    setError(null)
-    setIsSubmitting(true)
-    try {
-      await signUp.attemptEmailAddress({ email: value })
-      setEmail(value)
-      setStep(STEP_PASSWORD)
-    } catch (err) {
-      if (import.meta.env.DEV) console.error("signup email step failed", err)
-      setError(clerkErrorMessage(err?.errors, "Please enter your email address."))
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  async function submitPassword(e) {
-    e.preventDefault()
-    const password = e.currentTarget.password.value
     if (!password) {
       setError("Please choose a password.")
       return
@@ -65,15 +52,16 @@ export function SignupPage() {
     setError(null)
     setIsSubmitting(true)
     try {
-      const attempt = await signUp.attemptPassword({ password })
+      const attempt = await signUp.create({ emailAddress: value, password })
+      setEmail(value)
       if (attempt.status === "needs_email_verification") {
         setStep(STEP_CODE)
         return
       }
       await activateSession(signUp)
     } catch (err) {
-      if (import.meta.env.DEV) console.error("signup password step failed", err)
-      setError(clerkErrorMessage(err?.errors, "Please choose a password."))
+      if (import.meta.env.DEV) console.error("signup failed", err)
+      setError(clerkErrorMessage(err?.errors, "We could not create your account."))
     } finally {
       setIsSubmitting(false)
     }
@@ -89,7 +77,7 @@ export function SignupPage() {
     setError(null)
     setIsSubmitting(true)
     try {
-      const attempt = await signUp.attemptEmailVerification({ code })
+      const attempt = await signUp.attemptEmailAddressVerification({ code })
       if (attempt.status === "complete") {
         await activateSession(signUp)
         return
@@ -126,22 +114,13 @@ export function SignupPage() {
         </div>
 
         <div className="rounded-[12px] border border-[#e5e5e5] bg-white p-6">
-          {step === STEP_EMAIL && (
-            <form onSubmit={submitEmail} className="space-y-4">
+          {step === STEP_DETAILS && (
+            <form onSubmit={submitDetails} className="space-y-4">
               <div>
                 <label htmlFor="email" className={LABEL_CLASS}>Email</label>
                 <input id="email" name="email" type="email" className={INPUT_CLASS}
                   placeholder="you@example.com" autoComplete="email" disabled={disabled} />
               </div>
-              {error && <ErrorNote message={error} />}
-              <Button type="submit" disabled={disabled} className="w-full">
-                {isSubmitting ? "Continuing..." : "Continue"}
-              </Button>
-            </form>
-          )}
-
-          {step === STEP_PASSWORD && (
-            <form onSubmit={submitPassword} className="space-y-4">
               <div>
                 <label htmlFor="password" className={LABEL_CLASS}>Password</label>
                 <input id="password" name="password" type="password" className={INPUT_CLASS}
@@ -151,10 +130,6 @@ export function SignupPage() {
               <Button type="submit" disabled={disabled} className="w-full">
                 {isSubmitting ? "Creating account..." : "Create account"}
               </Button>
-              <button type="button" onClick={() => { setStep(STEP_EMAIL); setError(null) }}
-                className="w-full text-xs text-[#737373] hover:text-[#171717]">
-                Use a different email
-              </button>
             </form>
           )}
 
@@ -184,7 +159,7 @@ export function SignupPage() {
   )
 }
 
-// ErrorNote keeps the inline error treatment identical across all three steps.
+// ErrorNote keeps the inline error treatment identical across both steps.
 function ErrorNote({ message }) {
   return (
     <div className="rounded-[6px] bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">

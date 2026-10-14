@@ -17,6 +17,16 @@ import { authFetch } from "@/lib/auth"
 
 const COPY_FEEDBACK_MS = 2000
 
+// repository.NewID mints exactly 16 characters from a 58-symbol alphabet with
+// visually ambiguous characters removed. This mirrors that alphabet so an
+// unknown route like /some-typo is rejected on sight.
+//
+// The route pattern /:documentId otherwise matches every single-segment path
+// and the catch-all `*` never runs, so a typo rendered "Reading document..."
+// and then waited out the polling timeout before showing the 404 page. Checking
+// the shape here costs nothing and answers immediately.
+const DOCUMENT_ID = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{16}$/
+
 const ERROR_MESSAGES = {
   simplification_failed: "We couldn't simplify this paper. Please try again.",
   verification_failed_to_run: "We couldn't verify the summary against the original. Please try again.",
@@ -124,7 +134,7 @@ export function ResultPage() {
     }
   }
 
-  if (notFound) {
+  if (notFound || !DOCUMENT_ID.test(documentId)) {
     return <NotFoundPage />
   }
 

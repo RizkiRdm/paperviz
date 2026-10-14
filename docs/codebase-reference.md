@@ -330,7 +330,7 @@ MCP constraints:
 
 The server holds no model vendor credential. Web model calls run on the requesting user's own key, decrypted per request by `internal/app/credentials.Resolver`; there is no `GEMINI_API_KEY` and no `FRONTEND_URL` in the server path. `CREDENTIAL_ENCRYPTION_KEY` is the only secret `cmd/server` refuses to boot without.
 
-The HTTP process does not load `.env`. Export values before running it.
+The HTTP process does not load any `.env` file. Export values before running it. `.env.example` is the template; `.env.development` is the local (gitignored) copy that `make run`/`make dev` export, overridable with `ENV_FILE=`. Production config lives only in Render env vars — there is no `.env.production` file.
 
 ## Commands
 
@@ -345,7 +345,7 @@ npm --prefix e2e ci
 ### Development
 
 ```bash
-set -a; source .env; set +a
+set -a; source .env.development; set +a
 go run ./cmd/server
 npm --prefix frontend run dev
 ```
@@ -363,7 +363,7 @@ CGO_ENABLED=0 go build -o server ./cmd/server
 | Target | Effect |
 |---|---|
 | `make build` | Build frontend if needed, then `./server` |
-| `make run` | Build and run with `.env` exported |
+| `make run` | Build and run with `.env.development` exported (`ENV_FILE=` to override) |
 | `make dev` | Run backend with Air |
 | `make install-air` | Install Air |
 | `make clean` | Remove binary, frontend dependencies, and frontend build |

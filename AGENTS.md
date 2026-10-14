@@ -139,8 +139,8 @@ Plan: `.omo/plans/byok_auth_billing_removal.md`. Threats addressed: (a) key thef
 ## Git Rules
 - Every task MUST end with a commit and a push to `origin`. Uncommitted work is unfinished work.
 - MUST run the Verification Commands gate BEFORE committing. A commit that fails `go test ./...` or `gofmt -l .` is a broken commit; fix it in the same change, never amend around a failure.
-- Stage files selectively (`git add <path>`). Never `git add -A` or `git add .` — this repo gitignores `.env`, `paperviz.db*`, `.opencode/`, and scratch output, and a blind add is how those leak into history.
-- Never commit secrets. `.env`, real API keys, `paperviz.db`, and build output stay ignored.
+- Stage files selectively (`git add <path>`). Never `git add -A` or `git add .` — this repo gitignores `.env*`, `paperviz.db*`, `.opencode/`, and scratch output, and a blind add is how those leak into history.
+- Never commit secrets. `.env.development`, real API keys, `paperviz.db`, and build output stay ignored.
 - Do NOT force-push to `main`. Do NOT rewrite published history. If a commit must be corrected, add a new commit.
 - Do NOT use `git update-index --skip-worktree` or `--assume-unchanged` to hide local changes.
 - After code changes, run `graphify update .` so the code graph does not lag the tree.
@@ -181,6 +181,7 @@ git push origin main --tags
 - [DON'T] Expose user-owned operations (list, save, rename, delete, share, referral) through MCP. These stay REST-only, human-only — this was a deliberate decision, not an oversight (`docs/mcp-parity.md`).
 - [DON'T] Add a new MCP tool or a new SEO/marketing route without a demand signal first (see Chunk 10.5/10.6 checkpoints). This repo has a documented pattern of shipping ahead of validation — don't repeat it here.
 - [DO] Keep `docs/mcp-parity.md` and `goals/chunk-7-4-mcp/plan.md` in sync with `internal/mcp/tools.go`. Docs listing unimplemented tools is worse than no docs — it misleads the next agent session.
+- [DON'T] Create a `.env.production` file. Render's env vars are the only production source of truth; a file here is a second copy that drifts and adds one more place to leak a secret. Local config lives in `.env.development` (gitignored); `.env.example` is the only tracked env file. Adding an env var means editing `.env.example` and Render — never a new file.
 - [DO] Prefer one canonical route per feature. `/compare` and `/compare-research-papers` rendering the same component was route debt, not intentional design — don't introduce a second copy again.
 
 ## Deploy Protocol (Render)
@@ -198,4 +199,5 @@ Service `srv-db4ir7vavr4c73fdg45g` → `https://paperviz-z4ne.onrender.com`.
 - `go vet ./...` — vet must be clean
 - `gofmt -l .` — formatting check, must return empty
 - `scripts/mcp-handshake-check.sh` — boots `cmd/mcp`, runs a real `initialize` + `tools/list` over stdio, asserts the 5 tool names. **This is the MCP tool count check.** Never `grep -c "Name:" internal/mcp/tools.go`: that passes on a server that panics before serving any tool, which is how the agent surface shipped broken with a green suite.
-- `npm --prefix frontend run lint && npm --prefix frontend run build` — frontend gate (`oxlint`, then `vite build`)
+- `npm --prefix frontend run lint` — frontend lint gate (`oxlint`)
+- `make frontend/dist` — frontend build gate. **Not** `npm run build`: Vite inlines `VITE_*` at build time and loads `.env.production` in build mode, so a bare `npm run build` produces a bundle with no `VITE_CLERK_PUBLISHABLE_KEY` and every page renders "publishable key is not set". The Makefile target exports the env file into the build. This silently produced a fully-broken `frontend/dist` twice before it was written down here.

@@ -32,13 +32,15 @@ test.describe('Login Page', () => {
     await expect(page.locator('text=Please fill in all fields')).toBeVisible()
   })
 
+  // Wrong password and unknown account deliberately render the same message —
+  // distinguishing them would confirm which emails have accounts.
   test('shows error on invalid credentials', async ({ page }) => {
     await page.goto('/login')
     await page.waitForLoadState('networkidle')
     await page.locator('#email').fill('nonexistent@test.com')
     await page.locator('#password').fill('wrongpassword')
     await page.locator('button[type="submit"]').click()
-    await expect(page.locator('text=Invalid email or password')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('text=did not match')).toBeVisible({ timeout: 10000 })
   })
 
   test('PV logo links back to home', async ({ page }) => {

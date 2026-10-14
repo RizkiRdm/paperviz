@@ -23,9 +23,14 @@ export function LoginPage() {
     setError(null)
     setIsSubmitting(true)
     try {
-      const attempt = await signIn.attemptFirstFactor({
+      // signIn.create with the password strategy is the one-call form: it takes
+      // identifier + password together. attemptFirstFactor is only valid after
+      // an existing sign-in attempt exists, so it 422s here, and the resource
+      // has no attemptEmailAddress method at all — both failures look like a
+      // generic error for every single sign-in.
+      const attempt = await signIn.create({
         strategy: "password",
-        emailAddress: email,
+        identifier: email,
         password,
       })
       if (attempt.status === "complete") {
@@ -38,7 +43,7 @@ export function LoginPage() {
       setError(clerkErrorMessage(attempt.error, "Sign-in needs an extra step this page does not support."))
     } catch (err) {
       if (import.meta.env.DEV) console.error("login failed", err)
-      setError("Something went wrong. Please try again.")
+      setError(clerkErrorMessage(err?.errors, "Sign-in failed. Please try again."))
     } finally {
       setIsSubmitting(false)
     }

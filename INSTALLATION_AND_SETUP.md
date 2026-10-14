@@ -16,12 +16,12 @@ No external database server, C compiler, message broker, or Docker installation 
 ## Quick setup
 
 ```bash
-cp .env.example .env
+cp .env.example .env.development
 go mod download
 npm --prefix frontend ci
 ```
 
-Edit `.env` before starting the server. The HTTP process validates one variable at startup:
+Edit `.env.development` before starting the server. The HTTP process validates one variable at startup:
 
 ```dotenv
 CREDENTIAL_ENCRYPTION_KEY=base64-encoded-32-random-bytes
@@ -41,13 +41,13 @@ PaperViz holds no third-party account. There is no OAuth provider, no payment pr
 
 ## Run in development
 
-The Go process does not load `.env` itself. Export it first.
+The Go process does not load any `.env` file itself. Export it first.
 
 Terminal 1:
 
 ```bash
 set -a
-source .env
+source .env.development
 set +a
 go run ./cmd/server
 ```
@@ -83,7 +83,7 @@ Run it with exported environment variables:
 
 ```bash
 set -a
-source .env
+source .env.development
 set +a
 ./server
 ```

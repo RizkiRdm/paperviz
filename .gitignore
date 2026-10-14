@@ -1,5 +1,9 @@
-# Secrets — never commit (AGENTS.md Security Rules)
+# Secrets — never commit (AGENTS.md Security Rules).
+# Every .env.<something> holds real credentials. .env.example is the only
+# env file meant to be tracked, hence the negation.
 .env
+.env.*
+!.env.example
 
 # SQLite database file (runtime data, not source)
 *.db
@@ -63,4 +67,3 @@ air.log
 # OS/editor noise
 .DS_Store
 *.swp
-.env

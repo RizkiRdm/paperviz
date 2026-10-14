@@ -1,13 +1,22 @@
 .PHONY: build run dev install-air clean container container-run
 
+# Which env file to export. Override for another local profile:
+#   make run ENV_FILE=.env.staging
+ENV_FILE ?= .env.development
+
 build: frontend/dist
 	CGO_ENABLED=0 go build -o server ./cmd/server
 
+# Vite loads `.env.<mode>`, and `vite build` runs in production mode — so with
+# the file named .env.development a local `npm run build` found no
+# VITE_CLERK_PUBLISHABLE_KEY and the bundle rendered the "key is not set"
+# message. Exporting the env file into the build process is what actually
+# works, and it is mode-independent.
 frontend/dist:
-	cd frontend && npm ci && npm run build
+	cd frontend && npm ci && export $$(grep -v '^#' $(CURDIR)/$(ENV_FILE) | xargs) && npm run build
 
 run: build
-	export $$(grep -v '^#' .env | xargs) && ./server
+	export $$(grep -v '^#' $(ENV_FILE) | xargs) && ./server
 
 dev:
 	PATH="$$(go env GOPATH)/bin:$$PATH" air
