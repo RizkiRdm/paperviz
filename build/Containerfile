@@ -4,6 +4,11 @@ WORKDIR /build
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ .
+# Vite inlines VITE_* at build time, so the Clerk publishable key must be
+# present during this stage — it is not read at runtime. Render passes service
+# env vars as build args. Safe to bake in: the publishable key ships to every
+# browser anyway. The secret key is deliberately NOT referenced here.
+ARG VITE_CLERK_PUBLISHABLE_KEY
 RUN npm run build
 
 # Stage 2 — Build Go server
