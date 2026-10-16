@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useSignUp, useClerk } from "@clerk/clerk-react"
+import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { clerkErrorMessage } from "@/lib/auth"
 import { capture, identify } from "@/lib/analytics"
@@ -94,7 +95,16 @@ export function SignupPage() {
   const disabled = isSubmitting || !isLoaded
 
   return (
-    <div className="min-h-screen bg-white bg-dotted-grid flex items-center justify-center px-6">
+    <div className="relative min-h-screen bg-white bg-dotted-grid flex items-center justify-center px-6">
+      <header className="absolute left-6 top-6">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#e5e5e5] bg-white px-3 py-1.5 text-sm font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Link>
+      </header>
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <Link to="/" className="inline-flex items-center gap-2 mb-6">
