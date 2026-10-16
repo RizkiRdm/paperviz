@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"paperviz/internal/app/documents"
-	"paperviz/internal/repository"
 )
 
 // maxUploadBytes caps request body per ARCHITECTURE.md Section 4.
@@ -51,7 +50,7 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	readingLevel := r.FormValue("reading_level")
-	if readingLevel != repository.ReadingLevelSimplified && readingLevel != repository.ReadingLevelELI5 {
+	if !documents.ValidReadingLevel(readingLevel) {
 		writeError(w, http.StatusBadRequest, "invalid_reading_level")
 		return
 	}
@@ -106,5 +105,5 @@ func (h *DocumentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, createDocumentResponse{DocumentID: docID, Status: repository.StatusProcessing})
+	writeJSON(w, http.StatusCreated, createDocumentResponse{DocumentID: docID, Status: documents.StatusProcessing})
 }

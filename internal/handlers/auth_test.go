@@ -2,38 +2,17 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	"paperviz/internal/repository"
+	"paperviz/internal/testutil"
 )
 
-// newAuthTestDB opens an in-memory SQLite with the migrations needed by auth handlers.
-func newAuthTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	return db
-}
-
-// seedClerkUser writes the row AuthMiddleware would have created on first sight.
-func seedClerkUser(t *testing.T, db *sql.DB, id, email string) {
-	t.Helper()
-	if err := repository.NewUserRepo(db).UpsertClerkUser(id, email, 1700000000); err != nil {
-		t.Fatalf("seed user: %v", err)
-	}
-}
-
 func TestMeReturnsProfileForVerifiedClerkSubject(t *testing.T) {
-	db := newAuthTestDB(t)
-	seedClerkUser(t, db, "user_2abc", "reader@example.com")
+	db := testutil.OpenTestDB(t)
+	testutil.SeedClerkUser(t, db, "user_2abc", "reader@example.com", 1700000000)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
 	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user_2abc"))
@@ -52,8 +31,8 @@ func TestMeReturnsProfileForVerifiedClerkSubject(t *testing.T) {
 // TestMeRejectsMissingIdentity keeps Me safe if it is ever mounted without
 // RequireAuth: it must not fall back to any ambient identity.
 func TestMeRejectsMissingIdentity(t *testing.T) {
-	db := newAuthTestDB(t)
-	seedClerkUser(t, db, "user_2abc", "reader@example.com")
+	db := testutil.OpenTestDB(t)
+	testutil.SeedClerkUser(t, db, "user_2abc", "reader@example.com", 1700000000)
 
 	rec := httptest.NewRecorder()
 	NewAuthHandler(db).Me(rec, httptest.NewRequest(http.MethodGet, "/api/auth/me", nil))
@@ -64,7 +43,7 @@ func TestMeRejectsMissingIdentity(t *testing.T) {
 }
 
 func TestMeRejectsUnknownSubject(t *testing.T) {
-	db := newAuthTestDB(t)
+	db := testutil.OpenTestDB(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
 	req = req.WithContext(context.WithValue(req.Context(), userIDKey, "user_missing"))
@@ -80,9 +59,9 @@ func TestMeRejectsUnknownSubject(t *testing.T) {
 // TestMeIsIdempotentAcrossReloads stands in for the Render restart case: the
 // local row survives a deploy, so Me keeps working without re-provisioning.
 func TestMeIsIdempotentAcrossReloads(t *testing.T) {
-	db := newAuthTestDB(t)
-	seedClerkUser(t, db, "user_2abc", "reader@example.com")
-	seedClerkUser(t, db, "user_2abc", "reader@example.com")
+	db := testutil.OpenTestDB(t)
+	testutil.SeedClerkUser(t, db, "user_2abc", "reader@example.com", 1700000000)
+	testutil.SeedClerkUser(t, db, "user_2abc", "reader@example.com", 1700000000)
 
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = ?`, "user_2abc").Scan(&count); err != nil {

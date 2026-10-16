@@ -6,13 +6,11 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"paperviz/internal/app/credentials"
 	"paperviz/internal/external"
-	"paperviz/internal/repository"
 )
 
 // CredentialHandler manages the BYOK model keys a user supplies.
@@ -21,13 +19,12 @@ import (
 // data it stores. Two rules govern every method here: the plaintext key is
 // never written to a log, and never returned in a response.
 type CredentialHandler struct {
-	db     *sql.DB
-	cipher *external.Cipher
+	store *credentials.Store
 }
 
 // NewCredentialHandler creates a CredentialHandler bound to a cipher.
 func NewCredentialHandler(db *sql.DB, cipher *external.Cipher) *CredentialHandler {
-	return &CredentialHandler{db: db, cipher: cipher}
+	return &CredentialHandler{store: credentials.NewStore(db, cipher)}
 }
 
 // createCredentialRequest is the wire shape for POST /api/credentials.
@@ -78,44 +75,14 @@ func (h *CredentialHandler) Create(w http.ResponseWriter, r *http.Request) {
 		model = provider.DefaultModel()
 	}
 
-	repo := repository.NewCredentialRepo(h.db)
-	existing, err := repo.ListByUser(userID)
+	cred, err := h.store.Create(userID, string(provider), model, apiKey)
 	if err != nil {
-		slog.Error("list credentials before create failed", "error", err)
+		slog.Error("create credential failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
 
-	ciphertext, nonce, err := h.cipher.Encrypt([]byte(apiKey), external.CredentialAAD(userID, provider, model))
-	if err != nil {
-		slog.Error("encrypt credential failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	id, err := repository.NewID()
-	if err != nil {
-		slog.Error("generate credential id failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	now := time.Now().Unix()
-	cred := repository.Credential{
-		ID: id, UserID: userID, Provider: string(provider), Model: model,
-		Ciphertext: ciphertext, Nonce: nonce, KeyHint: external.KeyHint(apiKey),
-		// The first key a user adds becomes their default, otherwise they
-		// would add a credential and still be told none is configured.
-		IsDefault: len(existing) == 0,
-		CreatedAt: now, UpdatedAt: now,
-	}
-	if err := repo.Insert(cred); err != nil {
-		slog.Error("insert credential failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, toCredentialResponse(cred))
+	writeJSON(w, http.StatusCreated, toCredentialResponse(*cred))
 }
 
 // List handles GET /api/credentials.
@@ -126,7 +93,7 @@ func (h *CredentialHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creds, err := repository.NewCredentialRepo(h.db).ListByUser(userID)
+	creds, err := h.store.List(userID)
 	if err != nil {
 		slog.Error("list credentials failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -154,8 +121,8 @@ func (h *CredentialHandler) SetDefault(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := repository.NewCredentialRepo(h.db).SetDefault(userID, id)
-	if errors.Is(err, repository.ErrCredentialNotFound) {
+	err := h.store.SetDefault(userID, id)
+	if errors.Is(err, credentials.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "credential_not_found")
 		return
 	}
@@ -181,7 +148,7 @@ func (h *CredentialHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := repository.NewCredentialRepo(h.db).Delete(userID, id); err != nil {
+	if err := h.store.Delete(userID, id); err != nil {
 		slog.Error("delete credential failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
@@ -191,7 +158,7 @@ func (h *CredentialHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // toCredentialResponse projects a stored credential onto the wire shape,
 // dropping the ciphertext and nonce on the way out.
-func toCredentialResponse(c repository.Credential) credentialResponse {
+func toCredentialResponse(c credentials.Credential) credentialResponse {
 	return credentialResponse{
 		ID:        c.ID,
 		Provider:  c.Provider,

@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,20 +11,8 @@ import (
 
 	"paperviz/internal/app/credentials"
 	"paperviz/internal/external"
-	"paperviz/internal/repository"
+	"paperviz/internal/testutil"
 )
-
-// newOwnershipRouterDB opens an in-memory SQLite with the migrations a
-// document read needs.
-func newOwnershipRouterDB(t *testing.T) *sql.DB {
-	t.Helper()
-	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	return db
-}
 
 // testIdentityHeader carries the Clerk subject a request should be treated as
 // having. It stands in for a verified Clerk session token.
@@ -56,26 +42,13 @@ func withTestIdentity(next http.Handler) http.Handler {
 // route: without it the session never reaches the context, the owner is read
 // as anonymous, and the owner is locked out of their own document.
 func TestGetDocumentRespectsOwnershipOverRouter(t *testing.T) {
-	db := newOwnershipRouterDB(t)
-	users := repository.NewUserRepo(db)
-	docs := repository.NewDocumentRepo(db)
+	db := testutil.OpenTestDB(t)
 
 	owner, other := "user_router_owner", "user_router_other"
-	for _, u := range []string{owner, other} {
-		if err := users.UpsertClerkUser(u, u+"@test.com", time.Now().Unix()); err != nil {
-			t.Fatalf("provision user %s: %v", u, err)
-		}
-	}
-
 	now := time.Now().Unix()
-	ownerPtr := owner
-	if err := docs.Insert(repository.Document{
-		ID: "doc-1", CreatedAt: now, LastAccessedAt: now,
-		Status: repository.StatusComplete, SourceType: repository.SourceTypePastedText,
-		ReadingLevel: repository.ReadingLevelSimplified, OriginalText: "body", UserID: &ownerPtr,
-	}); err != nil {
-		t.Fatalf("insert document: %v", err)
-	}
+	testutil.SeedClerkUser(t, db, owner, owner+"@test.com", now)
+	testutil.SeedClerkUser(t, db, other, other+"@test.com", now)
+	testutil.SeedOwnedDocument(t, db, "doc-1", owner)
 
 	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t)), t.TempDir()))
 
@@ -106,7 +79,7 @@ func TestGetDocumentRespectsOwnershipOverRouter(t *testing.T) {
 // TestRequireAuthRejectsRequestWithoutClerkToken keeps RequireAuth from
 // accepting a request that merely carries no session at all.
 func TestRequireAuthRejectsRequestWithoutClerkToken(t *testing.T) {
-	db := newOwnershipRouterDB(t)
+	db := testutil.OpenTestDB(t)
 	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t)), t.TempDir()))
 
 	rec := httptest.NewRecorder()

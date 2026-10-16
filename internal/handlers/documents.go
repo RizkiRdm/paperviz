@@ -14,8 +14,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -23,7 +21,6 @@ import (
 	"paperviz/internal/app/documents"
 	"paperviz/internal/apperr"
 	"paperviz/internal/external"
-	"paperviz/internal/repository"
 	"paperviz/internal/services"
 )
 
@@ -35,19 +32,21 @@ import (
 type DocumentHandler struct {
 	db       *sql.DB
 	provider *credentials.Resolver
+	// svc owns document domain logic; the handler is transport only.
+	svc *documents.Service
 	// images is nil when external chart-image storage is unconfigured, which
 	// is a supported deployment that keeps images in the database column.
 	images external.ChartImageStore
 }
 
 func NewDocumentHandler(db *sql.DB, provider *credentials.Resolver) *DocumentHandler {
-	return &DocumentHandler{db: db, provider: provider}
+	return &DocumentHandler{db: db, provider: provider, svc: documents.New(db, provider)}
 }
 
 // NewDocumentHandlerWithImages builds a handler backed by external chart-image
 // storage. A nil store is valid and selects the database column.
 func NewDocumentHandlerWithImages(db *sql.DB, provider *credentials.Resolver, images external.ChartImageStore) *DocumentHandler {
-	return &DocumentHandler{db: db, provider: provider, images: images}
+	return &DocumentHandler{db: db, provider: provider, svc: documents.New(db, provider), images: images}
 }
 
 // resolveClient builds a model client for the requesting user and writes the
@@ -114,10 +113,8 @@ func (h *DocumentHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	docRepo := repository.NewDocumentRepo(h.db)
-	docs, err := docRepo.ListSummariesByUser(userID, limit, offset)
+	docs, err := h.svc.List(userID, limit, offset)
 	if err != nil {
-		slog.Error("list documents failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
@@ -151,34 +148,16 @@ func (h *DocumentHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	docRepo := repository.NewDocumentRepo(h.db)
-
-	total, err := docRepo.CountByUser(userID)
+	stats, err := h.svc.Stats(userID)
 	if err != nil {
-		slog.Error("count documents failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	saved, err := docRepo.CountSavedByUser(userID)
-	if err != nil {
-		slog.Error("count saved failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	colRepo := repository.NewCollectionRepo(h.db)
-	collections, err := colRepo.ListByUser(userID)
-	if err != nil {
-		slog.Error("count collections failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
 
 	writeJSON(w, http.StatusOK, documentStatsResponse{
-		Total:       total,
-		Saved:       saved,
-		Collections: len(collections),
+		Total:       stats.Total,
+		Saved:       stats.Saved,
+		Collections: stats.Collections,
 	})
 }
 
@@ -255,9 +234,8 @@ func (h *DocumentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // Get handles GET /api/documents/:id.
 func (h *DocumentHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	svc := documents.New(h.db, h.provider)
-	rm, err := svc.GetReadModel(id)
-	if errors.Is(err, repository.ErrNotFound) {
+	rm, err := h.svc.GetReadModel(id)
+	if errors.Is(err, documents.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
 	}
@@ -365,9 +343,8 @@ func (h *DocumentHandler) GetChartImage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	chartRepo := repository.NewChartRepo(h.db)
-	chart, err := chartRepo.GetByDocumentAndID(docID, chartID)
-	if errors.Is(err, repository.ErrNotFound) {
+	chart, err := h.svc.Chart(docID, chartID)
+	if errors.Is(err, documents.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
 	}
@@ -442,18 +419,11 @@ type compareResponse struct {
 func (h *DocumentHandler) GetClaims(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	docRepo := repository.NewDocumentRepo(h.db)
-	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+	claims, err := h.svc.ListClaims(id)
+	if errors.Is(err, documents.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
-	} else if err != nil {
-		slog.Error("get document for claims failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
 	}
-
-	claimRepo := repository.NewClaimRepo(h.db)
-	claims, err := claimRepo.ListByPaper(id)
 	if err != nil {
 		slog.Error("list claims failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -484,18 +454,11 @@ func (h *DocumentHandler) GetClaims(w http.ResponseWriter, r *http.Request) {
 func (h *DocumentHandler) GetTables(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	docRepo := repository.NewDocumentRepo(h.db)
-	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+	tables, err := h.svc.ListTables(id)
+	if errors.Is(err, documents.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
-	} else if err != nil {
-		slog.Error("get document for tables failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
 	}
-
-	tableRepo := repository.NewPaperTableRepo(h.db)
-	tables, err := tableRepo.ListByPaper(id)
 	if err != nil {
 		slog.Error("list tables failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -526,18 +489,11 @@ func (h *DocumentHandler) GetTables(w http.ResponseWriter, r *http.Request) {
 func (h *DocumentHandler) GetMethods(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	docRepo := repository.NewDocumentRepo(h.db)
-	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+	methods, err := h.svc.ListMethods(id)
+	if errors.Is(err, documents.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
-	} else if err != nil {
-		slog.Error("get document for methods failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
 	}
-
-	methodRepo := repository.NewMethodRepo(h.db)
-	methods, err := methodRepo.ListByPaper(id)
 	if err != nil {
 		slog.Error("list methods failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -566,18 +522,11 @@ func (h *DocumentHandler) GetMethods(w http.ResponseWriter, r *http.Request) {
 func (h *DocumentHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	docRepo := repository.NewDocumentRepo(h.db)
-	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+	results, err := h.svc.ListResults(id)
+	if errors.Is(err, documents.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
-	} else if err != nil {
-		slog.Error("get document for results failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
 	}
-
-	resultRepo := repository.NewResultRepo(h.db)
-	results, err := resultRepo.ListByPaper(id)
 	if err != nil {
 		slog.Error("list results failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -607,18 +556,11 @@ func (h *DocumentHandler) GetResults(w http.ResponseWriter, r *http.Request) {
 func (h *DocumentHandler) GetCitations(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	docRepo := repository.NewDocumentRepo(h.db)
-	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+	citations, err := h.svc.ListCitations(id)
+	if errors.Is(err, documents.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
-	} else if err != nil {
-		slog.Error("get document for citations failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
 	}
-
-	citationRepo := repository.NewCitationRepo(h.db)
-	citations, err := citationRepo.ListByPaper(id)
 	if err != nil {
 		slog.Error("list citations failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -719,34 +661,21 @@ type evidenceGraphResponse struct {
 func (h *DocumentHandler) GetEvidenceGraph(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	docRepo := repository.NewDocumentRepo(h.db)
-	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+	graph, err := h.svc.EvidenceGraph(id)
+	if errors.Is(err, documents.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
-	} else if err != nil {
-		slog.Error("get document for evidence graph failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
 	}
-
-	claimRepo := repository.NewClaimRepo(h.db)
-	claims, err := claimRepo.ListByPaper(id)
 	if err != nil {
-		slog.Error("list claims for evidence graph failed", "error", err)
+		slog.Error("get evidence graph failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
 
-	claimResponses := make([]claimWithEvidenceResponse, 0, len(claims))
-	for _, c := range claims {
-		evidence, err := claimRepo.GetEvidence(c.ID)
-		if err != nil {
-			slog.Error("get evidence for claim failed", "claim_id", c.ID, "error", err)
-			writeError(w, http.StatusInternalServerError, "internal_error")
-			return
-		}
-		evResponses := make([]evidenceResponse, 0, len(evidence))
-		for _, e := range evidence {
+	claimResponses := make([]claimWithEvidenceResponse, 0, len(graph.Claims))
+	for _, c := range graph.Claims {
+		evResponses := make([]evidenceResponse, 0, len(c.Evidence))
+		for _, e := range c.Evidence {
 			evResponses = append(evResponses, evidenceResponse{
 				ID:              e.ID,
 				Page:            e.Page,
@@ -758,20 +687,14 @@ func (h *DocumentHandler) GetEvidenceGraph(w http.ResponseWriter, r *http.Reques
 			})
 		}
 		claimResponses = append(claimResponses, claimWithEvidenceResponse{
-			ID: c.ID, ClaimText: c.ClaimText, ClaimType: c.ClaimType,
-			Confidence: c.Confidence, SourcePage: c.SourcePage,
-			SourceText: c.SourceText, CreatedAt: c.CreatedAt,
+			ID: c.Claim.ID, ClaimText: c.Claim.ClaimText, ClaimType: c.Claim.ClaimType,
+			Confidence: c.Claim.Confidence, SourcePage: c.Claim.SourcePage,
+			SourceText: c.Claim.SourceText, CreatedAt: c.Claim.CreatedAt,
 			Evidence: evResponses,
 		})
 	}
 
-	tableRepo := repository.NewPaperTableRepo(h.db)
-	tables, err := tableRepo.ListByPaper(id)
-	if err != nil {
-		slog.Error("list tables for evidence graph failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
+	tables := graph.Tables
 	tableResponses := make([]egTableResp, 0, len(tables))
 	for _, t := range tables {
 		tableResponses = append(tableResponses, egTableResp{
@@ -781,13 +704,7 @@ func (h *DocumentHandler) GetEvidenceGraph(w http.ResponseWriter, r *http.Reques
 		})
 	}
 
-	methodRepo := repository.NewMethodRepo(h.db)
-	methods, err := methodRepo.ListByPaper(id)
-	if err != nil {
-		slog.Error("list methods for evidence graph failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
+	methods := graph.Methods
 	methodResponses := make([]egMethodResp, 0, len(methods))
 	for _, m := range methods {
 		methodResponses = append(methodResponses, egMethodResp{
@@ -796,13 +713,7 @@ func (h *DocumentHandler) GetEvidenceGraph(w http.ResponseWriter, r *http.Reques
 		})
 	}
 
-	resultRepo := repository.NewResultRepo(h.db)
-	results, err := resultRepo.ListByPaper(id)
-	if err != nil {
-		slog.Error("list results for evidence graph failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
+	results := graph.Results
 	resultResponses := make([]egResultResp, 0, len(results))
 	for _, res := range results {
 		resultResponses = append(resultResponses, egResultResp{
@@ -812,13 +723,7 @@ func (h *DocumentHandler) GetEvidenceGraph(w http.ResponseWriter, r *http.Reques
 		})
 	}
 
-	citationRepo := repository.NewCitationRepo(h.db)
-	citations, err := citationRepo.ListByPaper(id)
-	if err != nil {
-		slog.Error("list citations for evidence graph failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
+	citations := graph.Citations
 	citationResponses := make([]egCitationResp, 0, len(citations))
 	for _, c := range citations {
 		citationResponses = append(citationResponses, egCitationResp{
@@ -852,29 +757,14 @@ type createRelationshipRequest struct {
 	EvidenceText     *string `json:"evidence_text,omitempty"`
 }
 
-var validRelationshipTypes = map[string]bool{
-	repository.PaperRelationshipSupporting:         true,
-	repository.PaperRelationshipContradicting:      true,
-	repository.PaperRelationshipCiting:             true,
-	repository.PaperRelationshipSimilarMethodology: true,
-	repository.PaperRelationshipDifferentFindings:  true,
-}
-
 func (h *DocumentHandler) GetPaperRelationships(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	docRepo := repository.NewDocumentRepo(h.db)
-	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+	rels, err := h.svc.Relationships(id)
+	if errors.Is(err, documents.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
-	} else if err != nil {
-		slog.Error("get document for relationships failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
 	}
-
-	relRepo := repository.NewPaperRelationshipRepo(h.db)
-	rels, err := relRepo.ListByPaper(id)
 	if err != nil {
 		slog.Error("list paper relationships failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
@@ -895,8 +785,10 @@ func (h *DocumentHandler) GetPaperRelationships(w http.ResponseWriter, r *http.R
 func (h *DocumentHandler) CreatePaperRelationship(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	docRepo := repository.NewDocumentRepo(h.db)
-	if _, err := docRepo.Get(id); errors.Is(err, repository.ErrNotFound) {
+	// Existence is checked before the body is parsed, matching the endpoint's
+	// historical precedence: a missing source paper answers 404 even for a
+	// malformed payload.
+	if _, err := h.svc.GetMetadata(id); errors.Is(err, documents.ErrNotFound) {
 		writeError(w, http.StatusNotFound, "not_found")
 		return
 	} else if err != nil {
@@ -918,44 +810,23 @@ func (h *DocumentHandler) CreatePaperRelationship(w http.ResponseWriter, r *http
 		writeError(w, http.StatusBadRequest, "relationship_type_required")
 		return
 	}
-	if !validRelationshipTypes[req.RelationshipType] {
+
+	rel, err := h.svc.CreateRelationship(id, req.TargetPaperID, req.RelationshipType, req.EvidenceText)
+	switch {
+	case errors.Is(err, documents.ErrNotFound):
+		writeError(w, http.StatusNotFound, "not_found")
+		return
+	case errors.Is(err, documents.ErrInvalidRelationshipType):
 		writeError(w, http.StatusBadRequest, "invalid_relationship_type")
 		return
-	}
-
-	if req.TargetPaperID == id {
+	case errors.Is(err, documents.ErrSelfReference):
 		writeError(w, http.StatusBadRequest, "cannot_self_reference")
 		return
-	}
-
-	if _, err := docRepo.Get(req.TargetPaperID); errors.Is(err, repository.ErrNotFound) {
+	case errors.Is(err, documents.ErrTargetNotFound):
 		writeError(w, http.StatusNotFound, "target_paper_not_found")
 		return
-	} else if err != nil {
-		slog.Error("get target document failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	relID, err := repository.NewID()
-	if err != nil {
-		slog.Error("generate relationship id failed", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	rel := repository.PaperRelationship{
-		ID:               relID,
-		SourcePaperID:    id,
-		TargetPaperID:    req.TargetPaperID,
-		RelationshipType: req.RelationshipType,
-		EvidenceText:     req.EvidenceText,
-		CreatedAt:        time.Now().Unix(),
-	}
-
-	relRepo := repository.NewPaperRelationshipRepo(h.db)
-	if err := relRepo.Insert(rel); err != nil {
-		slog.Error("insert paper relationship failed", "error", err)
+	case err != nil:
+		slog.Error("create paper relationship failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
@@ -1040,44 +911,21 @@ func (h *DocumentHandler) Compare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	docRepo := repository.NewDocumentRepo(h.db)
-	var papers []services.PaperSummary
-
-	for _, docID := range req.DocumentIDs {
-		doc, err := docRepo.Get(docID)
-		if errors.Is(err, repository.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "document_not_found")
-			return
-		}
-		if err != nil {
-			slog.Error("get document for comparison failed", "error", err)
-			writeError(w, http.StatusInternalServerError, "internal_error")
-			return
-		}
-
-		summary, err := services.ExtractPaperSummary(r.Context(), client, doc.ID, doc.Title, doc.OriginalText)
-		if err != nil {
-			slog.Error("extract paper summary failed", "document_id", docID, "error", err)
-			writeError(w, http.StatusInternalServerError, "extraction_failed")
-			return
-		}
-		papers = append(papers, summary)
-	}
-
-	comparison, err := services.ComparePapers(r.Context(), client, papers)
-	if err != nil {
-		slog.Error("compare papers failed", "error", err)
+	comparison, err := h.svc.Compare(r.Context(), client, req.DocumentIDs)
+	switch {
+	case errors.Is(err, documents.ErrDocumentMissing):
+		writeError(w, http.StatusNotFound, "document_not_found")
+		return
+	case errors.Is(err, documents.ErrExtractionFailed):
+		writeError(w, http.StatusInternalServerError, "extraction_failed")
+		return
+	case errors.Is(err, documents.ErrComparisonFailed):
 		writeError(w, http.StatusInternalServerError, "comparison_failed")
 		return
-	}
-
-	// Track comparison event for analytics (Chunk 6.1).
-	eventID, _ := repository.NewID()
-	if eventID != "" {
-		_, _ = h.db.Exec(
-			`INSERT INTO analytics_events (id, event_type, entity_id, metadata, created_at) VALUES (?, 'comparison', ?, ?, ?)`,
-			eventID, strings.Join(req.DocumentIDs, ","), "", time.Now().Unix(),
-		)
+	case err != nil:
+		slog.Error("compare documents failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
 	}
 
 	writeJSON(w, http.StatusOK, compareResponse{
