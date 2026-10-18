@@ -168,6 +168,7 @@ jobs:
         working-directory: e2e
         env:
           BASE_URL: http://localhost:4173
+          API_URL: http://localhost:8080
         run: npx playwright test
 
       - uses: actions/upload-artifact@v4

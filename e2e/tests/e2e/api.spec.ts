@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test'
 
+// The Go service is an API only — the SPA has its own origin, so API specs
+// must not resolve against the UI baseURL.
+test.use({ baseURL: process.env.API_URL || 'http://localhost:8080' })
+
 test.describe('API Endpoints', () => {
   test('GET /api/auth/me returns 401 when not authenticated', async ({ request }) => {
     const response = await request.get('/api/auth/me')
