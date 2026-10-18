@@ -14,9 +14,21 @@ export function registerTokenProviderOnce(fn) {
   tokenProvider = fn
 }
 
+// API_BASE points at the Go API. Empty by default so local dev keeps using the
+// Vite /api proxy; deployed builds set VITE_API_BASE_URL because the SPA is
+// served from Cloudflare Pages, not from the Go binary.
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || ""
+
+// withBase prefixes a string path with API_BASE. Absolute URLs pass through.
+export function withBase(path) {
+  if (/^https?:\/\//.test(path)) return path
+  return `${API_BASE}${path}`
+}
+
 // authFetch behaves like fetch and additionally sends the Clerk bearer token
 // when one is available. Public endpoints still work with no token.
 export async function authFetch(input, init = {}) {
+  const url = typeof input === "string" ? withBase(input) : input
   const headers = new Headers(init.headers)
   if (tokenProvider) {
     try {
@@ -31,7 +43,7 @@ export async function authFetch(input, init = {}) {
       }
     }
   }
-  return fetch(input, { ...init, headers })
+  return fetch(url, { ...init, headers })
 }
 
 // clerkErrorMessage maps a Clerk attempt's error array to something a person

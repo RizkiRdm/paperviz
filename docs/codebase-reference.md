@@ -343,11 +343,12 @@ MCP constraints:
 | `INGESTION_ENABLED` | server | No | `true`. `false` returns 503 on document creation; read/share/library keep working |
 | `PIPELINE_MAX_CONCURRENCY` | server | No | `2`. Bounds concurrent pipelines, not model spend |
 | `DATABASE_PATH` | server, MCP, admin | No | `paperviz.db` |
-| `STATIC_DIR` | server | No | `frontend/dist` |
+| `ALLOWED_ORIGINS` | server | No | Comma-separated CORS allowlist; `http://localhost:5173` always allowed. Required in production so the deployed SPA origin can call the API |
 | `PORT` | server and Vite proxy | No | `8080` |
 | `LOG_FILE` | server | No | `paperviz.log.jsonl` |
 | `CLERK_SECRET_KEY` | server | Yes | Clerk session verification; startup fails if missing |
 | `VITE_CLERK_PUBLISHABLE_KEY` | frontend build | Yes | Inlined by Vite at build time |
+| `VITE_API_BASE_URL` | frontend build | No | Origin of the Go API for the deployed SPA. Empty locally — Vite proxies `/api` |
 | `PAPERVIZ_API_KEY` | MCP | Yes for MCP | Process-level MCP key |
 | `MIGRATIONS_DIR` | MCP, admin | No | `migrations` |
 

@@ -1,5 +1,7 @@
-# Backend-only image — Go binary serving API + embedded frontend
-# Used for: production deployment, API server, full-stack single-binary
+# Backend-only image — compiles and runs the Go API binary.
+# The SPA is built and served separately (Cloudflare Pages); this image holds
+# no frontend assets.
+# Used for: production deployment, API server.
 FROM docker.io/golang:1.25-alpine AS builder
 WORKDIR /build
 COPY go.mod go.sum ./

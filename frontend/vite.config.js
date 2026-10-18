@@ -7,9 +7,10 @@ import path from 'path'
 // defaults: the Tailwind v4 Vite plugin (styles are generated at build
 // time, no separate PostCSS config needed), and a proxy to the Go backend
 // during local dev so `npm run dev` can call /api/* without CORS headaches.
-// In production the built assets are served directly by the Go binary
-// (ARCHITECTURE.md: "single binary" architecture style) — no proxy needed
-// there, since frontend and backend share an origin.
+// The Go binary serves the API only — the SPA is deployed separately (Cloudflare
+// Pages today) and talks to it cross-origin via VITE_API_BASE_URL, with the
+// backend allowlisting that origin in ALLOWED_ORIGINS. Local dev leaves
+// VITE_API_BASE_URL unset so relative /api paths go through the proxy below.
 export default defineConfig(({ mode }) => {
   // Load .env from project root so PORT in .env matches the backend proxy
   // target. Vite's config function runs before .envDir is processed, so we

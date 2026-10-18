@@ -1,31 +1,19 @@
-# Stage 1 — Build frontend
-FROM node:24-alpine AS frontend
-WORKDIR /build
-COPY frontend/package*.json ./
-RUN npm ci
-COPY frontend/ .
-# Vite inlines VITE_* at build time, so the Clerk publishable key must be
-# present during this stage — it is not read at runtime. Render passes service
-# env vars as build args. Safe to bake in: the publishable key ships to every
-# browser anyway. The secret key is deliberately NOT referenced here.
-ARG VITE_CLERK_PUBLISHABLE_KEY
-RUN npm run build
-
-# Stage 2 — Build Go server
+# Go API image. Identical in purpose to Containerfile.backend — the SPA is
+# built and served separately (Cloudflare Pages), so there is no node stage and
+# no frontend assets in the runtime layer.
+# Stage 1 — Build Go server
 FROM docker.io/golang:1.25-alpine AS backend
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-COPY --from=frontend /build/dist ./frontend/dist
 RUN CGO_ENABLED=0 go build -o /server ./cmd/server
 
-# Stage 3 — Runtime (3.3 MB + binary = ~20 MB)
+# Stage 2 — Runtime (3.3 MB + binary = ~20 MB)
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata
 RUN adduser -D -h /app paperviz
 COPY --from=backend /server /app/server
-COPY --from=frontend /build/dist /app/frontend/dist
 # Migrations are read from disk at startup, not embedded in the binary. Without
 # this the server exits before binding a port.
 COPY --from=backend /build/migrations /app/migrations
@@ -36,7 +24,6 @@ RUN mkdir -p /data && chown paperviz:paperviz /data
 WORKDIR /app
 USER paperviz
 ENV DATABASE_PATH=/data/paperviz.db \
-    STATIC_DIR=/app/frontend/dist \
     MIGRATIONS_DIR=/app/migrations
 EXPOSE 8080
 CMD ["/app/server"]

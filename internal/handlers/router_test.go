@@ -3,112 +3,111 @@ package handlers
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	"paperviz/internal/app/credentials"
+	"paperviz/internal/external"
+	"paperviz/internal/testutil"
 )
 
-// newStaticFixture builds a temp staticDir with a dummy index.html and assets/app.js.
-func newStaticFixture(t *testing.T) string {
+// newTestRouter builds the real API router so route/CORS behaviour is asserted end to end.
+func newTestRouter(t *testing.T) http.Handler {
 	t.Helper()
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "index.html"), []byte("<html>spa-shell</html>"), 0o644); err != nil {
-		t.Fatalf("write index.html: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(dir, "assets"), 0o755); err != nil {
-		t.Fatalf("mkdir assets: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "assets", "app.js"), []byte("console.log('app');"), 0o644); err != nil {
-		t.Fatalf("write app.js: %v", err)
-	}
-	return dir
+	db := testutil.OpenTestDB(t)
+	return withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t))))
 }
 
-func TestSpaNotFound(t *testing.T) {
-	staticDir := newStaticFixture(t)
-	fileServer := http.FileServer(http.Dir(staticDir))
-	handler := spaNotFound(staticDir, fileServer)
+// TestAPIRootAndNoSPA asserts the binary serves the JSON API root and no longer falls back to an SPA shell.
+func TestAPIRootAndNoSPA(t *testing.T) {
+	handler := newTestRouter(t)
 
-	tests := []struct {
-		name           string
-		method         string
-		target         string
-		wantStatus     int
-		wantCTPrefix   string
-		wantBodySub    string
-		wantBodyAbsent string
-	}{
-		{
-			name:         "unknown_api_path_returns_json_404",
-			method:       http.MethodGet,
-			target:       "/api/nope",
-			wantStatus:   http.StatusNotFound,
-			wantCTPrefix: "application/json",
-			wantBodySub:  "not_found",
-		},
-		{
-			name:         "unknown_page_path_serves_index_html",
-			method:       http.MethodGet,
-			target:       "/research-paper-summarizer",
-			wantStatus:   http.StatusOK,
-			wantCTPrefix: "text/html",
-			wantBodySub:  "spa-shell",
-		},
-		{
-			name:         "deep_link_share_doc_serves_index_html",
-			method:       http.MethodGet,
-			target:       "/share/doc/tok123",
-			wantStatus:   http.StatusOK,
-			wantCTPrefix: "text/html",
-			wantBodySub:  "spa-shell",
-		},
-		{
-			name:         "existing_asset_served_from_disk",
-			method:       http.MethodGet,
-			target:       "/assets/app.js",
-			wantStatus:   http.StatusOK,
-			wantCTPrefix: "text/javascript",
-			wantBodySub:  "console.log('app');",
-		},
-		{
-			name:         "post_unknown_path_returns_json_404",
-			method:       http.MethodPost,
-			target:       "/nope",
-			wantStatus:   http.StatusNotFound,
-			wantCTPrefix: "application/json",
-			wantBodySub:  "not_found",
-		},
-		{
-			name:           "traversal_attempt_never_leaks_outside_static_dir",
-			method:         http.MethodGet,
-			target:         "/../../etc/passwd",
-			wantStatus:     http.StatusNotFound,
-			wantCTPrefix:   "application/json",
-			wantBodySub:    "not_found",
-			wantBodyAbsent: "root:",
-		},
-	}
+	t.Run("root_returns_json_healthcheck", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200 (body: %q)", rec.Code, rec.Body.String())
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, "application/json") {
+			t.Errorf("Content-Type = %q, want application/json", ct)
+		}
+		for _, want := range []string{`"status":"ok"`, `"service":"PaperViz API"`} {
+			if !strings.Contains(rec.Body.String(), want) {
+				t.Errorf("body %q missing %q", rec.Body.String(), want)
+			}
+		}
+	})
+
+	// The SPA now lives on Cloudflare Pages; every non-API path must 404 as JSON.
+	for _, target := range []string{"/index.html", "/upload", "/assets/app.js", "/api/nope"} {
+		t.Run("no_spa_fallback_"+target, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			handler.ServeHTTP(rec, httptest.NewRequest(tt.method, tt.target, nil))
+			handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, target, nil))
 
-			if rec.Code != tt.wantStatus {
-				t.Errorf("status = %d, want %d (body: %q)", rec.Code, tt.wantStatus, rec.Body.String())
+			if rec.Code != http.StatusNotFound {
+				t.Errorf("status = %d, want 404 (body: %q)", rec.Code, rec.Body.String())
 			}
-			if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, tt.wantCTPrefix) {
-				t.Errorf("Content-Type = %q, want prefix %q", ct, tt.wantCTPrefix)
+			body := rec.Body.String()
+			if !strings.Contains(body, "not_found") {
+				t.Errorf("body %q does not contain %q", body, "not_found")
 			}
-			if body := rec.Body.String(); !strings.Contains(body, tt.wantBodySub) {
-				t.Errorf("body %q does not contain %q", body, tt.wantBodySub)
-			}
-			if tt.wantBodyAbsent != "" && strings.Contains(rec.Body.String(), tt.wantBodyAbsent) {
-				t.Errorf("body leaked forbidden content %q: %q", tt.wantBodyAbsent, rec.Body.String())
+			if strings.Contains(body, "<html") {
+				t.Errorf("body looks like an SPA shell: %q", body)
 			}
 		})
 	}
+}
+
+// TestCORSMiddleware asserts the origin allowlist and preflight handling.
+func TestCORSMiddleware(t *testing.T) {
+	t.Setenv("ALLOWED_ORIGINS", "https://paperviz.pages.dev")
+
+	tests := []struct {
+		name        string
+		origin      string
+		wantAllowed bool
+	}{
+		{"allowlisted_pages_origin", "https://paperviz.pages.dev", true},
+		{"always_allowed_local_dev", "http://localhost:5173", true},
+		{"unknown_origin", "https://evil.example", false},
+		{"no_origin_header", "", false},
+	}
+
+	handler := newTestRouter(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+			if tt.origin != "" {
+				req.Header.Set("Origin", tt.origin)
+			}
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+
+			got := rec.Header().Get("Access-Control-Allow-Origin")
+			if tt.wantAllowed && got != tt.origin {
+				t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, tt.origin)
+			}
+			if !tt.wantAllowed && got != "" {
+				t.Errorf("Access-Control-Allow-Origin = %q, want empty", got)
+			}
+		})
+	}
+
+	t.Run("preflight_returns_204_without_auth", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodOptions, "/api/documents", nil)
+		req.Header.Set("Origin", "https://paperviz.pages.dev")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNoContent {
+			t.Errorf("preflight status = %d, want 204", rec.Code)
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(got, "POST") {
+			t.Errorf("Access-Control-Allow-Methods = %q, want it to contain POST", got)
+		}
+	})
 }
 
 func TestNoindexMiddleware(t *testing.T) {
@@ -133,16 +132,5 @@ func TestNoindexMiddleware(t *testing.T) {
 				t.Errorf("X-Robots-Tag = %q, want %q", got, tt.wantValue)
 			}
 		})
-	}
-}
-
-func TestSpaNotFoundHeadFallback(t *testing.T) {
-	staticDir := newStaticFixture(t)
-	handler := spaNotFound(staticDir, http.FileServer(http.Dir(staticDir)))
-
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodHead, "/dashboard", nil))
-	if rec.Code != http.StatusOK {
-		t.Errorf("HEAD deep link status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }

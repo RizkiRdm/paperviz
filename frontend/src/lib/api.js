@@ -9,7 +9,7 @@
 // error contract ({ "error": "<snake_case_code>" }) instead of a generic
 // "something went wrong."
 
-import { authFetch } from "@/lib/auth"
+import { authFetch, withBase } from "@/lib/auth"
 
 export class ApiError extends Error {
   constructor(code, status) {
@@ -190,7 +190,7 @@ export async function updateDocumentVisibility(documentId, visibility) {
 // never see an error and the upload flow is never blocked or delayed.
 export async function trackReferral(ref) {
   try {
-    await fetch("/api/share-referrals", {
+    await fetch(withBase("/api/share-referrals"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ref }),
