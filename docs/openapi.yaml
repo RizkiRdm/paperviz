@@ -89,7 +89,7 @@ paths:
     get:
       operationId: getMe
       summary: "Get current authenticated user"
-      description: "Returns the user associated with the current session cookie."
+      description: "Returns the user identified by the current Clerk auth state."
       tags: ["Authentication"]
       security:
         - clerkSessionToken: []

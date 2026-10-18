@@ -16,7 +16,7 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-09-21 — Chunk 12 deploy readiness 12.1-12.7 complete
+**Last updated:** 2026-10-18 — master refactor waves + CI/CD deploy pipeline
 
 > **Documentation verification note (2026-09-25):** entries below preserve project history and may describe earlier tool counts, routes, or validation results. For current behavior, verify `internal/mcp/tools.go`, `internal/handlers/router.go`, `frontend/src/App.jsx`, and the focused architecture/product documents. The current MCP surface has five deterministic tools; web ingestion runs the full pipeline in an in-process goroutine.
 
@@ -25,10 +25,11 @@
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Chunk 12 Deploy Readiness — 12.1 migrations + 12.2 env validation + 12.3 /healthz + 12.5 mcp-parity drift fix + 12.7 CI gate done; code lane complete, `go test 446 passed`
-- **Active task file:** `goals/chunk-12-deploy-readiness/plan.md` (Lane 1 complete; Lane 2 = human dashboard setup per plan)
-- **Blocked on / pending decision:** none — Lane 2 (Railway project/volume/env vars, Google/Stripe dashboard, DNS) is Don's action, doesn't block code
-- **Next action if resuming:** Human lane: create Railway project + volume for DATABASE_PATH, set 9 env vars, register OAuth redirect + Stripe webhook, DNS → then deploy and hit `/healthz` to verify DB
+- **Working on:** Master refactor (P01–P61, plan `.omo/plans/paperviz_master_refactor_plan.md`) on branch `refactor/master`, all committed+pushed. Landed: P01–P03 (inventory, canonical flow, routing/IA), P04–P06 (`ae56066` — result-page split), P07–P10 (`98e0def` — app services; handlers no longer import `internal/repository`), P08 (`b7c880c` — documents handlers split into 8 files), P28 (`a58f1d6` — MCP: `internal/mcp/server.go` has no LLM field, `cmd/mcp` no longer reads `GEMINI_API_KEY`), P40–P41 (`2ca3011` — account/annotation splits; dead `collections-panel.jsx` + `useCollections.js` deleted), P44–P49 (`e915130`) + ownership guard (`8879d63` — 7 section GETs + relationships routes behind `OptionalAuth` + `RequireDocAccess`, test `TestSectionRoutesRespectOwnershipOverRouter`)
+- **CI/CD (decided 2026-10-17, `3dc099e`/`dbfa751`, logged in `docs/decisions.md`):** `go-ci.yml` owns all gates (go, frontend lint+build, containers, e2e, MCP handshake); its `deploy` job runs on push to `main` or `refs/tags/v*` and deploys to Render prod via `.github/actions/render-deploy` (poll to live, then assert `/healthz` 200, `/api/collections` 401, `/api/auth/me` 401). `frontend-ci.yml` and `e2e.yml` deleted (folded into `go-ci.yml`). `release.yml` = workflow_dispatch SemVer tag cut (validates `x.y.z`, asserts green main HEAD, creates annotated tag, deploys directly because `GITHUB_TOKEN` pushes cannot trigger other workflows). GitHub secrets: `RENDER_API_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
+- **Active task file:** `.omo/plans/paperviz_master_refactor_plan.md`
+- **Blocked on / pending decision:** none
+- **Next action if resuming:** Wave H final audits (P50–P61: file-size gate, dep-direction, ownership table, E2E, MCP smoke, simplification), then PR `refactor/master` → `main` (merge triggers the go-ci deploy job → Render prod). P11–P14 and P15–P24 were audited as already satisfied (pipeline already split, zero `time.Sleep`, charts already decomposed into `charts_llm.go`/`grounding.go`/`evidence_extract.go`); P43 (DTO/presentation mappers) is the only open frontend item.
 
 ---
 
@@ -53,7 +54,7 @@ something that should stay frozen.)*
 - Chunk 5.3 Programmatic SEO foundation — done 2026-08-26 (`frontend/seo/explain-pages.json` publish registry, `/explain/:slug` route + `ExplainPage`, crawlable `frontend/public/explain/sleep-quality-executive-function.html`, `/sitemap.xml`, `robots.txt` Sitemap line, default `X-Robots-Tag: noindex, nofollow` on `/explain/*`)
 - Chunk 6.2 Usage Limits — done 2026-08-27 (Free/Pro/Research tiers, `user_tiers` table, fingerprint-based tracking, `UsageLimitMiddleware` on POST /api/documents, `GET /api/usage` endpoint, frontend `UsageDisplay` + `UpgradeCta` components)
 - Chunk 6.3 Cost Model — historical pricing analysis removed during documentation cleanup; current provider cost must be evaluated from live pricing
-- Chunk 6.4 Pricing & Packaging Experiment — historical experiment removed during documentation cleanup; current billing implementation is in `internal/handlers/billing.go`
+- Chunk 6.4 Pricing & Packaging Experiment — historical experiment removed during documentation cleanup; Stripe billing was removed entirely 2026-09-26 (see `docs/DECISIONS/ADR-003-clerk-auth.md`)
 - Chunk 7.1 Structured Research API — done 2026-08-29 (`docs/structured-research-api.md` — comprehensive API documentation for all endpoints)
 - Chunk 7.2 Canonical Research Output Contract — done 2026-08-29 (`docs/canonical-research-output-contract.md` — 15 entity schemas with provenance and uncertainty models)
 - Chunk 7.3 OpenAPI — done 2026-08-31 (`docs/openapi.yaml` — 1748-line OpenAPI 3.1.0 spec, 34 endpoints, 31 component schemas, session cookie auth, rate limits, error codes)
@@ -74,8 +75,8 @@ something that should stay frozen.)*
 - Docs consolidation (TASK-3) — archived superseded progress, task, and PRD files were removed during documentation cleanup; current state is maintained in `docs/PROJECT_STATE.md` and `docs/PRD.md`
 - Chart engine rework (C2-C17) — done 2026-09-08 (`internal/models/evidence.go` — NumericEvidence + EvidenceSource types; `internal/models/dataset.go` — CandidateDataset + DatasetPoint; `internal/models/chart_spec.go` — ChartSpec + BarData/LineData/ScatterData/PieData + ChartProvenance; `internal/services/evidence_extract.go` — ExtractNumericEvidence (5 regex patterns); `internal/services/table_extract.go` — ExtractTableData; `internal/services/dataset_build.go` — BuildCandidateDatasets; `internal/services/grounding.go` — ValidateGrounding (10 rules); `internal/services/charts.go` — GenerateChapterCharts (evidence→datasets→LLM plan, multi-chart per chapter); `internal/services/chart_regression_test.go` — 8 regression cases; `internal/services/chart_validation_test.go` — 5 real-paper validation cases; `frontend/src/components/data-chart.jsx` — grounding status badge + validation; `frontend/src/components/chart-card.jsx` — provenance display + unsupported state; 421 tests passing across 6 packages; `npm run build` clean)
 - Verification-polish chunk — done 2026-09-04 (`frontend/src/pages/result-page.jsx` ~313-328 badge gating + ~364-394 banner detail/claims opener/compare; `frontend/src/components/status-banners.jsx` 29+/12− hardened panel + badge; `internal/services/intake.go` ~154-172 claims fan-out tx; `save_pipeline_result_test.go` 3 new test cases; behavior: verification_failed now shows real `mismatch_detail` + claims opener + Compare-with-Original; Verified badge disabled when no claim_diff + aria-expanded on opener; ClaimComparisonPanel try/catch + empty state + count badge; pipeline writes one claims row per `OriginalClaims` in the same tx; `go test` 331 passed 7 pkgs; `npm run build` clean; screenshots snap-16/17 confirmed)
-- Chunk 11.1 Google OAuth — done 2026-09-10 (`internal/handlers/auth.go` — GoogleLogin + GoogleCallback handlers; `internal/repository/users.go` — UpsertByOAuth + GetByOAuth methods; `migrations/017_oauth_columns.sql` — oauth_provider, oauth_id columns; `frontend/src/pages/login-page.jsx` — "Continue with Google" button; `.env.example` — GOOGLE_CLIENT_ID/SECRET/REDIRECT_URL; 422 tests passing)
-- Chunk 11.2 Stripe Billing — done 2026-09-10 (`internal/handlers/billing.go` — CreateCheckoutSession, CreatePortalSession, HandleWebhook; `migrations/019_billing_columns.sql` — stripe_customer_id, subscription_tier, subscription_status; `.env.example` — STRIPE_SECRET_KEY/WEBHOOK_SECRET/PRICE_PRO/RESEARCH; `github.com/stripe/stripe-go/v79` added)
+- Chunk 11.1 Google OAuth — done 2026-09-10, **removed 2026-09-26 (ADR-003, superseded by Clerk 2026-10-13)**
+- Chunk 11.2 Stripe Billing — done 2026-09-10, **removed 2026-09-26 (ADR-003)**; `billing.go` and Stripe columns gone (migration 021 drops them)
 - Chunk 11.3 /agents Page — done 2026-09-10 (`frontend/src/pages/agents-page.jsx` — PNP install page with Claude Code/Desktop/Cursor/ChatGPT tabs; `internal/handlers/apikey.go` — GetApiKey + RegenerateApiKey; `migrations/018_api_key_column.sql` — api_key column; route `/agents` added)
 - Chunk 11.4 /account Page — done 2026-09-10 (`frontend/src/pages/account-page.jsx` — API key, usage, subscription management; `internal/handlers/account.go` — GetSummary endpoint; route `/account` added, `/dashboard` removed)
 - Chunk 11.5 Page Cuts — done 2026-09-10 (Removed: `/dashboard`, `/signup`, `/pricing`, `/compare`, `/compare-research-papers`, `/research-paper-summarizer`, `/figure-explanation`, `/explain/:slug`; Kept: `/`, `/agents`, `/login`, `/account`, `/upload`, share pages; deleted: signup-page.jsx, dashboard-page.jsx, compare-page.jsx, pricing-page.jsx, explain-page.jsx)
@@ -173,7 +174,7 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Frontend usage components: `frontend/src/components/usage-display.jsx`, `frontend/src/components/upgrade-cta.jsx`
 - Task/chunk docs: `docs/`
 - Cost model: historical analysis removed; current cost controls are documented in `docs/DATA_PIPELINE.md`
-- Pricing strategy: historical experiment removed; current billing routes are in `internal/handlers/billing.go`
+- Pricing strategy: historical experiment removed; Stripe billing routes removed 2026-09-26 (ADR-003)
 - Conversion tracking: `internal/handlers/analytics.go` (`TrackPricingView`, `TrackUpgradeIntent`)
 - Structured Research API docs: `docs/structured-research-api.md`
 - Canonical Research Output Contract: `docs/canonical-research-output-contract.md`
@@ -182,13 +183,13 @@ just a fast map: "if I need to change X, which file do I open".)*
 - MCP↔REST parity map: `docs/mcp-parity.md`
 - Structured research objects migration: `migrations/014_structured_research_objects.sql`
 - Structured research repos: `internal/repository/claims.go`, `internal/repository/tables.go`, `internal/repository/methods.go`, `internal/repository/results.go`, `internal/repository/citations.go`
-- Structured research API endpoints: `internal/handlers/documents.go` (GET /api/documents/:id/{claims,tables,methods,results,citations})
+- Structured research API endpoints: `internal/handlers/documents_sections.go` (GET /api/documents/:id/{claims,tables,methods,results,citations} — guarded by OptionalAuth + RequireDocAccess)
 - Evidence graph migration: `migrations/015_evidence_graph.sql`
 - Evidence graph repos: `internal/repository/claim_evidence.go`, `internal/repository/paper_relationships.go`
 - Evidence graph traversal: `internal/repository/claims.go` (GetEvidence), `internal/repository/evidence.go` (GetClaims)
-- Evidence graph API endpoints: `internal/handlers/documents.go` (GET evidence-graph, GET/POST relationships)
+- Evidence graph API endpoints: `internal/handlers/documents_readmodel.go` (GET evidence-graph), `internal/handlers/documents_relationships.go` (GET/POST relationships — guarded by RequireDocAccess)
 - Research map service: `internal/services/research_map.go`
-- Research map API endpoint: `internal/handlers/documents.go` (GET /api/documents/:id/research-map)
+- Research map API endpoint: `internal/handlers/documents_relationships.go` (GET /api/documents/:id/research-map)
 - Research map frontend: `frontend/src/components/research-map.jsx`
 - Relationship type constants: `internal/repository/types.go` (PaperRelationshipSupporting, etc.)
 - DOI/URL import external clients: `internal/external/crossref.go`, `internal/external/unpaywall.go`
@@ -203,11 +204,9 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Annotations handler: `internal/handlers/annotations.go` (POST/PUT/DELETE/GET /api/documents/:id/annotations)
 - Export service: `internal/services/export.go`
 - Export handler: `internal/handlers/export.go` (GET /api/documents/:id/export)
-- Annotation frontend: `frontend/src/components/annotation-panel.jsx` (row saveError/deleteError, loadError/createError Retry inline blocks)
+- Annotation frontend: `frontend/src/components/annotations/` + `frontend/src/hooks/useAnnotations.js` (split from 419-LOC `annotation-panel.jsx`, now 153 LOC)
 - Chart card frontend: `frontend/src/components/chart-card.jsx` (shareError Retry inline block)
-- Collections panel frontend: `frontend/src/components/collections-panel.jsx` (loadError/actionError Retry inline blocks)
-- Collections backend: `internal/services/collections.go`, `internal/handlers/collections.go`
-- Collections frontend: `frontend/src/lib/api.js` (listCollections, createCollection, getCollection, addDocumentToCollection, removeDocumentFromCollection), `frontend/src/components/collections-panel.jsx`
+- Collections frontend: backend unchanged (`internal/services/collections.go`, `internal/handlers/collections.go`, `frontend/src/lib/api.js` fns); the standalone `collections-panel.jsx` + `hooks/useCollections.js` were deleted as dead code (zero importers) in P40–P41 — the surviving add-to-collection UI is in `frontend/src/components/result/result-actions.jsx` driven by `hooks/useResultState.js`
 - Export collections join: `internal/services/export.go` (research context joins collections)
 - Charts service: `internal/services/charts.go` (`GenerateChapterCharts` — evidence→datasets→LLM plan; `tryExtractChartData` — image fallback path; `ReVisualizeCharts` — image re-visualization; failure categories `EXTRACTION_ERROR`/`DATASET_ERROR`/`CHART_SELECTION_ERROR`/`GROUNDING_ERROR`/`SCHEMA_ERROR`/`RENDER_ERROR`)
 - Chart evidence models: `internal/models/evidence.go` (NumericEvidence, EvidenceSource)
@@ -222,19 +221,17 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Chart validation tests: `internal/services/chart_validation_test.go` (5 real-paper cases)
 - Chart evidence tests: `internal/services/charts_evidence_test.go` (multi-dataset, provenance)
 - Comparison service: `internal/services/comparison.go` (ponytail ceiling comments 2026-09-04, 5 hits, zero logic change)
-- Verification UI: `frontend/src/pages/result-page.jsx` (~313-328 badge gating, ~364-394 banner detail + claims opener + compare)
+- Verification UI: badge gating in `frontend/src/components/result/result-header.jsx`; failure messages/status views in `frontend/src/components/result/status-views.jsx` (old `result-page.jsx` ~313–394 line refs died in the split)
 - Verification banners: `frontend/src/components/status-banners.jsx` (hardened panel + disabled badge)
 - Claims fan-out from verification: `internal/services/intake.go` (~154-172, writes one claims row per OriginalClaims in pipeline tx)
 - E2E test config: `e2e/playwright.config.ts`
-- E2E test specs: `e2e/tests/e2e/*.spec.ts` (landing, login, signup, dashboard, result, pricing, compare, share, explain, not-found, navigation, api)
+- E2E test specs: `e2e/tests/e2e/*.spec.ts` (landing, login, signup, account, result, agents, healthz, not-found, api)
 - E2E screenshots: `assets/*.png` (12 screenshots)
 - E2E test report: `report/E2E_TEST_REPORT.md`
-- OAuth handlers: `internal/handlers/auth.go` (GoogleLogin, GoogleCallback)
-- OAuth repository: `internal/repository/users.go` (UpsertByOAuth, GetByOAuth)
-- OAuth migration: `migrations/017_oauth_columns.sql`
+- Auth handler: `internal/handlers/auth.go` — `Me` only; Clerk owns signup/signin/sessions (Google OAuth handlers removed 2026-09-26, `sessions` table dropped in migration 022)
 - API key handler: `internal/handlers/apikey.go` (GetApiKey, RegenerateApiKey)
 - API key migration: `migrations/018_api_key_column.sql`
-- Billing handler: `internal/handlers/billing.go` (CreateCheckoutSession, CreatePortalSession, HandleWebhook)
+- Billing handler: removed 2026-09-26 with Stripe (ADR-003)
 - Billing migration: `migrations/019_billing_columns.sql`
 - Account handler: `internal/handlers/account.go` (GetSummary)
 - Agents page: `frontend/src/pages/agents-page.jsx`

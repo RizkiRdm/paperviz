@@ -17,7 +17,7 @@ PaperViz addresses this by treating research output as structured, inspectable d
 
 PaperViz is moving toward an agent-first product:
 
-1. A person signs in, manages billing, and obtains an API key.
+1. A person signs in (Clerk), stores their own model key (BYOK), and obtains a service API key.
 2. An AI agent uses PaperViz tools to ingest and retrieve research data.
 3. The web application remains available as a manual escape hatch for people who want to upload or paste a paper directly.
 
@@ -44,7 +44,7 @@ A person may need to:
 - choose Simplified or ELI5 output;
 - inspect verification and figure-grounding status;
 - annotate, organize, export, or share research context;
-- manage authentication, API keys, and billing.
+- manage authentication, API keys, and stored model keys.
 
 ### Student or researcher
 
@@ -60,7 +60,7 @@ The React application calls the Go HTTP API. Web and DOI/URL ingestion start the
 intake → simplify → verify claims → build evidence → plan figures → persist → poll result
 ```
 
-The HTTP server also serves the built React application, authentication, account management, billing, collections, annotations, sharing, exports, usage, and structured research endpoints.
+The HTTP server also serves the built React application, authentication, account management, collections, annotations, sharing, exports, usage, and structured research endpoints.
 
 ### MCP
 
@@ -146,7 +146,7 @@ This separation prevents a fluent explanation or chart title from being mistaken
 PaperViz stores research context as linked records rather than one opaque response:
 
 - documents and processing state;
-- users, sessions, API keys, and billing fields;
+- users (Clerk subject profile), API keys, and encrypted model credentials;
 - chapters and sections;
 - charts, chart data, provenance, and limited image blobs;
 - evidence, claims, and claim-evidence links;
@@ -162,7 +162,7 @@ Exact schemas live in [`../migrations/`](../migrations/) and repository code. Th
 - Extracted source text and derived research objects are stored in SQLite.
 - At most five embedded-image charts per document are sent through the image fallback path.
 - Document reads refresh the access timestamp used by expiry.
-- Expired sessions are removed at server startup; expired documents are swept at startup and hourly.
+- Expired documents are swept at server startup and hourly.
 - Sharing uses expiring public tokens and excludes source text from public document payloads.
 - Export includes structured research context and user-owned material, not original or simplified full text.
 

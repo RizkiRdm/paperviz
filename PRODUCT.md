@@ -99,9 +99,8 @@ MCP is additive to REST. It shares data and domain semantics but does not duplic
 
 ### Human and agent support
 
-- email/password and Google authentication;
-- session cookies and API keys;
-- Stripe checkout, portal, and webhook handling;
+- Clerk-hosted sign-up and sign-in;
+- service API keys and per-user encrypted model keys (BYOK);
 - usage and account summaries;
 - local stdio MCP server.
 
@@ -130,7 +129,7 @@ These gaps must be documented honestly and verified in code before being describ
 - Go 1.25 backend with `chi` and raw `database/sql`;
 - SQLite through `modernc.org/sqlite`, WAL enabled, no CGO;
 - React 19, Vite 8, Tailwind CSS 4, shadcn/ui, and Recharts;
-- direct Gemini HTTP integration;
+- direct model-provider integration (no gateway): Gemini, Anthropic, and OpenAI protocol via `github.com/zendev-sh/goai`, keys supplied per request;
 - no ORM;
 - no job queue or message broker;
 - no microservice split;

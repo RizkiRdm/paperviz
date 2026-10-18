@@ -7,11 +7,11 @@
 
 PaperViz supports two authentication modes:
 
-### Session-Based Auth (Authenticated Endpoints)
+### Bearer Token Auth (Authenticated Endpoints)
 
-- **Signup/Login:** Creates a `session_token` httpOnly cookie (7-day expiry)
-- **No API keys** — cookie-based authentication only
-- **Protected endpoints** require valid session cookie
+- **Identity is Clerk's** (ADR-003): signup, sign-in, and sessions are hosted by Clerk. There is no local `POST /api/auth/signup` or `POST /api/auth/login` — those return 404 by design, asserted by test.
+- **Send** `Authorization: Bearer <clerk session token>`; the server verifies it against Clerk's JWKS and yields 401 otherwise (no fallback identity).
+- **Service API keys** (`/api/auth/apikey`) are issued once and stored as digests for agent/MCP use; they are not accepted in place of the session token on these REST endpoints.
 
 ### Fingerprint-Based Auth (Unauthenticated Endpoints)
 
@@ -43,67 +43,15 @@ Limits reset on the 1st of each month.
 
 ### Authentication
 
-#### POST /api/auth/signup
-Create a new user account.
+Authentication is not served by this API:
 
-**Request:**
-```json
-{
-  "email": "string (required) — valid email address",
-  "password": "string (required) — minimum 8 characters"
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": "usr_abc123",
-  "email": "user@example.com"
-}
-```
-
-**Status codes:**
-- 201: Account created, session cookie set
-- 400: Invalid request (invalid_email, password_too_short)
-- 409: Email already taken
-
----
-
-#### POST /api/auth/login
-Authenticate an existing user.
-
-**Request:**
-```json
-{
-  "email": "string (required)",
-  "password": "string (required)"
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": "usr_abc123",
-  "email": "user@example.com"
-}
-```
-
-**Status codes:**
-- 200: Login successful, session cookie set
-- 400: Invalid request
-- 401: Invalid credentials
-
----
-
-#### POST /api/auth/logout
-End current session.
-
-**Response:** 200 OK (empty body, session cookie cleared)
+- `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/logout` → **404** (removed with the Clerk migration; a test asserts it). Sign-up, sign-in, and password recovery happen in Clerk; account sessions are revoked CLI-side with `go run ./cmd/admin revoke-sessions <email>`.
+- `GET /api/auth/apikey`, `POST /api/auth/apikey`, `POST /api/auth/apikey/regenerate` → issue/replace the one-time service API key.
 
 ---
 
 #### GET /api/auth/me
-Get current authenticated user.
+Get current authenticated user (Clerk bearer token required).
 
 **Response (200):**
 ```json
@@ -781,17 +729,14 @@ All errors follow consistent format:
 
 ## Examples
 
-### Create account
-```bash
-curl -X POST https://paperviz.com/api/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{"email": "you@example.com", "password": "securepass123"}'
-```
+### Sign up / sign in
 
-### Upload a paper (with session cookie)
+Authentication is Clerk-hosted (ADR-003); there is no signup endpoint on this API. Use your application's sign-in flow, then send the resulting session token as a bearer header in the examples below.
+
+### Upload a paper (authenticated)
 ```bash
 curl -X POST https://paperviz.com/api/documents \
-  -b "session_token=abc123" \
+  -H "Authorization: Bearer <clerk-session-token>" \
   -F "file=@paper.pdf" \
   -F "reading_level=simplified"
 ```
@@ -799,7 +744,7 @@ curl -X POST https://paperviz.com/api/documents \
 ### Paste text
 ```bash
 curl -X POST https://paperviz.com/api/documents \
-  -b "session_token=abc123" \
+  -H "Authorization: Bearer <clerk-session-token>" \
   -F "text=Your paper text here..." \
   -F "reading_level=eli5"
 ```
@@ -812,12 +757,13 @@ curl https://paperviz.com/api/documents/doc_abc123
 ### List your documents
 ```bash
 curl https://paperviz.com/api/documents \
-  -b "session_token=abc123"
+  -H "Authorization: Bearer <clerk-session-token>"
 ```
 
 ### Compare papers
 ```bash
 curl -X POST https://paperviz.com/api/documents/compare \
+  -H "Authorization: Bearer <clerk-session-token>" \
   -H "Content-Type: application/json" \
   -d '{"document_ids": ["doc_abc123", "doc_def456"]}'
 ```
@@ -825,7 +771,7 @@ curl -X POST https://paperviz.com/api/documents/compare \
 ### Create collection
 ```bash
 curl -X POST https://paperviz.com/api/collections \
-  -b "session_token=abc123" \
+  -H "Authorization: Bearer <clerk-session-token>" \
   -H "Content-Type: application/json" \
   -d '{"name": "ML Research"}'
 ```
@@ -833,7 +779,7 @@ curl -X POST https://paperviz.com/api/collections \
 ### Add paper to collection
 ```bash
 curl -X POST https://paperviz.com/api/collections/col_abc123/documents \
-  -b "session_token=abc123" \
+  -H "Authorization: Bearer <clerk-session-token>" \
   -H "Content-Type: application/json" \
   -d '{"document_id": "doc_xyz789"}'
 ```
@@ -841,7 +787,7 @@ curl -X POST https://paperviz.com/api/collections/col_abc123/documents \
 ### Share a paper
 ```bash
 curl -X POST https://paperviz.com/api/documents/doc_abc123/share \
-  -b "session_token=abc123"
+  -H "Authorization: Bearer <clerk-session-token>"
 ```
 
 ### Access shared paper
@@ -853,7 +799,7 @@ curl https://paperviz.com/share/doc/abc123xyz
 
 ## Limitations (MVP)
 
-- **No API keys** — session cookie auth only
+- **Session auth only** — REST endpoints take the Clerk session token as a bearer header; service API keys exist but are not accepted on these routes
 - **No webhooks** — polling required for async operations
 - **No batch operations** — one document at a time
 - **No streaming** — synchronous responses only

@@ -37,7 +37,7 @@ Document `id` (`repository.NewID()`). Used in `processing_stages` and pipeline l
 
 ### User / Tenant ID
 
-`user_id` from `session_token` cookie via `RequireAuth` → `context.WithValue(userIDKey)`. Logged via `UserIDFromContext` where applicable; anonymous docs use fingerprint.
+`user_id` from the verified Clerk bearer token via `RequireAuth`/`OptionalAuth` → `context.WithValue(userIDKey)`. Logged via `UserIDFromContext` where applicable; anonymous docs use fingerprint.
 
 ## 4. Structured Logging
 
@@ -165,13 +165,10 @@ No Alertmanager/PagerDuty.
 
 * No metrics endpoint (latency histograms, error rates, token usage not collected).
 * No tracing beyond RequestID.
-* No health endpoint.
-* Expired session accumulation — mitigated: `DeleteExpired()` on startup (no periodic sweep).
-* OAuth state previously hardcoded — fixed: random nonce via `crypto/rand` + httpOnly cookie 10m TTL.
 
 ## 13. Planned Improvements
 
-* Metrics: per-stage latency histogram, Gemini token cost per document, rate-limit hit counters.
-* Health: `/healthz` + DB pool check.
+* Metrics: per-stage latency histogram, model token cost per document, rate-limit hit counters.
 * Tracing: propagate `id` through pipeline `ctx`.
-* Periodic session sweeper.
+
+Shipped since earlier drafts: `/healthz` with DB ping (2026-09, chunk 12.3); session storage removed entirely with the Clerk migration, so no session sweeper is needed.

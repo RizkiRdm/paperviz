@@ -102,7 +102,7 @@ The local stdio server is implemented. The full remote agent-first journey is no
 |---|---|---|---|
 | Primary web | Input | `/` | Manual paper ingestion |
 | Primary web | Processing and result | `/:documentId` | Full paper-understanding journey |
-| Supporting web | Account | `/account` | API key, usage, subscription, account context |
+| Supporting web | Account | `/account` | API key, usage, stored model keys, account context |
 | Supporting web | Authentication | `/login`, `/signup` | Session entry |
 | Supporting web | Agent setup | `/agents` | Generated client configuration; remote transport currently mismatched |
 | Secondary web | Public sharing | `/share/doc/:shareToken`, `/share/fig/:shareToken` | Expiring shared research views |
@@ -122,7 +122,7 @@ Source: `frontend/src/App.jsx`.
 | `/dashboard` | Redirect | Compatibility redirect to `/account` |
 | `/login` | `LoginPage` | Login |
 | `/signup` | `SignupPage` | Signup |
-| `/account` | `AccountPage` | Account, API key, usage, billing |
+| `/account` | `AccountPage` | Account, API key, usage |
 | `/agents` | `AgentsPage` | MCP client configuration |
 | `/share/fig/:shareToken` | `ShareFigurePage` | Public figure |
 | `/share/doc/:shareToken` | `SharePaperPage` | Public paper |
@@ -145,7 +145,7 @@ Source: `internal/handlers/router.go`.
 | User management | title, save, delete, list, stats |
 | Research context | annotations, collections, export |
 | Sharing | document/figure token generation, revocation, visibility, public views |
-| Identity | signup, login, logout, session, Google OAuth, API key |
+| Identity | Clerk-hosted signup, login, session, recovery; service API key |
 | Billing | checkout, portal, webhook |
 | Usage and analytics | usage, account analytics, referral and upgrade events |
 

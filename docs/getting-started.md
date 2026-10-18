@@ -11,7 +11,7 @@ Install:
 - npm
 - `curl`
 
-You also need a Google Gemini API key. The HTTP server validates Google OAuth and Stripe environment variables at startup, so local configuration needs non-empty values for those variables too. Placeholders are enough for booting the server, but real integrations require real credentials.
+The server validates two required variables at startup: `CREDENTIAL_ENCRYPTION_KEY` and `CLERK_SECRET_KEY` (Clerk owns authentication — see `docs/DECISIONS/ADR-003-clerk-auth.md`). The frontend build additionally needs `VITE_CLERK_PUBLISHABLE_KEY`. Get a free Clerk application for local development; no other third-party account is required.
 
 ## 2. Get source and install dependencies
 
@@ -40,6 +40,9 @@ A minimal bootable local file looks like this:
 
 ```dotenv
 CREDENTIAL_ENCRYPTION_KEY=base64-encoded-32-random-bytes
+CLERK_SECRET_KEY=sk_test_...
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+
 INGESTION_ENABLED=true
 PIPELINE_MAX_CONCURRENCY=2
 
@@ -57,8 +60,9 @@ openssl rand -base64 32
 Notes:
 
 - `CREDENTIAL_ENCRYPTION_KEY` must be present and valid; the server exits at startup otherwise. Losing or rotating it makes every stored user model key unreadable.
+- `CLERK_SECRET_KEY` must be present too; the server exits without it because a wrong key makes every login fail while `/healthz` still reports ok.
 - Users bring their own model key through the web UI, so no model credential belongs in this file.
-- To run the local MCP server, export `GEMINI_API_KEY` in that process only. `cmd/mcp` calls the provider directly from your machine.
+- The MCP process reads only `PAPERVIZ_API_KEY` (plus `DATABASE_PATH`/`MIGRATIONS_DIR`); it is deterministic and calls no model (P28), so no model key is needed for it either.
 - The server reads process environment variables directly; it does not load `.env` itself.
 - Never commit `.env.development` or real credentials. `.env.example` is the only tracked env file.
 - Production has no env file. Render's env vars are the single production source of truth.
@@ -84,8 +88,7 @@ Expected startup behavior:
 - migrations load from `migrations/`;
 - SQLite is created at `DATABASE_PATH`;
 - WAL, foreign keys, and `synchronous=NORMAL` are enabled;
-- expired sessions are removed;
-- the expiry sweep starts;
+- the document expiry sweep starts;
 - HTTP server listens on `PORT`.
 
 Verify database-backed health:
@@ -112,7 +115,7 @@ npm --prefix frontend run dev
 
 Open `http://localhost:5173`.
 
-Vite proxies `/api` to `http://localhost:${PORT}`. Keep backend and frontend terminals running independently during development.
+Vite proxies `/api` to `http://localhost:${PORT}`. Vite reads `VITE_*` variables from the environment, so if the page reports "publishable key is not set", run `set -a; source .env.development; set +a` in the frontend terminal before `npm run dev`. Keep backend and frontend terminals running independently during development.
 
 ## 6. Analyze your first paper
 
@@ -162,12 +165,12 @@ go build -o paperviz-mcp ./cmd/mcp
 MCP startup requires:
 
 ```dotenv
-GEMINI_API_KEY=your-gemini-key
-GEMINI_MODEL=gemini-3.1-flash-lite
 DATABASE_PATH=/absolute/path/to/paperviz/paperviz.db
 MIGRATIONS_DIR=/absolute/path/to/paperviz/migrations
 PAPERVIZ_API_KEY=local-mcp-key
 ```
+
+No model key: as of P28 the MCP server is deterministic end to end and calls no provider.
 
 Use the same absolute `DATABASE_PATH` as the web server when both processes should read the same documents.
 
@@ -256,8 +259,9 @@ BASE_URL=http://localhost:8080 npm --prefix e2e test
 
 | Symptom | Meaning | Action |
 |---|---|---|
-| `GEMINI_API_KEY environment variable is required` | Required key missing | Export a real key before starting |
-| Google or Stripe variable required | Fail-loud startup validation | Add non-empty local values; use real credentials for those flows |
+| `CREDENTIAL_ENCRYPTION_KEY environment variable is required` | Required secret missing or malformed | `openssl rand -base64 32` and export it before starting |
+| `CLERK_SECRET_KEY environment variable is required` | Clerk secret missing | Export a `sk_test_...`/`sk_live_...` value from your Clerk application |
+| Frontend shows "publishable key is not set" | `VITE_CLERK_PUBLISHABLE_KEY` absent at Vite start/build | Source `.env.development` in that shell, or use `make frontend/dist` for builds |
 | `failed to load migrations` | Server started outside expected layout or migration file missing | Run from repository root or correct working directory |
 | `failed to open database` | SQLite path or permissions invalid | Check `DATABASE_PATH` and directory permissions |
 | `/healthz` returns `db_unreachable` | Database ping or query failed | Check database file, filesystem, and server logs |
