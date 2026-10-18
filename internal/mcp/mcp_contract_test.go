@@ -32,7 +32,7 @@ func newTestDB(t *testing.T) *sql.DB {
 // test suite.
 func newTestServer(t *testing.T) *MCPServer {
 	t.Helper()
-	return NewMCPServer(newTestDB(t), nil, "test-key")
+	return NewMCPServer(newTestDB(t), "test-key")
 }
 
 // TestMCPHandshake_ListsLockedTools connects a real client to the server over

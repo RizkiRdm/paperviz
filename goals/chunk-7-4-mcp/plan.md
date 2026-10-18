@@ -10,13 +10,14 @@
 ## Dependencies
 - `github.com/modelcontextprotocol/go-sdk/mcp` — Official Go SDK
 
-## Tools to Expose (from roadmap)
-1. `analyze_paper` — Upload and analyze a paper (wraps POST /api/documents)
-2. `get_summary` — Get simplified text for a paper
-3. `get_figures` — Get charts/figures for a paper
-4. `get_claims` — Get claim verification data
-5. `get_evidence` — Get evidence references
-6. `compare_papers` — Compare 2-10 papers
+## Tools to Expose (locked to 5 — Chunk 11 MCP boundary)
+1. `ingest_document` — deterministic text ingestion (replaces `analyze_paper`; no LLM, no pipeline)
+2. `search_documents` — global title search, stateless
+3. `get_document` — selective retrieval via `include` (replaces `get_summary`)
+4. `get_evidence` — evidence + claims with provenance (merges `get_claims`)
+5. `get_figures` — structured chart data + provenance
+
+Legacy names `analyze_paper`, `get_summary`, `get_claims`, `compare_papers` are deleted; compare stays in-app only.
 
 ### Tools Not Implemented (by design)
 - `get_tables` — No product reason yet; tables extracted on-demand per paper
