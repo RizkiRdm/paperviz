@@ -27,13 +27,17 @@ runs:
         SERVICE_ID: ${{ inputs.service-id }}
         BRANCH: ${{ inputs.branch }}
       run: |
-        resp=$(curl -sf -X POST "https://api.render.com/v1/services/${SERVICE_ID}/deploys" \
+        body=$(mktemp)
+        code=$(curl -sS -o "$body" -w '%{http_code}' -X POST "https://api.render.com/v1/services/${SERVICE_ID}/deploys" \
           -H "Authorization: Bearer ${RENDER_API_KEY}" \
           -H "accept: application/json" \
           -H "content-type: application/json" \
           -d "{\"branch\": \"${BRANCH}\", \"clear_cache\": false}") || {
-            echo "::error::Render deploy creation failed"; exit 1; }
-        id=$(echo "$resp" | jq -r '.deploy.id // empty')
+            echo "::error::Render deploy request failed: $(cat "$body")"; exit 1; }
+        resp=$(cat "$body")
+        [ "$code" = "200" ] || { echo "::error::Render deploy creation returned ${code}: ${resp}"; exit 1; }
+        # Render returns the deploy object flat (id/status at top level), not nested under .deploy
+        id=$(echo "$resp" | jq -r '.id // empty')
         [ -n "$id" ] || { echo "::error::no deploy id in response: $resp"; exit 1; }
         echo "id=$id" >> "$GITHUB_OUTPUT"
         echo "Created deploy $id (branch $BRANCH)"
@@ -42,13 +46,14 @@ runs:
       shell: bash
       env:
         RENDER_API_KEY: ${{ inputs.api-key }}
+        SERVICE_ID: ${{ inputs.service-id }}
         DEPLOY_ID: ${{ steps.deploy.outputs.id }}
       run: |
         # Render deploys are async; cap wait at 15 min (60 x 15s)
         for i in $(seq 1 60); do
-          status=$(curl -sf "https://api.render.com/v1/deploys/${DEPLOY_ID}" \
+          status=$(curl -sS "https://api.render.com/v1/services/${SERVICE_ID}/deploys/${DEPLOY_ID}" \
             -H "Authorization: Bearer ${RENDER_API_KEY}" \
-            -H "accept: application/json" | jq -r '.deploy.status // "unknown"')
+            -H "accept: application/json" | jq -r '.status // "unknown"')
           echo "[$i/60] ${DEPLOY_ID}: ${status}"
           case "$status" in
             live) exit 0 ;;
