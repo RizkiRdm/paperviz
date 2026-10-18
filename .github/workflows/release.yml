@@ -40,18 +40,21 @@ jobs:
             echo "::error::tag v${VERSION} already exists — tags are immutable, cut a new one"; exit 1
           fi
           # SemVer gate per AGENTS.md: tag only a state that passed the full CI gate.
-          # Filter to push-event suites so this dispatch run doesn't block itself.
+          # Gate on the push-event go-ci run for this exact SHA. The check-runs API has no
+          # check_suite.event field, so filtering check-runs by event never matches.
           sha=$(git rev-parse HEAD)
           echo "Checking CI for ${sha}"
-          gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/check-runs" --paginate \
-            --jq '[.check_runs[] | select(.check_suite.event == "push")] | length as $n |
-                  (if $n == 0 then error("no push check-runs found") else . end),
-                  (.[] | select(.status != "completed") | "CI still running: \(.name)" | halt_error),
-                  (.[] | select((.conclusion // "") as $c |
-                      ($c != "success") and ($c != "skipped") and ($c != "neutral")) |
-                    "CI red: \(.name) → \(.conclusion)" | halt_error)' \
-            || { echo "::error::main HEAD is not green — merge CI must pass before tagging"; exit 1; }
-          echo "All checks green"
+          run=$(gh run list --workflow go-ci.yml --branch main --commit "$sha" \
+                  --event push --limit 1 --json databaseId,status,conclusion \
+                  --jq '.[0] // empty')
+          [ -n "$run" ] || { echo "::error::no push CI run for ${sha} — merge CI must run before tagging"; exit 1; }
+          case "$(echo "$run" | jq -r .status)" in
+            completed) ;;
+            *) echo "::error::CI still running: $run"; exit 1 ;;
+          esac
+          [ "$(echo "$run" | jq -r .conclusion)" = "success" ] \
+            || { echo "::error::CI red: $run"; exit 1; }
+          echo "CI green for ${sha}"
 
       - name: Create annotated SemVer tag
         run: |
