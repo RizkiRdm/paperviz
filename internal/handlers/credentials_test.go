@@ -6,32 +6,23 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 
+	"paperviz/internal/app/credentials"
 	"paperviz/internal/external"
-	"paperviz/internal/repository"
+	"paperviz/internal/testutil"
 )
 
 const testModelKey = "AIzaSyD-SUPER-SECRET-USER-KEY-9999"
 
 func openCredentialHandlerDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-
+	db := testutil.OpenTestDB(t)
 	for _, id := range []string{"u1", "u2"} {
-		if err := repository.NewUserRepo(db).Insert(repository.User{
-			ID: id, Email: id + "@example.com", PasswordHash: "x", CreatedAt: 1,
-		}); err != nil {
-			t.Fatalf("seed user %s: %v", id, err)
-		}
+		testutil.SeedUser(t, db, id)
 	}
 	return db
 }
@@ -126,7 +117,7 @@ func TestStoredCredentialDecrypts(t *testing.T) {
 		t.Fatalf("status = %d; body %s", w.Code, w.Body.String())
 	}
 
-	stored, err := repository.NewCredentialRepo(db).GetDefault("u1")
+	stored, err := credentials.NewStore(db, cipher).GetDefault("u1")
 	if err != nil {
 		t.Fatalf("get default: %v", err)
 	}
@@ -226,7 +217,7 @@ func TestCredentialCreateRejectsUnknownProvider(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "unsupported_provider") {
 		t.Fatalf("body = %q, want unsupported_provider", w.Body.String())
 	}
-	list, err := repository.NewCredentialRepo(db).ListByUser("u1")
+	list, err := credentials.NewStore(db, testCipher(t)).List("u1")
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -298,7 +289,7 @@ func TestCredentialCrossUserAccessDenied(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("cross-user delete status = %d", rec.Code)
 	}
-	if _, err := repository.NewCredentialRepo(db).GetByID("u1", created.ID); err != nil {
+	if _, err := credentials.NewStore(db, testCipher(t)).GetByID("u1", created.ID); err != nil {
 		t.Fatalf("cross-user delete removed the row: %v", err)
 	}
 

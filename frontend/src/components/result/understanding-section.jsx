@@ -112,7 +112,10 @@ export function UnderstandingSection({
 
       {textCopyError && (
         <p className="mb-4 -mt-2 text-[11px] text-[#ea580c]" role="alert">
-          Couldn&apos;t copy automatically. Select the text and press Ctrl+C / Cmd+C.
+          Couldn&apos;t copy automatically. Select the text and press Ctrl+C / Cmd+C.{" "}
+          <button type="button" onClick={handleCopyText} className="font-medium text-[#2563eb] hover:text-[#1e40af] transition-colors">
+            Retry
+          </button>
         </p>
       )}
 

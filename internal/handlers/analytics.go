@@ -4,7 +4,8 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
-	"paperviz/internal/repository"
+
+	"paperviz/internal/app/analytics"
 )
 
 // AnalyticsHandler serves aggregate usage metrics for the dashboard.
@@ -33,8 +34,7 @@ func (h *AnalyticsHandler) TrackUpgradeIntent(w http.ResponseWriter, r *http.Req
 
 // GetSummary returns the aggregate usage metrics as JSON.
 func (h *AnalyticsHandler) GetSummary(w http.ResponseWriter, r *http.Request) {
-	repo := repository.NewAnalyticsRepo(h.db)
-	summary, err := repo.GetSummary()
+	summary, err := analytics.Summary(h.db)
 	if err != nil {
 		slog.Error("get analytics summary failed", "error", err)
 		writeError(w, http.StatusInternalServerError, "internal_error")

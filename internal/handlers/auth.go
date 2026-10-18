@@ -2,10 +2,11 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
 	"log/slog"
 	"net/http"
 
-	"paperviz/internal/repository"
+	"paperviz/internal/app/users"
 )
 
 // AuthHandler serves the endpoints that still belong to PaperViz after Clerk
@@ -16,11 +17,11 @@ import (
 // on purpose — a local credential path is one Clerk cannot revoke, so leaving a
 // second one behind would reintroduce the exact failure the pivot removed.
 type AuthHandler struct {
-	db *sql.DB
+	users *users.Service
 }
 
 func NewAuthHandler(db *sql.DB) *AuthHandler {
-	return &AuthHandler{db: db}
+	return &AuthHandler{users: users.New(db)}
 }
 
 // userResponse is the wire shape for user data in responses.
@@ -38,9 +39,9 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := repository.NewUserRepo(h.db).GetByID(userID)
+	user, err := h.users.GetByID(userID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, http.StatusUnauthorized, "unauthenticated")
 			return
 		}

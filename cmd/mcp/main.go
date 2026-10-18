@@ -1,8 +1,8 @@
 // Command mcp is PaperViz's MCP server entrypoint. It exposes 5 tools
 // (ingest_document, search_documents, get_document, get_figures, get_evidence)
-// over stdio transport. No LLM calls in any tool path.
-// Configuration comes from environment variables — same DB and Gemini key as
-// the main server, so both can share one database.
+// over stdio transport. No LLM calls in any tool path, so no model key is
+// required — configuration comes from environment variables and the same DB
+// as the main server.
 package main
 
 import (
@@ -12,22 +12,11 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"paperviz/internal/external"
 	papervizMCP "paperviz/internal/mcp"
 	"paperviz/internal/repository"
 )
 
 func main() {
-	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
-	if geminiAPIKey == "" {
-		log.Fatal("GEMINI_API_KEY environment variable is required")
-	}
-
-	geminiModel := os.Getenv("GEMINI_MODEL")
-	if geminiModel == "" {
-		geminiModel = external.ProviderGemini.DefaultModel()
-	}
-
 	dbPath := os.Getenv("DATABASE_PATH")
 	if dbPath == "" {
 		dbPath = "paperviz.db"
@@ -49,13 +38,7 @@ func main() {
 	}
 	defer db.Close()
 
-	tr := external.NewTransport()
-	gemini, err := tr.For(external.ProviderGemini, geminiAPIKey, geminiModel)
-	if err != nil {
-		log.Fatalf("failed to build llm client: %v", err)
-	}
-
-	srv := papervizMCP.NewMCPServer(db, gemini, papervizAPIKey)
+	srv := papervizMCP.NewMCPServer(db, papervizAPIKey)
 
 	if err := srv.Server().Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatalf("MCP server failed: %v", err)

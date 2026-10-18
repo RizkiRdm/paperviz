@@ -14,7 +14,7 @@ import (
 	clerkuser "github.com/clerk/clerk-sdk-go/v2/user"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"paperviz/internal/repository"
+	"paperviz/internal/app/users"
 	"paperviz/internal/services"
 )
 
@@ -73,11 +73,12 @@ var errUnauthenticated = errors.New("unauthenticated")
 
 // AuthMiddleware resolves a verified Clerk identity onto a local users row.
 type AuthMiddleware struct {
-	db *sql.DB
+	db    *sql.DB
+	users *users.Service
 }
 
 func NewAuthMiddleware(db *sql.DB) *AuthMiddleware {
-	return &AuthMiddleware{db: db}
+	return &AuthMiddleware{db: db, users: users.New(db)}
 }
 
 // RequireAuth rejects requests without a valid Clerk session token.
@@ -121,8 +122,7 @@ func (m *AuthMiddleware) resolveUserID(ctx context.Context) (string, error) {
 		return "", errUnauthenticated
 	}
 
-	users := repository.NewUserRepo(m.db)
-	local, err := users.GetByID(claims.Subject)
+	local, err := m.users.GetByID(claims.Subject)
 	if err == nil {
 		return local.ID, nil
 	}
@@ -138,7 +138,7 @@ func (m *AuthMiddleware) resolveUserID(ctx context.Context) (string, error) {
 	if email == "" {
 		return "", fmt.Errorf("clerk user %s has no primary email", claims.Subject)
 	}
-	if err := users.UpsertClerkUser(claims.Subject, email, time.Now().Unix()); err != nil {
+	if err := m.users.ProvisionClerk(claims.Subject, email, time.Now().Unix()); err != nil {
 		return "", err
 	}
 	return claims.Subject, nil

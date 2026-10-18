@@ -11,7 +11,7 @@ export default function DataChart({ chartData, title, provenance }) {
     let disposed = false
     import("recharts")
       .then((mod) => { if (!disposed) setRecharts(mod) })
-      .catch(() => { if (!disposed) setLoadFailed(true) })
+      .catch((err) => { console.error("Chart component failed to load", err); if (!disposed) setLoadFailed(true) })
     return () => { disposed = true }
   }, [])
 

@@ -72,11 +72,11 @@ PDF: no retry, return partial + Warn
 
 ### Idempotent Operations
 
-* `GET /api/documents/:id`, `GET /share/doc/:token` (visit++ is `UPDATE ... SET visits=visits+1` but safe to repeat), `POST /api/auth/logout` (deletes session, clears cookie).
+* `GET /api/documents/:id`, `GET /share/doc/:token` (visit++ is `UPDATE ... SET visits=visits+1` but safe to repeat).
 
 ### Non-Idempotent Operations
 
-* `POST /api/documents` (creates document + pipeline run), `POST /api/auth/signup` (unique email), `POST /api/documents/:id/share` (generates new `share_token`).
+* `POST /api/documents` (creates document + pipeline run), `POST /api/documents/:id/share` (generates new `share_token`).
 
 ### Idempotency Strategy
 
@@ -162,8 +162,7 @@ intake → simplify → verify → chapters/evidence → figures → persist
 
 ## 12. Known Reliability Risks
 
-* No periodic sweeping of expired sessions (only on startup).
-* In-process background processing shares the single SQLite connection; long Gemini latency can keep a document in `processing`, and there is no durable replay mechanism.
+* In-process background processing shares the single SQLite connection; long model latency can keep a document in `processing`, and there is no durable replay mechanism.
 * Leaked PDF goroutines on timeout remain running until completion (observable via Warn, not bounded).
 * Single SQLite file is SPOF; no replica/healthcheck beyond `WAL` + `synchronous=NORMAL`.
 

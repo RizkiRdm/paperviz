@@ -74,14 +74,14 @@ PaperViz treats research output as structured, inspectable data:
 |---|---|---|
 | PDF and pasted-text web ingestion | Implemented | Validates input, stores document, starts full pipeline |
 | DOI and URL web ingestion | Implemented | Fetches source and starts full pipeline |
-| Simplified and ELI5 output | Implemented | Gemini-backed transformation |
+| Simplified and ELI5 output | Implemented | Model-backed transformation on the user's own key (Gemini/Anthropic/OpenAI) |
 | Claim-diff verification | Implemented | Persists mismatch state and detail |
 | Evidence-grounded charts | Implemented | Deterministic extraction, dataset construction, and grounding |
 | Structured research objects | Implemented | Claims, evidence, tables, methods, results, citations, relationships |
-| Email/password authentication | Implemented | Signup, login, session, logout |
-| Google OAuth | Implemented in source | Provider configuration required for live use |
+| Authentication (Clerk) | Implemented | Clerk-hosted signup, sign-in, sessions, recovery; local `/api/auth/signup` and `/api/auth/login` return 404 (ADR-003) |
+| Google OAuth | Removed | Deleted 2026-09-26; superseded by Clerk (ADR-003) |
 | API-key management | Implemented | Retrieve and regenerate user key |
-| Stripe billing | Implemented in source | Checkout, portal, webhook; provider configuration required |
+| Stripe billing | Removed | Deleted 2026-09-26; PaperViz charges nobody (ADR-003) |
 | Account and usage surfaces | Implemented | `/account`, account summary, usage |
 | Annotations and collections | Implemented | Per-user ownership enforced |
 | Research export | Implemented | Structured context; excludes full source and simplified text |
@@ -141,15 +141,14 @@ PaperViz treats research output as structured, inspectable data:
 5. Export must exclude original and simplified full text.
 6. Shared public payloads must not expose private source text or user identifiers.
 
-### Authentication and billing
+### Authentication and security
 
-1. Email/password authentication must use secure session cookies.
-2. Passwords must meet complexity requirements.
-3. Google OAuth must validate state to prevent CSRF.
-4. Authentication endpoints must be rate limited.
+1. Sign-up, sign-in, sessions, and password recovery must go through Clerk; PaperViz must not hold a local credential path (`/api/auth/signup` and `/api/auth/login` return 404, asserted by test).
+2. Password policy is Clerk's responsibility.
+3. Session tokens must be verified against Clerk JWKS with no fallback identity.
+4. Document creation and import endpoints must be rate limited.
 5. Users must be able to retrieve and regenerate API keys.
-6. Stripe checkout, portal, and webhook routes must exist.
-7. Required integration configuration must fail loudly at startup.
+6. Required integration configuration (`CREDENTIAL_ENCRYPTION_KEY`, `CLERK_SECRET_KEY`) must fail loudly at startup.
 
 ### MCP
 
@@ -259,13 +258,12 @@ These are targets, not current verified measurements:
 
 - Decide whether MCP search should be user-scoped.
 - Benchmark and define supported concurrency.
-- Complete handler-to-application/repository decoupling.
 - Remove or clearly quarantine stale static SEO surfaces.
 
 ### P2: product hardening
 
 - Measure real processing latency and agent-tool latency.
-- Validate OAuth, Stripe, and remote MCP with live provider configuration.
+- Validate Clerk and remote MCP with live provider configuration.
 - Decide whether `/account` should retain document-management UI or remain account-only.
 
 ## Acceptance Scenarios

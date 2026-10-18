@@ -65,7 +65,7 @@ Rules:
 
 ### Current migration state
 
-`internal/app/documents` now owns document creation and read operations, and create handling has been split from document reads. Some remaining HTTP handlers still instantiate repositories directly for specialized research objects. This is a known refactor gap. New document behavior should use the application/service boundary rather than extending handler-to-repository coupling.
+`internal/app/documents` owns document creation and read operations; the remaining document handlers are split across focused files (`documents_create`, `_list`, `_update`, `_get`, `_sections`, `_readmodel`, `_relationships`, `_compare`). The P09–P10 refactor closed handler-to-repository coupling entirely: no file under `internal/handlers` imports `internal/repository` — business logic lives in `internal/app/{documents,credentials,users,analytics}`. New document behavior must use the application/service boundary rather than reaching for repositories from HTTP code.
 
 ## 4. HTTP Runtime
 
@@ -73,14 +73,13 @@ Rules:
 
 1. open JSONL log file;
 2. configure structured `slog` output to stdout and file;
-3. require Gemini, Google OAuth, Stripe, and frontend URL environment variables;
-4. resolve Gemini model, database path, static directory, and port;
+3. require `CREDENTIAL_ENCRYPTION_KEY` and `CLERK_SECRET_KEY` environment variables;
+4. resolve database path, static directory, migrations directory, and port;
 5. load all registered migrations;
 6. open SQLite and apply pending migrations;
-7. delete expired sessions;
-8. construct Gemini client;
-9. start document expiry sweep;
-10. start HTTP router.
+7. construct provider transport (no server-side model credential — keys arrive per request under BYOK);
+8. start document expiry sweep;
+9. start HTTP router.
 
 The server does not load `.env` itself. Environment export happens outside the process.
 
@@ -104,12 +103,13 @@ Current route inventory is maintained in [`codebase-reference.md`](codebase-refe
 
 `cmd/mcp/main.go`:
 
-1. requires `GEMINI_API_KEY`;
-2. requires `PAPERVIZ_API_KEY`;
-3. resolves model, database path, and migration directory;
-4. opens the same migrated SQLite model as HTTP;
-5. constructs MCP server;
-6. runs stdio transport.
+1. requires `PAPERVIZ_API_KEY`;
+2. resolves database path and migration directory;
+3. opens the same migrated SQLite model as HTTP;
+4. constructs MCP server;
+5. runs stdio transport.
+
+No model key is read: as of P28 every tool is deterministic and the process calls no provider.
 
 The current MCP surface contains five tools:
 
@@ -260,14 +260,12 @@ Implemented controls include:
 
 - environment-only secrets;
 - startup fail-loud validation for required integrations;
-- secure, HTTP-only, same-site session cookies;
-- Google OAuth state nonce validation;
-- password complexity enforcement;
+- Clerk bearer-token verification against Clerk JWKS (no local credential path, no session cookie);
+- AES-256-GCM encryption of stored user model keys;
 - auth and document-ingestion rate limits;
 - 20 MiB PDF limit and PDF content validation;
 - HTTPS URL import and private-network SSRF blocking;
-- ownership checks for annotations and collections;
-- Stripe webhook verification boundary;
+- ownership checks for annotations, collections, and per-document section reads (`RequireDocAccess`);
 - API-key requirement for MCP process;
 - per-key MCP rate and job limits;
 - security headers and panic recovery;

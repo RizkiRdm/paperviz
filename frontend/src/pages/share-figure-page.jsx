@@ -26,7 +26,8 @@ export function ShareFigurePage() {
         }
         const data = await res.json()
         if (!cancelled) setFigure(data)
-      } catch {
+      } catch (err) {
+        console.error("Share figure fetch failed", err)
         if (!cancelled) setError("network")
       } finally {
         if (!cancelled) setLoading(false)
@@ -40,6 +41,27 @@ export function ShareFigurePage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <p className="text-sm text-[#737373]">Loading figure…</p>
+      </div>
+    )
+  }
+
+  // Network failure gets its own state — a connection error must not read as
+  // an expired link (mirrors SharePaperPage's offline branch).
+  if (error === "network") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <h1 className="text-4xl font-semibold text-[#0a0a0a]">Offline</h1>
+          <p className="mt-2 text-sm text-[#737373]">
+            Something went wrong loading this figure. Check your connection and try again.
+          </p>
+          <Link
+            to={`/?ref=${shareToken}`}
+            className="mt-6 inline-block text-sm text-[#2563eb] hover:underline"
+          >
+            Analyze your own paper
+          </Link>
+        </div>
       </div>
     )
   }

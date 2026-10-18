@@ -20,7 +20,7 @@ The local MCP server exposes five tools:
 | `get_figures` | Retrieve chart data, source locations, and provenance |
 | `get_evidence` | Retrieve evidence and linked claims |
 
-MCP and REST share the same SQLite database when configured with the same `DATABASE_PATH`. The local MCP server reads the model key from its own environment and calls the provider directly, so no credential passes through this service.
+MCP and REST share the same SQLite database when configured with the same `DATABASE_PATH`. All five tools are deterministic: the MCP process calls no model provider, so no credential of any kind passes through it.
 
 ### Web interface
 
@@ -110,9 +110,9 @@ Two secrets come from Clerk: `CLERK_SECRET_KEY` for the server and
 openssl rand -base64 32
 ```
 
-Users supply their own model key in the web UI. A Gemini key in your
-environment is only needed to run the local MCP server, which calls the
-provider directly from your machine.
+Users supply their own model key in the web UI. No model key is needed to
+run the local MCP server — its five tools are deterministic and call no
+provider (P28).
 
 The server validates required environment variables at startup. See
 [`docs/getting-started.md`](docs/getting-started.md) for variable-by-variable setup.
@@ -202,7 +202,7 @@ paperviz/
 │   ├── models/              # shared chart and research value types
 │   ├── apperr/              # shared application errors
 │   └── infra/               # infrastructure helpers
-├── migrations/              # 21 ordered SQL migrations
+├── migrations/              # 22 ordered SQL migrations
 ├── frontend/                # React SPA
 ├── e2e/                     # Playwright tests
 ├── docs/                    # Product, architecture, operations, and API docs

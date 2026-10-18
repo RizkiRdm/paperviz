@@ -1,6 +1,8 @@
 package documents
 
 import (
+	"database/sql"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -62,7 +64,15 @@ func (s *Service) GetReadModel(id string) (*DocumentReadModel, error) {
 		return nil, err
 	}
 	claimDiffRepo := repository.NewClaimDiffRepo(tx)
-	claimDiff, _ := claimDiffRepo.GetByDocument(id)
+	// ErrNoRows is a valid "not yet verified" state; any other failure is a
+	// real read error and must not silently degrade the response.
+	claimDiff, err := claimDiffRepo.GetByDocument(id)
+	if errors.Is(err, sql.ErrNoRows) {
+		claimDiff = nil
+	} else if err != nil {
+		slog.Error("get claim diff for readmodel failed", "error", err)
+		return nil, err
+	}
 	tableRepo := repository.NewPaperTableRepo(tx)
 	tables, err := tableRepo.ListByPaper(id)
 	if err != nil {

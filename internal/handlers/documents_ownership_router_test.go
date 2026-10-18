@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -13,20 +11,8 @@ import (
 
 	"paperviz/internal/app/credentials"
 	"paperviz/internal/external"
-	"paperviz/internal/repository"
+	"paperviz/internal/testutil"
 )
-
-// newOwnershipRouterDB opens an in-memory SQLite with the migrations a
-// document read needs.
-func newOwnershipRouterDB(t *testing.T) *sql.DB {
-	t.Helper()
-	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-	return db
-}
 
 // testIdentityHeader carries the Clerk subject a request should be treated as
 // having. It stands in for a verified Clerk session token.
@@ -56,26 +42,13 @@ func withTestIdentity(next http.Handler) http.Handler {
 // route: without it the session never reaches the context, the owner is read
 // as anonymous, and the owner is locked out of their own document.
 func TestGetDocumentRespectsOwnershipOverRouter(t *testing.T) {
-	db := newOwnershipRouterDB(t)
-	users := repository.NewUserRepo(db)
-	docs := repository.NewDocumentRepo(db)
+	db := testutil.OpenTestDB(t)
 
 	owner, other := "user_router_owner", "user_router_other"
-	for _, u := range []string{owner, other} {
-		if err := users.UpsertClerkUser(u, u+"@test.com", time.Now().Unix()); err != nil {
-			t.Fatalf("provision user %s: %v", u, err)
-		}
-	}
-
 	now := time.Now().Unix()
-	ownerPtr := owner
-	if err := docs.Insert(repository.Document{
-		ID: "doc-1", CreatedAt: now, LastAccessedAt: now,
-		Status: repository.StatusComplete, SourceType: repository.SourceTypePastedText,
-		ReadingLevel: repository.ReadingLevelSimplified, OriginalText: "body", UserID: &ownerPtr,
-	}); err != nil {
-		t.Fatalf("insert document: %v", err)
-	}
+	testutil.SeedClerkUser(t, db, owner, owner+"@test.com", now)
+	testutil.SeedClerkUser(t, db, other, other+"@test.com", now)
+	testutil.SeedOwnedDocument(t, db, "doc-1", owner)
 
 	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t)), t.TempDir()))
 
@@ -103,10 +76,54 @@ func TestGetDocumentRespectsOwnershipOverRouter(t *testing.T) {
 	}
 }
 
+// TestSectionRoutesRespectOwnershipOverRouter guards the Wave G fix: section
+// reads and relationship writes once bypassed auth, so any foreign or anonymous
+// caller could read claims or post relationships on someone else's document.
+func TestSectionRoutesRespectOwnershipOverRouter(t *testing.T) {
+	db := testutil.OpenTestDB(t)
+
+	owner, other := "user_sect_owner", "user_sect_other"
+	now := time.Now().Unix()
+	testutil.SeedClerkUser(t, db, owner, owner+"@test.com", now)
+	testutil.SeedClerkUser(t, db, other, other+"@test.com", now)
+	testutil.SeedOwnedDocument(t, db, "doc-sect", owner)
+
+	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t)), t.TempDir()))
+
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		subject    string
+		wantStatus int
+	}{
+		{name: "owner may read claims", method: http.MethodGet, path: "/api/documents/doc-sect/claims", subject: owner, wantStatus: http.StatusOK},
+		{name: "other user forbidden from claims", method: http.MethodGet, path: "/api/documents/doc-sect/claims", subject: other, wantStatus: http.StatusForbidden},
+		{name: "anonymous forbidden from claims", method: http.MethodGet, path: "/api/documents/doc-sect/claims", subject: "", wantStatus: http.StatusForbidden},
+		{name: "other user forbidden from research map", method: http.MethodGet, path: "/api/documents/doc-sect/research-map", subject: other, wantStatus: http.StatusForbidden},
+		{name: "anonymous relationship write rejected", method: http.MethodPost, path: "/api/papers/doc-sect/relationships", subject: "", wantStatus: http.StatusUnauthorized},
+		{name: "other user forbidden from relationship write", method: http.MethodPost, path: "/api/papers/doc-sect/relationships", subject: other, wantStatus: http.StatusForbidden},
+		{name: "anonymous compare rejected", method: http.MethodPost, path: "/api/documents/compare", subject: "", wantStatus: http.StatusUnauthorized},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			if tt.subject != "" {
+				req.Header.Set(testIdentityHeader, tt.subject)
+			}
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if rec.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d (body %s)", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+		})
+	}
+}
+
 // TestRequireAuthRejectsRequestWithoutClerkToken keeps RequireAuth from
 // accepting a request that merely carries no session at all.
 func TestRequireAuthRejectsRequestWithoutClerkToken(t *testing.T) {
-	db := newOwnershipRouterDB(t)
+	db := testutil.OpenTestDB(t)
 	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t)), t.TempDir()))
 
 	rec := httptest.NewRecorder()

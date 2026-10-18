@@ -119,13 +119,15 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 		r.With(requireIngestionEnabled, rateLimitDocumentCreate, authMiddleware.OptionalAuth, authMiddleware.UsageLimitMiddleware).Post("/", docHandler.Create)
 		r.With(authMiddleware.OptionalAuth).Get("/{id}", docHandler.Get)
 		r.With(authMiddleware.OptionalAuth).Get("/{id}/charts/{chartId}/image", docHandler.GetChartImage)
-		r.Get("/{id}/claims", docHandler.GetClaims)
-		r.Get("/{id}/tables", docHandler.GetTables)
-		r.Get("/{id}/methods", docHandler.GetMethods)
-		r.Get("/{id}/results", docHandler.GetResults)
-		r.Get("/{id}/citations", docHandler.GetCitations)
-		r.Get("/{id}/evidence-graph", docHandler.GetEvidenceGraph)
-		r.Get("/{id}/research-map", docHandler.GetResearchMap)
+		// Sections and relationships share Get's ownership rule: optional
+		// auth so the owner's identity reaches the guard, then RequireDocAccess.
+		r.With(authMiddleware.OptionalAuth, docHandler.RequireDocAccess).Get("/{id}/claims", docHandler.GetClaims)
+		r.With(authMiddleware.OptionalAuth, docHandler.RequireDocAccess).Get("/{id}/tables", docHandler.GetTables)
+		r.With(authMiddleware.OptionalAuth, docHandler.RequireDocAccess).Get("/{id}/methods", docHandler.GetMethods)
+		r.With(authMiddleware.OptionalAuth, docHandler.RequireDocAccess).Get("/{id}/results", docHandler.GetResults)
+		r.With(authMiddleware.OptionalAuth, docHandler.RequireDocAccess).Get("/{id}/citations", docHandler.GetCitations)
+		r.With(authMiddleware.OptionalAuth, docHandler.RequireDocAccess).Get("/{id}/evidence-graph", docHandler.GetEvidenceGraph)
+		r.With(authMiddleware.OptionalAuth, docHandler.RequireDocAccess).Get("/{id}/research-map", docHandler.GetResearchMap)
 		r.With(authMiddleware.RequireAuth).Get("/stats", docHandler.Stats)
 		r.With(authMiddleware.RequireAuth).Get("/", docHandler.List)
 		r.With(authMiddleware.RequireAuth).Put("/{id}/save", docHandler.ToggleSaved)
@@ -136,7 +138,7 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 		r.With(authMiddleware.RequireAuth).Post("/{id}/share", shareHandler.GenerateDocToken)
 		r.With(authMiddleware.RequireAuth).Delete("/{id}/share", shareHandler.RevokeDocToken)
 		r.With(authMiddleware.RequireAuth).Patch("/{id}/visibility", shareHandler.UpdateVisibility)
-		r.Post("/compare", docHandler.Compare)
+		r.With(authMiddleware.RequireAuth).Post("/compare", docHandler.Compare)
 
 		r.With(authMiddleware.RequireAuth).Get("/{id}/annotations", annotationHandler.List)
 		r.With(authMiddleware.RequireAuth).Post("/{id}/annotations", annotationHandler.Create)
@@ -194,8 +196,8 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 	})
 
 	r.Route("/api/papers", func(r chi.Router) {
-		r.Get("/{id}/relationships", docHandler.GetPaperRelationships)
-		r.Post("/{id}/relationships", docHandler.CreatePaperRelationship)
+		r.With(authMiddleware.OptionalAuth, docHandler.RequireDocAccess).Get("/{id}/relationships", docHandler.GetPaperRelationships)
+		r.With(authMiddleware.RequireAuth, docHandler.RequireDocAccess).Post("/{id}/relationships", docHandler.CreatePaperRelationship)
 	})
 
 	// spaNotFound serves API 404 JSON, real static files, and the SPA fallback for deep links.

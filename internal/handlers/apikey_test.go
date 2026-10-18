@@ -6,11 +6,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	"paperviz/internal/repository"
+	"paperviz/internal/testutil"
 )
 
 func openApiKeyTestDB(t *testing.T) *sql.DB {
@@ -19,17 +18,8 @@ func openApiKeyTestDB(t *testing.T) *sql.DB {
 	// 002, 017, 018, 019, 021 and needed a comment explaining that a DROP
 	// cannot succeed on a column that was never created. Ordering is now the
 	// library's problem, not each test's.
-	db, err := repository.Open(":memory:", filepath.Join("..", "..", "migrations"))
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	t.Cleanup(func() { db.Close() })
-
-	if err := repository.NewUserRepo(db).Insert(repository.User{
-		ID: "u1", Email: "u1@example.com", PasswordHash: "x", CreatedAt: 1,
-	}); err != nil {
-		t.Fatalf("seed user: %v", err)
-	}
+	db := testutil.OpenTestDB(t)
+	testutil.SeedUser(t, db, "u1")
 	return db
 }
 

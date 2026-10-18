@@ -28,7 +28,8 @@ export function ShareDialog({ url, onClose }) {
       setCopyError(false)
       clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => setCopied(false), COPY_FEEDBACK_MS)
-    } catch {
+    } catch (err) {
+      console.error("Copy share link failed", err)
       setCopyError(true)
       inputRef.current?.select()
     }
@@ -98,12 +99,27 @@ export function ResultOverlays({ documentId, showResearchMap, setShowResearchMap
 }
 
 // Render management actions — collections, export, navigation, DESIGN.md compact density.
-export function ResultActions({ documentId, collections = [], showAddToCollection, setShowAddToCollection, onAddToCollection }) {
+export function ResultActions({
+  documentId,
+  collections = [],
+  collectionsError = false,
+  onRetryCollections,
+  collectionAddError = null,
+  onRetryCollectionAdd,
+  showAddToCollection,
+  setShowAddToCollection,
+  onAddToCollection,
+}) {
+  const [exportError, setExportError] = useState(false)
+
+  // handleExport downloads research context; failure surfaces inline with Retry.
   async function handleExport() {
+    setExportError(false)
     try {
       await exportResearchContext(documentId)
     } catch (err) {
       console.error("export failed", err)
+      setExportError(true)
     }
   }
 
@@ -111,7 +127,10 @@ export function ResultActions({ documentId, collections = [], showAddToCollectio
     <div className="mt-12 rounded-[12px] border border-[#e5e5e5] bg-[#fafafa] p-6">
       <h3 className="text-sm font-medium text-[#0a0a0a] mb-3">What&apos;s next?</h3>
       <div className="flex flex-wrap gap-3">
-        <div className="relative">
+        <div
+          className="relative"
+          onKeyDown={(e) => { if (e.key === "Escape") setShowAddToCollection(false) }}
+        >
           <button
             onClick={() => setShowAddToCollection(!showAddToCollection)}
             aria-expanded={showAddToCollection}
@@ -122,7 +141,18 @@ export function ResultActions({ documentId, collections = [], showAddToCollectio
           </button>
           {showAddToCollection && (
             <div role="menu" className="absolute left-0 top-full mt-1 z-10 bg-white border border-[#e5e5e5] rounded-[8px] shadow-lg py-1 w-48">
-              {collections.length === 0 ? (
+              {collectionsError ? (
+                <div className="px-3 py-2 text-xs text-[#737373]">
+                  <p>Couldn&apos;t load collections.</p>
+                  <button
+                    type="button"
+                    onClick={onRetryCollections}
+                    className="mt-1 font-medium text-[#2563eb] hover:text-[#1e40af] transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : collections.length === 0 ? (
                 <div className="px-3 py-2 text-xs text-[#737373]">No collections yet</div>
               ) : (
                 collections.map((col) => (
@@ -158,6 +188,22 @@ export function ResultActions({ documentId, collections = [], showAddToCollectio
           Export Research Data
         </button>
       </div>
+      {collectionAddError && (
+        <p role="alert" className="mt-3 text-[11px] text-[#ea580c]">
+          {collectionAddError}{" "}
+          <button type="button" onClick={onRetryCollectionAdd} className="font-medium text-[#2563eb] hover:text-[#1e40af] transition-colors">
+            Retry
+          </button>
+        </p>
+      )}
+      {exportError && (
+        <p role="alert" className="mt-3 text-[11px] text-[#ea580c]">
+          Couldn&apos;t export research data.{" "}
+          <button type="button" onClick={handleExport} className="font-medium text-[#2563eb] hover:text-[#1e40af] transition-colors">
+            Retry
+          </button>
+        </p>
+      )}
     </div>
   )
 }

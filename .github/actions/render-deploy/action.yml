@@ -1,0 +1,78 @@
+name: Render Prod Deploy
+description: Trigger Render deploy, poll until live, run post-deploy health checks
+
+inputs:
+  api-key:
+    description: Render REST API key
+    required: true
+  service-id:
+    description: Render service ID
+    required: true
+  base-url:
+    description: Production base URL for health checks
+    required: true
+  branch:
+    description: Git branch for Render to build
+    required: false
+    default: main
+
+runs:
+  using: composite
+  steps:
+    - name: Trigger deploy
+      id: deploy
+      shell: bash
+      env:
+        RENDER_API_KEY: ${{ inputs.api-key }}
+        SERVICE_ID: ${{ inputs.service-id }}
+        BRANCH: ${{ inputs.branch }}
+      run: |
+        resp=$(curl -sf -X POST "https://api.render.com/v1/services/${SERVICE_ID}/deploys" \
+          -H "Authorization: Bearer ${RENDER_API_KEY}" \
+          -H "accept: application/json" \
+          -H "content-type: application/json" \
+          -d "{\"branch\": \"${BRANCH}\", \"clear_cache\": false}") || {
+            echo "::error::Render deploy creation failed"; exit 1; }
+        id=$(echo "$resp" | jq -r '.deploy.id // empty')
+        [ -n "$id" ] || { echo "::error::no deploy id in response: $resp"; exit 1; }
+        echo "id=$id" >> "$GITHUB_OUTPUT"
+        echo "Created deploy $id (branch $BRANCH)"
+
+    - name: Poll deploy until live
+      shell: bash
+      env:
+        RENDER_API_KEY: ${{ inputs.api-key }}
+        DEPLOY_ID: ${{ steps.deploy.outputs.id }}
+      run: |
+        # Render deploys are async; cap wait at 15 min (60 x 15s)
+        for i in $(seq 1 60); do
+          status=$(curl -sf "https://api.render.com/v1/deploys/${DEPLOY_ID}" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "accept: application/json" | jq -r '.deploy.status // "unknown"')
+          echo "[$i/60] ${DEPLOY_ID}: ${status}"
+          case "$status" in
+            live) exit 0 ;;
+            build_failed|canceled|deactivated)
+              echo "::error::deploy ${DEPLOY_ID} ended in ${status}"; exit 1 ;;
+          esac
+          sleep 15
+        done
+        echo "::error::deploy ${DEPLOY_ID} timed out after 15 min"; exit 1
+
+    - name: Post-deploy health checks
+      shell: bash
+      env:
+        BASE_URL: ${{ inputs.base-url }}
+      run: |
+        # Render returns 504 on cold start right after "live" — retry healthz
+        for i in $(seq 1 10); do
+          if curl -sf "${BASE_URL}/healthz" >/dev/null; then echo "healthz ok"; break; fi
+          [ "$i" -eq 10 ] && { echo "::error::healthz never returned 200"; exit 1; }
+          sleep 10
+        done
+        # A 200 on /healthz alone does not prove auth wired (AGENTS.md)
+        code=$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/collections")
+        [ "$code" = "401" ] || { echo "::error::/api/collections expected 401, got ${code}"; exit 1; }
+        code=$(curl -s -o /dev/null -w '%{http_code}' "${BASE_URL}/api/auth/me")
+        [ "$code" = "401" ] || { echo "::error::/api/auth/me expected 401, got ${code}"; exit 1; }
+        echo "All health checks passed"

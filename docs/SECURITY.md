@@ -8,11 +8,11 @@ Covers authentication, authorization, input validation, file handling, rate limi
 
 ### Assets
 
-* User data: email, password_hash, sessions, API keys (`api_key_hash` column, SHA-256 digest)
+* User data: account email, service API keys (`api_key_hash` column, SHA-256 digest), Clerk subject id
 * Uploaded documents: PDF bytes (in-memory only, not persisted to disk), extracted text, simplified text, charts
 * Structured research data: claims, tables, methods, results, citations, annotations, collections
 * User model credentials: encrypted blobs in `user_credentials` (AES-256-GCM), `key_hint`
-* Process secrets: `CREDENTIAL_ENCRYPTION_KEY` (server), `GEMINI_API_KEY` and `PAPERVIZ_API_KEY` (MCP only)
+* Process secrets: `CREDENTIAL_ENCRYPTION_KEY` (server), `CLERK_SECRET_KEY` (server), `PAPERVIZ_API_KEY` (MCP only)
 * Generated results: share tokens (`share_token` on documents/charts), public share pages
 
 ### Threat Actors
@@ -37,7 +37,7 @@ Covers authentication, authorization, input validation, file handling, rate limi
 
 ### Credential Storage
 
-* `bcrypt.GenerateFromPassword` with `DefaultCost` (10). `CompareHashAndPassword` on login. Generic `invalid_credentials` on mismatch — no user enumeration via timing distinction (same 401 for missing email vs bad password). OAuth users never store Google token.
+* PaperViz stores **no password**: signup, sign-in, password hashing, and password recovery are Clerk's responsibility (ADR-003). Locally the only credential material is the encrypted model-key ciphertext in `user_credentials` and the `api_key_hash` digest.
 
 ## 4. Authorization
 
@@ -52,10 +52,11 @@ No RBAC. Single `user` role. Access controlled by resource ownership.
 | Collections | `collections.go` `Get/Rename/Delete/Add/Remove/ListDocuments(userID)` → `403` on `ErrForbidden` | `services/collections.go` + `handlers/collections.go` |
 | Share tokens | Figures inherit document `visibility`; share service gates visibility/expired checks | `share.go` |
 | Export | `ExportResearchContext` excludes `OriginalText`/`SimplifiedText` (copyright) | `export.go` |
-| Account / API key / Billing | `RequireAuth` | `router.go` |
+| Account / API key / model credentials | `RequireAuth` | `router.go` |
+| Section + relationship reads (claims, tables, methods, results, citations, evidence-graph, research-map, relationships) | `OptionalAuth` + `RequireDocAccess` ownership guard — 403/404 for non-owners of private docs (test `TestSectionRoutesRespectOwnershipOverRouter`) | `documents.go` (`RequireDocAccess`) |
 | MCP tools | Separate interface, deterministic intake/retrieval, `PAPERVIZ_API_KEY` required, no user-library access | `internal/mcp/server.go` |
 
-`OptionalAuth` for document creation: attaches `userID` only if valid session; anonymous allowed but usage tracked by fingerprint.
+`OptionalAuth` for document creation: attaches `userID` only if a valid Clerk token is present; anonymous allowed but usage tracked by fingerprint.
 
 ## 5. Input Validation
 
@@ -108,7 +109,6 @@ No RBAC. Single `user` role. Access controlled by resource ownership.
 | Secret | Purpose | Storage |
 |--------|---------|---------|
 | `CREDENTIAL_ENCRYPTION_KEY` | AES-256-GCM key for stored user model keys | env, `os.Getenv`; never persisted |
-| `GEMINI_API_KEY` | Provider calls from the local MCP process | env, `cmd/mcp` only |
 | `PAPERVIZ_API_KEY` | MCP per-key auth | env (MCP) |
 | `CLERK_SECRET_KEY` | Verifies session tokens, resolves account email | env, `os.Getenv`; never persisted |
 | `VITE_CLERK_PUBLISHABLE_KEY` | Clerk browser SDK | env, frontend build; safe to expose |
@@ -136,15 +136,14 @@ No RBAC. Single `user` role. Access controlled by resource ownership.
 
 | Service | Data Sent | Risk | Mitigation |
 |---------|-----------|------|------------|
-| Gemini API (direct HTTP) | Extracted text / evidence (never full PDF bytes to disk) | Prompt data exfil, quota burn | 5 image charts/doc cap, `dualClaimExtractionPrompt` reduces calls, structured JSON validation |
-| Google OAuth (`googleapis.com/oauth2/v2/userinfo`) | `code` exchange, bearer token | Token leakage | `oauth_state` CSRF nonce, `Secure` cookies, token not persisted |
+| Model providers (Gemini / Anthropic / OpenAI, direct via `goai`, per-request user key) | Extracted text / evidence (never full PDF bytes to disk) | Prompt data exfil, quota burn (user's own spend) | 5 image charts/doc cap, `dualClaimExtractionPrompt` reduces calls, structured JSON validation; no server-held provider credential |
+| Clerk (authentication) | Account email, session-token verification claims | Identity SaaS dependency, lock-in | JWKS signature verification, no local credential path, ADR-003 risk register |
 | Crossref / Unpaywall (DOI import) | DOI / URL | SSRF, large fetch | https-only, private-IP block, 100 MiB read cap |
-| Stripe | checkout/portal, webhook | Webhook spoof | HMAC via `stripe-go/v79` (verify signature) |
 
 ## 12. Logging & Sensitive Data
 
 * `log/slog` structured JSON. `slogRequestLogger`: `id, method, path, status, duration` with `Warn` ≥400, `Error` ≥500. PDF timeout branches log `Warn` (observable leaked goroutines). Gemini calls log stage/duration, not text.
-* **Must not log**: full document text, `password`, `password_hash`, `session_token`, `oauth_state`, Gemini URL with key, Stripe secrets.
+* **Must not log**: full document text, plaintext model keys, `CREDENTIAL_ENCRYPTION_KEY`, `CLERK_SECRET_KEY`, `PAPERVIZ_API_KEY`, Gemini URL with key.
 
 ## 13. Data Retention
 
@@ -155,20 +154,17 @@ No RBAC. Single `user` role. Access controlled by resource ownership.
 
 | Area | Method | Status |
 |------|--------|--------|
-| Authentication | table-driven `go test ./...` (422 passing) + manual OAuth CSRF verification (`state` mismatch → 400) | Implemented |
-| Authorization | ownership checks covered by `collections_test.go`, `annotations` tests (`ErrForbidden` → 403) | Implemented |
-| Input validation | `isValidEmail`, `hasMinComplexity` unit paths; `MaxBytesReader` limit | Implemented |
+| Authentication | table-driven `go test ./...` + Clerk token verification tests; local signup/login 404 asserted by test | Implemented |
+| Authorization | ownership checks covered by `collections_test.go`, `annotations` tests (`ErrForbidden` → 403); router-level section guard `TestSectionRoutesRespectOwnershipOverRouter` | Implemented |
+| Input validation | `isValidEmail` unit paths; `MaxBytesReader` limit | Implemented |
 | File handling | `pdf.go` timeout + size tests | Implemented |
 | Prompt injection | Grounding validator regression tests (unsupported → not rendered) | Partial |
 
 ## 15. Known Security Risks
 
-* OAuth: no PKCE (authorization-code flow without PKCE; `state` is CSRF-only, not code-verifier). Low for confidential client.
+* Clerk lock-in: a Clerk outage or account suspension blocks all sign-in; no local fallback path may be added (ADR-003).
 * Rate limiter in-memory only; resets on restart; no distributed limiter.
-* `PasswordVersion` exists but not enforced — password change does not revoke sessions (no endpoint).
 * Prompt injection: no dedicated sanitizer; relies on grounding validator.
-* Expired sessions cleaned only on startup, not periodically.
-* Stripe webhook must be configured manually in dashboard (`/api/billing/webhook`).
 
 ## 16. Security Decisions
 

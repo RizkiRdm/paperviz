@@ -4,14 +4,11 @@ import (
 	"database/sql"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-
-	"paperviz/internal/external"
 )
 
 // MCPServer holds shared dependencies for all MCP tool handlers.
 type MCPServer struct {
 	db          *sql.DB
-	gemini      *external.LLM
 	apiKey      string
 	rateLimiter *RateLimiter
 	jobLimiter  *JobLimiter
@@ -21,10 +18,9 @@ type MCPServer struct {
 func (s *MCPServer) Server() *mcp.Server { return s.mcpServer }
 
 // NewMCPServer creates the MCP server and registers all research tools.
-func NewMCPServer(db *sql.DB, gemini *external.LLM, apiKey string) *MCPServer {
+func NewMCPServer(db *sql.DB, apiKey string) *MCPServer {
 	mcpSrv := &MCPServer{
 		db:          db,
-		gemini:      gemini,
 		apiKey:      apiKey,
 		rateLimiter: NewRateLimiter(),
 		jobLimiter:  NewJobLimiter(3),

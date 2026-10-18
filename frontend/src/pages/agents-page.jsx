@@ -52,15 +52,21 @@ const TEST_PROMPT = "Search my papers for anything about image classification ac
 export function AgentsPage() {
   const [activeTab, setActiveTab] = useState("claude-code")
   const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState(false)
 
   const activeClient = CLIENTS.find((c) => c.id === activeTab) ?? CLIENTS[0]
 
   async function copyToClipboard() {
+    setCopyError(false)
     try {
       await navigator.clipboard.writeText(STDIO_CONFIG)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    } catch (err) { console.error("Copy to clipboard failed", err) }
+    } catch (err) {
+      // A blocked clipboard API is a real state — surface it inline (12.1).
+      console.error("Copy to clipboard failed", err)
+      setCopyError(true)
+    }
   }
 
   return (
@@ -115,6 +121,11 @@ export function AgentsPage() {
                 {copied ? "Copied!" : "Copy"}
                   </button>
                 </div>
+                {copyError && (
+                  <p className="mt-2 text-[11px] text-[#ea580c]">
+                    Couldn&apos;t copy automatically. Select the block and copy it manually.
+                  </p>
+                )}
                 <p className="mt-3 text-xs text-[#737373]">
                   Build the binary first with <code className="font-mono">go build -o paperviz-mcp ./cmd/mcp</code>.
                 </p>
