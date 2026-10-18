@@ -47,7 +47,8 @@ export function SharePaperPage() {
         }
         const data = await res.json()
         if (!cancelled) setPaper(data)
-      } catch {
+      } catch (err) {
+        console.error("Share paper fetch failed", err)
         if (!cancelled) setError("network")
       } finally {
         if (!cancelled) setLoading(false)

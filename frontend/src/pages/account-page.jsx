@@ -49,8 +49,14 @@ export function AccountPage() {
     )
   }
 
+  // No user yet: either the /login redirect is in flight or the load failed —
+  // surface the load error inline instead of a blank screen (P47).
   if (!user) {
-    return null
+    return (
+      <div className="min-h-screen bg-white bg-dotted-grid flex items-center justify-center px-6">
+        <p className="text-sm text-[#737373]">{credError || "Loading..."}</p>
+      </div>
+    )
   }
 
   return (

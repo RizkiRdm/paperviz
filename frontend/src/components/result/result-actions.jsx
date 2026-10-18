@@ -127,7 +127,10 @@ export function ResultActions({
     <div className="mt-12 rounded-[12px] border border-[#e5e5e5] bg-[#fafafa] p-6">
       <h3 className="text-sm font-medium text-[#0a0a0a] mb-3">What&apos;s next?</h3>
       <div className="flex flex-wrap gap-3">
-        <div className="relative">
+        <div
+          className="relative"
+          onKeyDown={(e) => { if (e.key === "Escape") setShowAddToCollection(false) }}
+        >
           <button
             onClick={() => setShowAddToCollection(!showAddToCollection)}
             aria-expanded={showAddToCollection}
