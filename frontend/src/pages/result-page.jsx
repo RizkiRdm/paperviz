@@ -1,234 +1,48 @@
-import { useEffect, useRef, useState } from "react"
-import { useParams, useNavigate } from "react-router-dom"
-import { Button } from "@/components/ui/button"
-import { WarningBanner, ErrorBanner, ClaimComparisonPanel } from "@/components/ui/status-banners"
-import { useDocumentPoll } from "@/hooks/use-document-poll"
-import { capture } from "@/lib/analytics"
-import { generateDocumentShare, updateDocumentVisibility } from "@/lib/api"
-import { RefreshCw } from "lucide-react"
+import { useNavigate, useParams } from "react-router-dom"
+import { WarningBanner, ClaimComparisonPanel } from "@/components/ui/status-banners"
 import { NotFoundPage } from "@/pages/not-found-page"
+import { useResultState } from "@/hooks/useResultState"
 import { ResultHeader } from "@/components/result/result-header"
 import { UnderstandingSection } from "@/components/result/understanding-section"
 import { EvidenceSection } from "@/components/result/evidence-section"
 import { FiguresSection } from "@/components/result/figures-section"
 import { SourceSection } from "@/components/result/source-section"
 import { ResultActions, ResultOverlays, ShareDialog } from "@/components/result/result-actions"
-import { authFetch } from "@/lib/auth"
+import { ProcessingView, TimeoutView, FailureView } from "@/components/result/status-views"
 
-const COPY_FEEDBACK_MS = 2000
-
-// repository.NewID mints exactly 16 characters from a 58-symbol alphabet with
-// visually ambiguous characters removed. This mirrors that alphabet so an
-// unknown route like /some-typo is rejected on sight.
-//
-// The route pattern /:documentId otherwise matches every single-segment path
-// and the catch-all `*` never runs, so a typo rendered "Reading document..."
-// and then waited out the polling timeout before showing the 404 page. Checking
-// the shape here costs nothing and answers immediately.
-const DOCUMENT_ID = /^[23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{16}$/
-
-const ERROR_MESSAGES = {
-  simplification_failed: "We couldn't simplify this paper. Please try again.",
-  verification_failed_to_run: "We couldn't verify the summary against the original. Please try again.",
-  extraction_failed: "We couldn't read this PDF. Please check that it has a text layer and try again.",
-}
-
+// Thin orchestrator: every state decision, stage label, and handler lives in
+// useResultState (single source of truth); sections own their own JSX.
 export function ResultPage() {
   const { documentId } = useParams()
   const navigate = useNavigate()
-  const onBack = () => navigate("/")
-  const { doc, error, notFound, timedOut, takingLong, retry } = useDocumentPoll(documentId)
-  const [showOriginal, setShowOriginal] = useState(false)
-  const [showShare, setShowShare] = useState(false)
-  const [shareUrl, setShareUrl] = useState(null)
-  const [shareError, setShareError] = useState(false)
-  const [visibility, setVisibility] = useState("private")
-  const [visibilityError, setVisibilityError] = useState(false)
-  const [showClaims, setShowClaims] = useState(false)
-  const [textCopied, setTextCopied] = useState(false)
-  const [textCopyError, setTextCopyError] = useState(false)
-  const [activeChapter, setActiveChapter] = useState(-1)
-  const [collections, setCollections] = useState([])
-  const [showAddToCollection, setShowAddToCollection] = useState(false)
-  const [showResearchMap, setShowResearchMap] = useState(false)
-  const [showAnnotations, setShowAnnotations] = useState(false)
-  const copyTimerRef = useRef(null)
+  const {
+    state, doc, error, stageLabel, takingLong, retry, onBack,
+    showOriginal, setShowOriginal, showShare, setShowShare, shareUrl, shareError,
+    visibility, visibilityError, showClaims, setShowClaims,
+    textCopied, textCopyError, handleCopyText,
+    activeChapter, setActiveChapter,
+    collections, collectionsError, retryCollections,
+    collectionAddError, retryAddToCollection,
+    showAddToCollection, setShowAddToCollection, handleAddToCollection,
+    showResearchMap, setShowResearchMap, showAnnotations, setShowAnnotations,
+    handleShare, handleVisibilityChange,
+  } = useResultState(documentId, navigate)
 
-  useEffect(() => () => clearTimeout(copyTimerRef.current), [])
-
-  // Fires paper_analysed once per document. This page re-renders on every poll
-  // tick and every state change, so a capture in render would fire repeatedly.
-  useEffect(() => {
-    if (!doc || doc.status === "processing") return
-    if (doc.status === "failed") return
-    capture("paper_analysed", {
-      document_id: doc.id,
-      source_type: doc.source_type,
-      reading_level: doc.reading_level,
-      chart_count: doc.charts?.length ?? 0,
-      verification_failed: doc.status === "verification_failed",
-    })
-    // Intentionally keyed on identity and status only. Including doc itself
-    // would re-fire on every poll tick that returns an equal document.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc?.id, doc?.status])
-  useEffect(() => {
-    const hasChapters = doc?.chapters && doc.chapters.length > 1
-    if (hasChapters && activeChapter === -1) setActiveChapter(0)
-  }, [doc, activeChapter])
-
-  useEffect(() => {
-    async function fetchCollections() {
-      try {
-        const res = await authFetch("/api/collections")
-        if (res.ok) {
-          const data = await res.json()
-          setCollections(data.collections || [])
-        }
-      } catch (err) { console.error("Failed to load collections", err) }
-    }
-    fetchCollections()
-  }, [])
-
-  async function handleCopyText() {
-    const text = showOriginal ? doc.original_text : doc.simplified_text
-    try {
-      await navigator.clipboard.writeText(text)
-      setTextCopied(true)
-      setTextCopyError(false)
-      clearTimeout(copyTimerRef.current)
-      copyTimerRef.current = setTimeout(() => setTextCopied(false), COPY_FEEDBACK_MS)
-    } catch (err) {
-      console.error("Copy to clipboard failed", err)
-      setTextCopied(false)
-      setTextCopyError(true)
-    }
-  }
-
-  // handleShare mints a real share link via the API, then opens the
-  // dialog with the absolute URL; failures surface inline near the button.
-  async function handleShare() {
-    setShareError(false)
-    try {
-      const { share_url } = await generateDocumentShare(documentId)
-      setShareUrl(window.location.origin + share_url)
-      setShowShare(true)
-    } catch (err) {
-      console.error("Share link creation failed", err)
-      setShareError(true)
-    }
-  }
-
-  // handleVisibilityChange applies the new visibility optimistically and
-  // reverts to the previous value if the PATCH fails.
-  async function handleVisibilityChange(next) {
-    const previous = visibility
-    setVisibility(next)
-    setVisibilityError(false)
-    try {
-      await updateDocumentVisibility(documentId, next)
-    } catch (err) {
-      console.error("Visibility update failed", err)
-      setVisibility(previous)
-      setVisibilityError(true)
-    }
-  }
-
-  if (notFound || !DOCUMENT_ID.test(documentId)) {
-    return <NotFoundPage />
-  }
-
-  if (timedOut) {
+  if (state === "empty") return <NotFoundPage />
+  if (state === "retryable-error" && !error) return <TimeoutView onRetry={retry} onBack={onBack} />
+  if (state === "error" || state === "retryable-error") {
     return (
-      <div className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-md rounded-[16px] border border-[#e5e5e5] bg-white p-8 shadow-xs">
-          <p className="text-sm text-[#737373]">Processing is taking longer than expected.</p>
-          <div className="mt-6 flex flex-col gap-2">
-            <Button onClick={retry} variant="primary">
-              <RefreshCw className="h-4 w-4 mr-2" /> Check Status Again
-            </Button>
-            <Button onClick={onBack} variant="secondary">
-              Upload Another Paper
-            </Button>
-          </div>
-        </div>
-      </div>
+      <FailureView
+        pollError={state === "retryable-error" ? error : null}
+        failCode={doc?.error_message}
+        onRetry={state === "retryable-error" ? retry : null}
+        onBack={onBack}
+      />
     )
   }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6">
-        <div className="max-w-md w-full">
-          <ErrorBanner message={error} />
-          <Button onClick={onBack} variant="secondary" className="mt-4 w-full">
-            Start Over
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-const STAGE_LABELS = { simplifying: "Reading document...", verifying: "Preparing evidence...", generating_charts: "Rebuilding figures...", extracting_structure: "Extracting structure...", completing: "Completing..." }
-
-// Fires paper_analysed once per document, not once per render. The result page
-// re-renders on every poll and on every state change, and an analytics event
-// that fires per render is noise.
-
-
-  if (!doc || doc.status === "processing") {
-    const stageLabel = doc?.processing_stage ? STAGE_LABELS[doc.processing_stage] || doc.processing_stage : null
-    return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6 text-center"
-      >
-        <div className="max-w-md rounded-[16px] border border-[#e5e5e5] bg-white p-8 shadow-xs flex flex-col items-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#2563eb] border-t-transparent mb-4" />
-          <h2 className="font-satoshi text-lg font-medium text-[#0a0a0a]">
-            {stageLabel || "Reading document..."}
-          </h2>
-          <p className="mt-2 text-xs text-[#737373] leading-relaxed">
-            {takingLong
-              ? "Still working — large papers with many figures can take a few minutes. This page refreshes automatically."
-              : "Reading your paper, creating a plain-language summary, and checking it against the original."}
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  if (doc.status === "failed") {
-    const msg = doc.error_message && ERROR_MESSAGES[doc.error_message]
-      ? ERROR_MESSAGES[doc.error_message]
-      : "We couldn't process this PDF. It may be image-only or corrupted. Please try a different file."
-    return (
-      <div className="min-h-screen bg-white bg-dotted-grid flex flex-col items-center justify-center p-6">
-        <div className="max-w-md w-full">
-          <ErrorBanner message={msg} />
-          <Button onClick={onBack} variant="secondary" className="mt-4 w-full">
-            Start Over
-          </Button>
-        </div>
-      </div>
-    )
-  }
+  if (state === "loading") return <ProcessingView stageLabel={stageLabel} takingLong={takingLong} />
 
   const hasChapters = doc.chapters && doc.chapters.length > 1
-
-  async function handleAddToCollection(colId) {
-    try {
-      const res = await authFetch(`/api/collections/${colId}/documents`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ document_id: documentId }),
-      })
-      if (res.ok) {
-        setShowAddToCollection(false)
-      }
-    } catch (err) { console.error("Failed to add to collection", err) }
-  }
 
   return (
     <div className="min-h-screen bg-white text-[#171717] bg-dotted-grid">
@@ -245,7 +59,7 @@ const STAGE_LABELS = { simplifying: "Reading document...", verifying: "Preparing
       />
 
       <main className="mx-auto max-w-[900px] px-6 py-12">
-        {doc.status === "verification_failed" && (
+        {state === "partial" && (
           <div className="mb-6">
             <WarningBanner detail={doc.claim_diff?.mismatch_detail} />
             {doc.claim_diff && (
@@ -317,10 +131,14 @@ const STAGE_LABELS = { simplifying: "Reading document...", verifying: "Preparing
 
         <SourceSection doc={doc} showOriginal={showOriginal} onToggleOriginal={setShowOriginal} />
 
-        {doc.status === "complete" && (
+        {state === "ready" && (
           <ResultActions
             documentId={documentId}
             collections={collections}
+            collectionsError={collectionsError}
+            onRetryCollections={retryCollections}
+            collectionAddError={collectionAddError}
+            onRetryCollectionAdd={retryAddToCollection}
             showAddToCollection={showAddToCollection}
             setShowAddToCollection={setShowAddToCollection}
             onAddToCollection={handleAddToCollection}
