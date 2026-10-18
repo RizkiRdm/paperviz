@@ -13,6 +13,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"paperviz/internal/app/credentials"
 	"paperviz/internal/app/documents"
 	"paperviz/internal/apperr"
@@ -56,6 +58,21 @@ func (h *DocumentHandler) resolveClient(w http.ResponseWriter, r *http.Request) 
 		return nil, false
 	}
 	return client, true
+}
+
+// RequireDocAccess rejects a request before its handler runs unless the caller
+// may access the document named by the :id route parameter. It backs the
+// section and relationship routes so their ownership rule is the one Get uses
+// instead of none (Wave G found these routes unguarded).
+func (h *DocumentHandler) RequireDocAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		err := services.DocumentAccessAllowed(h.db, chi.URLParam(r, "id"), UserIDFromContext(r.Context()))
+		if err != nil {
+			writeDocumentAccessError(w, err, "document access denied")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // writeDocumentAccessError maps an ownership failure to 403 and a missing

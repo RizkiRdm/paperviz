@@ -76,6 +76,50 @@ func TestGetDocumentRespectsOwnershipOverRouter(t *testing.T) {
 	}
 }
 
+// TestSectionRoutesRespectOwnershipOverRouter guards the Wave G fix: section
+// reads and relationship writes once bypassed auth, so any foreign or anonymous
+// caller could read claims or post relationships on someone else's document.
+func TestSectionRoutesRespectOwnershipOverRouter(t *testing.T) {
+	db := testutil.OpenTestDB(t)
+
+	owner, other := "user_sect_owner", "user_sect_other"
+	now := time.Now().Unix()
+	testutil.SeedClerkUser(t, db, owner, owner+"@test.com", now)
+	testutil.SeedClerkUser(t, db, other, other+"@test.com", now)
+	testutil.SeedOwnedDocument(t, db, "doc-sect", owner)
+
+	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t)), t.TempDir()))
+
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		subject    string
+		wantStatus int
+	}{
+		{name: "owner may read claims", method: http.MethodGet, path: "/api/documents/doc-sect/claims", subject: owner, wantStatus: http.StatusOK},
+		{name: "other user forbidden from claims", method: http.MethodGet, path: "/api/documents/doc-sect/claims", subject: other, wantStatus: http.StatusForbidden},
+		{name: "anonymous forbidden from claims", method: http.MethodGet, path: "/api/documents/doc-sect/claims", subject: "", wantStatus: http.StatusForbidden},
+		{name: "other user forbidden from research map", method: http.MethodGet, path: "/api/documents/doc-sect/research-map", subject: other, wantStatus: http.StatusForbidden},
+		{name: "anonymous relationship write rejected", method: http.MethodPost, path: "/api/papers/doc-sect/relationships", subject: "", wantStatus: http.StatusUnauthorized},
+		{name: "other user forbidden from relationship write", method: http.MethodPost, path: "/api/papers/doc-sect/relationships", subject: other, wantStatus: http.StatusForbidden},
+		{name: "anonymous compare rejected", method: http.MethodPost, path: "/api/documents/compare", subject: "", wantStatus: http.StatusUnauthorized},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, tt.path, nil)
+			if tt.subject != "" {
+				req.Header.Set(testIdentityHeader, tt.subject)
+			}
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if rec.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d (body %s)", rec.Code, tt.wantStatus, rec.Body.String())
+			}
+		})
+	}
+}
+
 // TestRequireAuthRejectsRequestWithoutClerkToken keeps RequireAuth from
 // accepting a request that merely carries no session at all.
 func TestRequireAuthRejectsRequestWithoutClerkToken(t *testing.T) {
