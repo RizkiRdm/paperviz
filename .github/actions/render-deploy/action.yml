@@ -35,7 +35,11 @@ runs:
           -d "{\"branch\": \"${BRANCH}\", \"clear_cache\": false}") || {
             echo "::error::Render deploy request failed: $(cat "$body")"; exit 1; }
         resp=$(cat "$body")
-        [ "$code" = "200" ] || { echo "::error::Render deploy creation returned ${code}: ${resp}"; exit 1; }
+        # Render answers a deploy trigger with 201 Created, not 200
+        case "$code" in
+          200|201) ;;
+          *) echo "::error::Render deploy creation returned ${code}: ${resp}"; exit 1 ;;
+        esac
         # Render returns the deploy object flat (id/status at top level), not nested under .deploy
         id=$(echo "$resp" | jq -r '.id // empty')
         [ -n "$id" ] || { echo "::error::no deploy id in response: $resp"; exit 1; }
