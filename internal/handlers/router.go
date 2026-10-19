@@ -4,9 +4,6 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 
 	clerkhttp "github.com/clerk/clerk-sdk-go/v2/http"
@@ -26,38 +23,9 @@ func noindexMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// spaNotFound dispatches unmatched paths per plan chunk 5.1 §1.7: API prefix gets 404 JSON, existing static files are served, GET/HEAD fall back to the SPA shell, other methods get 404.
-func spaNotFound(staticDir string, fileServer http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") {
-			writeError(w, http.StatusNotFound, "not_found")
-			return
-		}
-		cleaned := filepath.Clean("/" + r.URL.Path)
-		if strings.Contains(r.URL.Path, "..") {
-			writeError(w, http.StatusNotFound, "not_found")
-			return
-		}
-		full := filepath.Join(staticDir, cleaned)
-		if full == staticDir || strings.HasPrefix(full, staticDir+string(os.PathSeparator)) {
-			if info, err := os.Stat(full); err == nil && info.Mode().IsRegular() {
-				fileServer.ServeHTTP(w, r)
-				return
-			}
-		}
-		if r.Method == http.MethodGet || r.Method == http.MethodHead {
-			http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
-			return
-		}
-		writeError(w, http.StatusNotFound, "not_found")
-	}
-}
-
-// NewRouter builds the full chi router: the two unversioned API endpoints
-// (ARCHITECTURE.md Section E) plus static file serving for the built React
-// SPA. staticDir is the frontend's built assets directory (frontend/dist),
-// served directly by this Go binary — no separate frontend server in
-// production, per ARCHITECTURE.md's "single binary" architecture style.
+// NewRouter builds the chi router. The binary serves the REST API only: the
+// React SPA is deployed separately (ARCHITECTURE.md), so no static file
+// serving, no SPA fallback, and no catch-all wildcard route live here.
 // chartImageStore caches the process-wide store built from the environment.
 // It is resolved once: the answer cannot change without a redeploy, and reading
 // three environment variables per request would be needless work on the image
@@ -77,7 +45,7 @@ var chartImageStore = sync.OnceValue(func() external.ChartImageStore {
 // ChartImageStore returns the configured chart-image store, or nil.
 func ChartImageStore() external.ChartImageStore { return chartImageStore() }
 
-func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) http.Handler {
+func NewRouter(db *sql.DB, provider *credentials.Resolver) http.Handler {
 	r := chi.NewRouter()
 
 	// RequestID injects a unique request ID into every request context so
@@ -88,6 +56,11 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 	// of crashing the whole server process — this is standard chi
 	// middleware, not a new dependency (chi ships it).
 	r.Use(middleware.Recoverer)
+
+	// corsMiddleware answers preflights and marks allowlisted origins so the
+	// separately deployed frontend can call this API. Before it, because a
+	// failed preflight must not depend on auth or route state.
+	r.Use(corsMiddleware)
 
 	// SecurityHeaders sets X-Content-Type-Options, X-Frame-Options, and
 	// CSP on every response. Must run before logging so headers are set
@@ -104,6 +77,7 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 	r.Use(clerkhttp.WithHeaderAuthorization())
 
 	r.Get("/healthz", healthzHandler(db))
+	r.Get("/", apiRootHandler)
 
 	docHandler := NewDocumentHandlerWithImages(db, provider, ChartImageStore())
 	importHandler := NewImportHandler(db, provider, services.NewPaperFetcher())
@@ -200,9 +174,11 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver, staticDir string) htt
 		r.With(authMiddleware.RequireAuth, docHandler.RequireDocAccess).Post("/{id}/relationships", docHandler.CreatePaperRelationship)
 	})
 
-	// spaNotFound serves API 404 JSON, real static files, and the SPA fallback for deep links.
-	fileServer := http.FileServer(http.Dir(staticDir))
-	r.NotFound(spaNotFound(staticDir, fileServer))
+	// Unknown paths get JSON 404. This process serves no files, so a path that
+	// is not a route is a client error, not a deep link into an SPA shell.
+	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
+		writeError(w, http.StatusNotFound, "not_found")
+	})
 
 	return r
 }

@@ -50,7 +50,7 @@ func TestGetDocumentRespectsOwnershipOverRouter(t *testing.T) {
 	testutil.SeedClerkUser(t, db, other, other+"@test.com", now)
 	testutil.SeedOwnedDocument(t, db, "doc-1", owner)
 
-	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t)), t.TempDir()))
+	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t))))
 
 	tests := []struct {
 		name       string
@@ -88,7 +88,7 @@ func TestSectionRoutesRespectOwnershipOverRouter(t *testing.T) {
 	testutil.SeedClerkUser(t, db, other, other+"@test.com", now)
 	testutil.SeedOwnedDocument(t, db, "doc-sect", owner)
 
-	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t)), t.TempDir()))
+	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t))))
 
 	tests := []struct {
 		name       string
@@ -124,7 +124,7 @@ func TestSectionRoutesRespectOwnershipOverRouter(t *testing.T) {
 // accepting a request that merely carries no session at all.
 func TestRequireAuthRejectsRequestWithoutClerkToken(t *testing.T) {
 	db := testutil.OpenTestDB(t)
-	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t)), t.TempDir()))
+	router := withTestIdentity(NewRouter(db, credentials.NewResolver(db, external.NewTransport(), testCipher(t))))
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/documents/", nil))

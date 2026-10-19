@@ -48,11 +48,6 @@ func main() {
 		dbPath = "paperviz.db"
 	}
 
-	staticDir := os.Getenv("STATIC_DIR")
-	if staticDir == "" {
-		staticDir = "frontend/dist"
-	}
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -129,7 +124,7 @@ func main() {
 	// run in its own goroutine, not block main().
 	go services.RunExpirySweepLoop(repository.NewDocumentRepo(db))
 
-	router := handlers.NewRouter(db, resolver, staticDir)
+	router := handlers.NewRouter(db, resolver)
 
 	slog.Info("paperviz server starting", "port", port, "database_path", dbPath)
 	if err := http.ListenAndServe(":"+port, router); err != nil {

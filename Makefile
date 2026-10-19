@@ -1,10 +1,10 @@
-.PHONY: build run dev install-air clean container container-run
+.PHONY: build run dev frontend-dev install-air clean container container-run
 
 # Which env file to export. Override for another local profile:
 #   make run ENV_FILE=.env.staging
 ENV_FILE ?= .env.development
 
-build: frontend/dist
+build:
 	CGO_ENABLED=0 go build -o server ./cmd/server
 
 # Vite loads `.env.<mode>`, and `vite build` runs in production mode — so with
@@ -20,6 +20,11 @@ run: build
 
 dev:
 	PATH="$$(go env GOPATH)/bin:$$PATH" air
+
+# The Go binary serves the API only; the SPA is a separate process (Vite in dev,
+# Cloudflare Pages in prod). Run both during local development.
+frontend-dev:
+	cd frontend && npm run dev
 
 install-air:
 	go install github.com/air-verse/air@latest

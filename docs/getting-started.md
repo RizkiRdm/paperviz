@@ -47,9 +47,13 @@ INGESTION_ENABLED=true
 PIPELINE_MAX_CONCURRENCY=2
 
 DATABASE_PATH=paperviz.db
-STATIC_DIR=frontend/dist
 PORT=8080
 ```
+
+Two processes run locally: the Go API on `PORT`, and the SPA in Vite on
+`http://localhost:5173` (its `/api` requests are proxied to the Go port, so
+`VITE_API_BASE_URL` can stay unset locally). Start them with `make dev` and
+`make frontend-dev`.
 
 Generate the one required secret with:
 
@@ -223,13 +227,16 @@ set +a
 ./server
 ```
 
-Open `http://localhost:8080`. The Go binary serves both `/api/*` and the built SPA from `STATIC_DIR`.
+Open `http://localhost:8080` — that is the API, so `GET /` answers with JSON
+status and unknown paths answer 404. For the web app, run `make frontend-dev` (or
+`cd frontend && npm run dev`) and open `http://localhost:5173`.
 
 Repository shortcuts are also available:
 
 ```bash
-make build
-make run
+make build          # Go binary only
+make run            # build + run the API with .env.development exported
+make frontend-dev   # Vite dev server for the SPA
 ```
 
 ## 9. Run verification commands

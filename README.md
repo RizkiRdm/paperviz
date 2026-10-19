@@ -172,9 +172,10 @@ Vite proxies `/api` requests to the backend port configured by `PORT`.
 ```bash
 make build
 make run
+make frontend-dev
 ```
 
-`make build` installs frontend dependencies when needed, creates `frontend/dist`, and builds `./server`. `make run` rebuilds and starts that binary with variables exported from `.env.development` (`ENV_FILE=` to override).
+`make build` compiles `./server` (the API only — it serves no static files). `make run` rebuilds and starts it with variables exported from `.env.development` (`ENV_FILE=` to override). `make frontend-dev` runs the Vite dev server for the SPA on `http://localhost:5173`; run both during development.
 
 For explicit builds:
 

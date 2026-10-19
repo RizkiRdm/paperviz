@@ -23,6 +23,7 @@ PaperViz converts academic papers (PDF/pasted text/DOI/URL) into simplified-lang
 - LLM: provider-agnostic HTTP client with one backend per vendor. Keys are supplied per request (BYOK) from the user's own stored credential; the server holds no model vendor account.
 - PDF processing: Go-native text/image extraction libraries (pinned exact versions in `go.mod`).
 - No Docker/orchestration requirement for MVP — single binary + SQLite file.
+- Backend is a headless REST API (no static file serving). The SPA is deployed separately (Cloudflare Pages) and reaches the API cross-origin: `ALLOWED_ORIGINS` allowlists its origin, `VITE_API_BASE_URL` is inlined at build time. Local dev runs two processes (`make dev` + `make frontend-dev`, Vite proxies `/api`). Never re-add a FileServer/SPA fallback to the router.
 - Agent access: `internal/mcp` (stdio MCP server, `cmd/mcp`), stateless text intake and research-data retrieval, separate interface sharing services/data with REST. See `docs/mcp-parity.md`.
 
 ## graphify
