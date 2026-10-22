@@ -1,18 +1,11 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useSignUp, useClerk } from "@clerk/clerk-react"
-import { ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { clerkErrorMessage } from "@/lib/auth"
 import { capture, identify } from "@/lib/analytics"
 
 const STEP_DETAILS = "details"
 const STEP_CODE = "code"
-
-const INPUT_CLASS =
-  "w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb]"
-
-const LABEL_CLASS = "block text-xs font-medium text-[#737373] mb-1.5"
 
 export function SignupPage() {
   const navigate = useNavigate()
@@ -39,20 +32,13 @@ export function SignupPage() {
     }
   }
 
-  // activateSession turns a finished signup into a live session, then records
-  // the conversion. Clerk returns a session id that only exists once every
-  // required step is done.
-  async function activateSession(signUpResource) {
-    await setActive({ session: signUpResource.session?.id })
+  async function activateSession() {
+    await setActive({ session: signUp.session?.id })
     identify(email)
     capture("signup_completed")
     navigate("/account")
   }
 
-  // signUp.create is the only creation entry point on the resource: it takes
-  // emailAddress + password together and returns a status. The older
-  // attemptEmailAddress / attemptPassword pair does not exist on the resource,
-  // so splitting signup across those steps fails for every user.
   async function submitDetails(e) {
     e.preventDefault()
     const value = e.currentTarget.email.value.trim()
@@ -74,7 +60,7 @@ export function SignupPage() {
         setStep(STEP_CODE)
         return
       }
-      await activateSession(signUp)
+      await activateSession()
     } catch (err) {
       if (import.meta.env.DEV) console.error("signup failed", err)
       setError(clerkErrorMessage(err?.errors, "We could not create your account."))
@@ -95,7 +81,7 @@ export function SignupPage() {
     try {
       const attempt = await signUp.attemptEmailAddressVerification({ code })
       if (attempt.status === "complete") {
-        await activateSession(signUp)
+        await activateSession()
         return
       }
       setError(clerkErrorMessage(attempt.error, "That code was not accepted."))
@@ -110,100 +96,33 @@ export function SignupPage() {
   const disabled = isSubmitting || !isLoaded
 
   return (
-    <div className="relative min-h-screen bg-white bg-dotted-grid flex items-center justify-center px-6">
-      <header className="absolute left-6 top-6">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#e5e5e5] bg-white px-3 py-1.5 text-sm font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Link>
-      </header>
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-[#0a0a0a] text-white font-mono text-xs font-bold">
-              PV
-            </div>
-            <span className="font-mono text-sm font-semibold tracking-tight text-[#0a0a0a]">PaperViz</span>
-          </Link>
-          <h1 className="font-satoshi text-2xl font-medium text-[#0a0a0a]">
-            {step === STEP_CODE ? "Check your email" : "Create your account"}
-          </h1>
-          <p className="mt-1 text-sm text-[#737373]">
-            {step === STEP_CODE
-              ? `We sent a code to ${email}`
-              : "Get started with PaperViz"}
-          </p>
-        </div>
-
-        <div className="rounded-[12px] border border-[#e5e5e5] bg-white p-6">
+    <div className="auth-screen dot-grid">
+      <div className="auth-card-wrap">
+        <Link to="/" className="brand auth-brand"><span className="brand__mark">PV</span><span>PaperViz</span></Link>
+        <div className="auth-card">
+          <p className="eyebrow">ACCOUNT</p>
+          <h1>{step === STEP_CODE ? "Check your email" : "Create your account"}</h1>
+          <p className="muted">{step === STEP_CODE ? `We sent a code to ${email}` : "A simple session for your research workspace."}</p>
           {step === STEP_DETAILS && (
-            <>
-              <button
-                type="button"
-                onClick={handleGoogle}
-                disabled={disabled}
-                className="w-full rounded-[6px] border border-[#e5e5e5] bg-white px-3 py-2 text-sm font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors disabled:opacity-50"
-              >
-                Continue with Google
-              </button>
-              <div className="my-4 flex items-center gap-3 text-xs text-[#a3a3a3]">
-                <div className="h-px flex-1 bg-[#e5e5e5]" />
-                <span>or</span>
-                <div className="h-px flex-1 bg-[#e5e5e5]" />
-              </div>
-              <form onSubmit={submitDetails} className="space-y-4">
-              <div>
-                <label htmlFor="email" className={LABEL_CLASS}>Email</label>
-                <input id="email" name="email" type="email" className={INPUT_CLASS}
-                  placeholder="you@example.com" autoComplete="email" disabled={disabled} />
-              </div>
-              <div>
-                <label htmlFor="password" className={LABEL_CLASS}>Password</label>
-                <input id="password" name="password" type="password" className={INPUT_CLASS}
-                  placeholder="At least 8 characters" autoComplete="new-password" disabled={disabled} />
-              </div>
-              {error && <ErrorNote message={error} />}
-              <Button type="submit" disabled={disabled} className="w-full">
-                {isSubmitting ? "Creating account..." : "Create account"}
-              </Button>
+            <form className="stack" onSubmit={submitDetails}>
+              <button type="button" onClick={handleGoogle} disabled={disabled} className="btn btn--outline btn--full">Continue with Google</button>
+              <div className="divider"><span>or</span></div>
+              <label className="field"><span>Email</span><input id="email" name="email" type="email" placeholder="you@example.com" autoComplete="email" disabled={disabled} /></label>
+              <label className="field"><span>Password</span><input id="password" name="password" type="password" placeholder="At least 8 characters" autoComplete="new-password" disabled={disabled} /></label>
+              {error && <div className="alert alert--error">{error}</div>}
+              <button type="submit" className="btn btn--dark btn--full" disabled={disabled}>{isSubmitting ? "Creating account..." : "Create account"}</button>
             </form>
-            </>
           )}
-
           {step === STEP_CODE && (
-            <form onSubmit={submitCode} className="space-y-4">
-              <div>
-                <label htmlFor="code" className={LABEL_CLASS}>Verification code</label>
-                <input id="code" name="code" type="text" inputMode="numeric" className={INPUT_CLASS}
-                  placeholder="123456" autoComplete="one-time-code" disabled={disabled} />
-              </div>
-              {error && <ErrorNote message={error} />}
-              <Button type="submit" disabled={disabled} className="w-full">
-                {isSubmitting ? "Verifying..." : "Verify"}
-              </Button>
+            <form className="stack" onSubmit={submitCode}>
+              <label className="field"><span>Verification code</span><input id="code" name="code" type="text" inputMode="numeric" placeholder="123456" autoComplete="one-time-code" disabled={disabled} /></label>
+              {error && <div className="alert alert--error">{error}</div>}
+              <button type="submit" className="btn btn--dark btn--full" disabled={disabled}>{isSubmitting ? "Verifying..." : "Verify"}</button>
             </form>
           )}
-
-          {step !== STEP_CODE && (
-            <p className="mt-4 text-center text-xs text-[#737373]">
-              Already have an account?{" "}
-              <Link to="/login" className="text-[#2563eb] hover:underline">Sign in</Link>
-            </p>
-          )}
+          {step !== STEP_CODE && <p className="auth-meta">Already have an account? <Link to="/login">Sign in</Link></p>}
         </div>
       </div>
-    </div>
-  )
-}
-
-// ErrorNote keeps the inline error treatment identical across both steps.
-function ErrorNote({ message }) {
-  return (
-    <div className="rounded-[6px] bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-      {message}
     </div>
   )
 }

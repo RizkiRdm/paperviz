@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Link } from "react-router-dom"
+import { AppShell } from "@/components/app-shell"
 
 // PaperViz ships a stdio MCP server (cmd/mcp). It runs on the user's own
 // machine, against their own SQLite file, calling the provider with their own
@@ -70,21 +70,12 @@ export function AgentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white bg-dotted-grid">
-      <div className="mx-auto max-w-3xl px-6 py-12">
-        <div className="mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-[#0a0a0a] text-white font-mono text-xs font-bold">
-              PV
-            </div>
-            <span className="font-mono text-sm font-semibold tracking-tight text-[#0a0a0a]">PaperViz</span>
-          </Link>
-          <h1 className="font-satoshi text-3xl font-medium text-[#0a0a0a]">Add PaperViz to your agent</h1>
-          <p className="mt-2 text-sm text-[#737373]">
-            PaperViz ships an MCP server that runs on your machine. It reads your
-            local PaperViz database and calls the model provider with your own key.
-          </p>
-        </div>
+    <AppShell active="agents">
+      <div className="page-intro">
+        <p className="eyebrow">AGENTS / MCP</p>
+        <h1>Add PaperViz to your agent</h1>
+        <p className="muted">PaperViz ships a local stdio MCP server. Setup is intentionally explicit because the current repository does not expose a hosted MCP transport.</p>
+      </div>
 
         <div className="rounded-[12px] border border-[#e5e5e5] bg-white">
           <div className="flex border-b border-[#e5e5e5]" role="tablist" aria-label="MCP client">
@@ -144,12 +135,8 @@ export function AgentsPage() {
         </div>
 
         <p className="mt-6 text-xs text-[#737373] text-center">
-          Need help? Check the{" "}
-          <a href="https://github.com/rizki/paperviz#readme" className="text-[#2563eb] hover:underline">
-            documentation
-          </a>
+          Need help? Check the documentation.
         </p>
-      </div>
-    </div>
+    </AppShell>
   )
 }
