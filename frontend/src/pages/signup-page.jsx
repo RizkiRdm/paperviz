@@ -107,15 +107,15 @@ export function SignupPage() {
             <form className="stack" onSubmit={submitDetails}>
               <button type="button" onClick={handleGoogle} disabled={disabled} className="btn btn--outline btn--full">Continue with Google</button>
               <div className="divider"><span>or</span></div>
-              <label className="field"><span>Email</span><input name="email" type="email" placeholder="you@example.com" autoComplete="email" disabled={disabled} required /></label>
-              <label className="field"><span>Password</span><input name="password" type="password" placeholder="At least 8 characters" autoComplete="new-password" disabled={disabled} required /></label>
+              <label className="field"><span>Email</span><input id="email" name="email" type="email" placeholder="you@example.com" autoComplete="email" disabled={disabled} /></label>
+              <label className="field"><span>Password</span><input id="password" name="password" type="password" placeholder="At least 8 characters" autoComplete="new-password" disabled={disabled} /></label>
               {error && <div className="alert alert--error">{error}</div>}
               <button type="submit" className="btn btn--dark btn--full" disabled={disabled}>{isSubmitting ? "Creating account..." : "Create account"}</button>
             </form>
           )}
           {step === STEP_CODE && (
             <form className="stack" onSubmit={submitCode}>
-              <label className="field"><span>Verification code</span><input name="code" type="text" inputMode="numeric" placeholder="123456" autoComplete="one-time-code" disabled={disabled} required /></label>
+              <label className="field"><span>Verification code</span><input id="code" name="code" type="text" inputMode="numeric" placeholder="123456" autoComplete="one-time-code" disabled={disabled} /></label>
               {error && <div className="alert alert--error">{error}</div>}
               <button type="submit" className="btn btn--dark btn--full" disabled={disabled}>{isSubmitting ? "Verifying..." : "Verify"}</button>
             </form>

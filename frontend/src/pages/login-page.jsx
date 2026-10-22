@@ -66,8 +66,8 @@ export function LoginPage() {
           <form className="stack" onSubmit={handleSubmit}>
             <button type="button" onClick={handleGoogle} disabled={isSubmitting || !isLoaded} className="btn btn--outline btn--full">Continue with Google</button>
             <div className="divider"><span>or</span></div>
-            <label className="field"><span>Email</span><input name="email" type="email" placeholder="you@example.com" autoComplete="email" disabled={isSubmitting || !isLoaded} required /></label>
-            <label className="field"><span>Password</span><input name="password" type="password" placeholder="Your password" autoComplete="current-password" disabled={isSubmitting || !isLoaded} required /></label>
+            <label className="field"><span>Email</span><input id="email" name="email" type="email" placeholder="you@example.com" autoComplete="email" disabled={isSubmitting || !isLoaded} /></label>
+            <label className="field"><span>Password</span><input id="password" name="password" type="password" placeholder="Your password" autoComplete="current-password" disabled={isSubmitting || !isLoaded} /></label>
             {error && <div className="alert alert--error">{error}</div>}
             <button type="submit" className="btn btn--dark btn--full" disabled={isSubmitting || !isLoaded}>{isSubmitting ? "Signing in..." : "Sign in"}</button>
           </form>

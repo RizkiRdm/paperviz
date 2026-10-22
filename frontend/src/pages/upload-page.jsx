@@ -136,7 +136,7 @@ export function UploadPage() {
       <div className="container section" id="agents-capability">
         <div className="agent-promo">
           <div><p className="eyebrow">AGENT CAPABILITY</p><h2>Research context that AI agents can inspect and reuse.</h2><p>The current repository ships a local stdio MCP server with five deterministic tools. This page shows setup, not a fictional hosted agent marketplace.</p></div>
-          <div className="agent-promo__code"><code>claude mcp add paperviz -- /absolute/path/to/paperviz-mcp</code><button className="btn btn--outline" type="button">Copy</button></div>
+          <div className="agent-promo__code"><code>claude mcp add paperviz -- /absolute/path/to/paperviz-mcp</code><Link to="/agents" className="btn btn--dark">Add to Claude Code</Link></div>
         </div>
       </div>
 
