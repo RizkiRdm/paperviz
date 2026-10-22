@@ -5,7 +5,7 @@ test.describe('Landing / Upload Page', () => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
     await expect(page).toHaveTitle(/PaperViz/)
-    await expect(page.locator('h1')).toContainText('Papers, in plain language')
+    await expect(page.locator('h1')).toContainText('Turn research papers into evidence you can inspect.')
   })
 
   test('shows two CTAs: Add to Claude Code and Sign in', async ({ page }) => {
@@ -25,8 +25,8 @@ test.describe('Landing / Upload Page', () => {
   test('shows Sign in to an anonymous visitor', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
-    await expect(page.locator('h1 ~ div a[href="/login"]')).toBeVisible()
-    await expect(page.locator('h1 ~ div a[href="/account"]')).toHaveCount(0)
+    await expect(page.locator('a[href="/login"]')).toBeVisible()
+    await expect(page.locator('a[href="/account"]')).toHaveCount(0)
   })
 
   test('shows PDF/Paste/DOI/URL tab selector', async ({ page }) => {
