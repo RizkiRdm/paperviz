@@ -1,5 +1,7 @@
 # PaperViz
 
+![PaperViz landing page](assets/landing-page.png)
+
 PaperViz turns academic papers into simplified explanations, verified claims, and evidence-grounded figures. It is designed for AI agents that need structured research data, with a web app for account management and manual paper upload.
 
 PaperViz holds no model vendor account and no billing account: users bring their own model key, which is encrypted at rest, and model spend belongs to the user. Authentication is handled by Clerk, which makes PaperViz's identity a SaaS dependency — a trade documented in [`ADR-003`](docs/DECISIONS/ADR-003-clerk-auth.md), along with the lock-in risk it accepts.
