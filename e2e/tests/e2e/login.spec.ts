@@ -4,7 +4,7 @@ test.describe('Login Page', () => {
   test('loads with login form', async ({ page }) => {
     await page.goto('/login')
     await page.waitForLoadState('networkidle')
-    await expect(page.locator('h1')).toContainText('Welcome back')
+    await expect(page.locator('h1')).toContainText('Sign in')
     await expect(page.locator('#email')).toBeVisible()
     await expect(page.locator('#password')).toBeVisible()
     await expect(page.locator('button[type="submit"]')).toContainText('Sign in')
