@@ -6,6 +6,7 @@ import { UploadPage } from "@/pages/upload-page"
 import { ResultPage } from "@/pages/result-page"
 import { LoginPage } from "@/pages/login-page"
 import { SignupPage } from "@/pages/signup-page"
+import { SsoCallbackPage } from "@/pages/sso-callback-page"
 import { AccountPage } from "@/pages/account-page"
 import { ShareFigurePage } from "@/pages/share-figure-page"
 import { SharePaperPage } from "@/pages/share-paper-page"
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/dashboard" element={<Navigate to="/account" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/sso-callback" element={<SsoCallbackPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/share/fig/:shareToken" element={<ShareFigurePage />} />

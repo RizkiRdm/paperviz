@@ -10,12 +10,10 @@ test.describe('Login Page', () => {
     await expect(page.locator('button[type="submit"]')).toContainText('Sign in')
   })
 
-  // PaperViz holds no Google account, so the OAuth affordance must stay gone.
-  test('has no Google OAuth affordance', async ({ page }) => {
+  test('has Google OAuth affordance', async ({ page }) => {
     await page.goto('/login')
     await page.waitForLoadState('networkidle')
-    await expect(page.locator('a[href="/api/auth/google/login"]')).toHaveCount(0)
-    await expect(page.locator('text=Continue with Google')).toHaveCount(0)
+    await expect(page.locator('text=Continue with Google')).toBeVisible()
   })
 
   test('has link to signup', async ({ page }) => {
