@@ -11,6 +11,21 @@ export function LoginPage() {
   const [error, setError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  async function handleGoogle() {
+    if (!isLoaded) return
+    setError(null)
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: "/sso-callback",
+        redirectUrlComplete: "/account",
+      })
+    } catch (err) {
+      if (import.meta.env.DEV) console.error("google sign-in failed", err)
+      setError(clerkErrorMessage(err?.errors, "Google sign-in failed."))
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     const form = e.currentTarget
@@ -74,6 +89,19 @@ export function LoginPage() {
         </div>
 
         <div className="rounded-[12px] border border-[#e5e5e5] bg-white p-6">
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={isSubmitting || !isLoaded}
+            className="w-full rounded-[6px] border border-[#e5e5e5] bg-white px-3 py-2 text-sm font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors disabled:opacity-50"
+          >
+            Continue with Google
+          </button>
+          <div className="my-4 flex items-center gap-3 text-xs text-[#a3a3a3]">
+            <div className="h-px flex-1 bg-[#e5e5e5]" />
+            <span>or</span>
+            <div className="h-px flex-1 bg-[#e5e5e5]" />
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-xs font-medium text-[#737373] mb-1.5">Email</label>
