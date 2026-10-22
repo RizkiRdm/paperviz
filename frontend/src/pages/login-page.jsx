@@ -1,8 +1,6 @@
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useSignIn } from "@clerk/clerk-react"
-import { ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { clerkErrorMessage } from "@/lib/auth"
 
 export function LoginPage() {
@@ -39,11 +37,6 @@ export function LoginPage() {
     setError(null)
     setIsSubmitting(true)
     try {
-      // signIn.create with the password strategy is the one-call form: it takes
-      // identifier + password together. attemptFirstFactor is only valid after
-      // an existing sign-in attempt exists, so it 422s here, and the resource
-      // has no attemptEmailAddress method at all — both failures look like a
-      // generic error for every single sign-in.
       const attempt = await signIn.create({
         strategy: "password",
         identifier: email,
@@ -53,9 +46,6 @@ export function LoginPage() {
         navigate("/account")
         return
       }
-      // Password sign-in completed but the session is not active yet, which
-      // means Clerk wants another factor. PaperViz enables no second factor,
-      // so this is reported rather than left on a dead button.
       setError(clerkErrorMessage(attempt.error, "Sign-in needs an extra step this page does not support."))
     } catch (err) {
       if (import.meta.env.DEV) console.error("login failed", err)
@@ -66,83 +56,22 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-white bg-dotted-grid flex items-center justify-center px-6">
-      <header className="absolute left-6 top-6">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-1.5 rounded-[8px] border border-[#e5e5e5] bg-white px-3 py-1.5 text-sm font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Link>
-      </header>
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-[#0a0a0a] text-white font-mono text-xs font-bold">
-              PV
-            </div>
-            <span className="font-mono text-sm font-semibold tracking-tight text-[#0a0a0a]">PaperViz</span>
-          </Link>
-          <h1 className="font-satoshi text-2xl font-medium text-[#0a0a0a]">Welcome back</h1>
-          <p className="mt-1 text-sm text-[#737373]">Sign in to your account</p>
-        </div>
-
-        <div className="rounded-[12px] border border-[#e5e5e5] bg-white p-6">
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={isSubmitting || !isLoaded}
-            className="w-full rounded-[6px] border border-[#e5e5e5] bg-white px-3 py-2 text-sm font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors disabled:opacity-50"
-          >
-            Continue with Google
-          </button>
-          <div className="my-4 flex items-center gap-3 text-xs text-[#a3a3a3]">
-            <div className="h-px flex-1 bg-[#e5e5e5]" />
-            <span>or</span>
-            <div className="h-px flex-1 bg-[#e5e5e5]" />
-          </div>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-xs font-medium text-[#737373] mb-1.5">Email</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                className="w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb]"
-                placeholder="you@example.com"
-                autoComplete="email"
-                disabled={isSubmitting || !isLoaded}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-xs font-medium text-[#737373] mb-1.5">Password</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                className="w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb]"
-                placeholder="Your password"
-                autoComplete="current-password"
-                disabled={isSubmitting || !isLoaded}
-              />
-            </div>
-
-            {error && (
-              <div className="rounded-[6px] bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-                {error}
-              </div>
-            )}
-
-            <Button type="submit" disabled={isSubmitting || !isLoaded} className="w-full">
-              {isSubmitting ? "Signing in..." : "Sign in"}
-            </Button>
+    <div className="auth-screen dot-grid">
+      <div className="auth-card-wrap">
+        <Link to="/" className="brand auth-brand"><span className="brand__mark">PV</span><span>PaperViz</span></Link>
+        <div className="auth-card">
+          <p className="eyebrow">ACCOUNT</p>
+          <h1>Sign in</h1>
+          <p className="muted">Return to your research workspace.</p>
+          <form className="stack" onSubmit={handleSubmit}>
+            <button type="button" onClick={handleGoogle} disabled={isSubmitting || !isLoaded} className="btn btn--outline btn--full">Continue with Google</button>
+            <div className="divider"><span>or</span></div>
+            <label className="field"><span>Email</span><input name="email" type="email" placeholder="you@example.com" autoComplete="email" disabled={isSubmitting || !isLoaded} required /></label>
+            <label className="field"><span>Password</span><input name="password" type="password" placeholder="Your password" autoComplete="current-password" disabled={isSubmitting || !isLoaded} required /></label>
+            {error && <div className="alert alert--error">{error}</div>}
+            <button type="submit" className="btn btn--dark btn--full" disabled={isSubmitting || !isLoaded}>{isSubmitting ? "Signing in..." : "Sign in"}</button>
           </form>
-
-          <p className="mt-4 text-center text-xs text-[#737373]">
-            Don't have an account?{" "}
-            <Link to="/signup" className="text-[#2563eb] hover:underline">Sign up</Link>
-          </p>
+          <p className="auth-meta">Don't have an account? <Link to="/signup">Sign up</Link></p>
         </div>
       </div>
     </div>

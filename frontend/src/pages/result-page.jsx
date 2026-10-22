@@ -45,7 +45,7 @@ export function ResultPage() {
   const hasChapters = doc.chapters && doc.chapters.length > 1
 
   return (
-    <div className="min-h-screen bg-white text-[#171717] bg-dotted-grid">
+    <div className="workspace-shell bg-dotted-grid">
       <ResultHeader
         doc={doc}
         visibility={visibility}
@@ -58,7 +58,7 @@ export function ResultPage() {
         onToggleClaims={() => setShowClaims(v => !v)}
       />
 
-      <main className="mx-auto max-w-[900px] px-6 py-12">
+      <main className="container workspace-content">
         {state === "partial" && (
           <div className="mb-6">
             <WarningBanner detail={doc.claim_diff?.mismatch_detail} />

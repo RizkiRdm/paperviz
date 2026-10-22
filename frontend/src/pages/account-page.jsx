@@ -6,6 +6,7 @@ import { useClerk } from "@clerk/clerk-react"
 import { useAccount } from "@/hooks/useAccount"
 import { CredentialsCard } from "@/components/account/credentials-card"
 import { AgentKeyCard } from "@/components/account/agent-key-card"
+import { AppShell } from "@/components/app-shell"
 
 export function AccountPage() {
   const {
@@ -60,9 +61,13 @@ export function AccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white bg-dotted-grid">
-      <div className="mx-auto max-w-lg px-6 py-12">
-        <div className="mb-8">
+    <AppShell active="account">
+      <div className="page-intro">
+        <p className="eyebrow">ACCOUNT</p>
+        <h1>Account</h1>
+        <p className="muted">{user.email}</p>
+      </div>
+      <div className="stack">
           <Link to="/" className="inline-flex items-center gap-2 mb-6">
             <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-[#0a0a0a] text-white font-mono text-xs font-bold">
               PV
@@ -133,7 +138,6 @@ export function AccountPage() {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </AppShell>
   )
 }
