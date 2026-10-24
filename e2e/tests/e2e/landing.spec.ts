@@ -8,6 +8,14 @@ test.describe('Landing / Upload Page', () => {
     await expect(page.locator('h1')).toContainText('Turn research papers into evidence you can inspect.')
   })
 
+  // Regression: a bundle built without VITE_CLERK_PUBLISHABLE_KEY renders
+  // this guard text instead of the app on every route, including public ones.
+  test('does not render the missing-publishable-key guard', async ({ page }) => {
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('text=VITE_CLERK_PUBLISHABLE_KEY is not set')).toHaveCount(0)
+  })
+
   test('shows two CTAs: Add to Claude Code and Sign in', async ({ page }) => {
     await page.goto('/')
     await page.waitForLoadState('networkidle')
