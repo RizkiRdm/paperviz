@@ -1,4 +1,4 @@
-.PHONY: build run dev frontend-dev install-air clean container container-run
+.PHONY: build run dev frontend-dev frontend/dist frontend-bundle-check deploy-frontend install-air clean container container-run
 
 # Which env file to export. Override for another local profile:
 #   make run ENV_FILE=.env.staging
@@ -12,8 +12,20 @@ build:
 # VITE_CLERK_PUBLISHABLE_KEY and the bundle rendered the "key is not set"
 # message. Exporting the env file into the build process is what actually
 # works, and it is mode-independent.
+#
+# Declared .PHONY on purpose: as a real `frontend/dist` directory target it had
+# no prerequisites, so after the first build make always reported it
+# "up-to-date" and skipped the build — which is how a stale, keyless bundle got
+# deployed. It now rebuilds every time, then asserts the key is actually
+# inlined.
 frontend/dist:
 	cd frontend && npm ci && export $$(grep -v '^#' $(CURDIR)/$(ENV_FILE) | xargs) && npm run build
+	./scripts/frontend-bundle-check.sh frontend/dist
+
+# Manual Cloudflare SPA deploy. Build (guarded) first, then ship — never deploy
+# a dist that skipped the key check.
+deploy-frontend: frontend/dist
+	npx wrangler deploy
 
 run: build
 	export $$(grep -v '^#' $(ENV_FILE) | xargs) && ./server

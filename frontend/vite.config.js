@@ -12,13 +12,15 @@ import path from 'path'
 // backend allowlisting that origin in ALLOWED_ORIGINS. Local dev leaves
 // VITE_API_BASE_URL unset so relative /api paths go through the proxy below.
 export default defineConfig(({ mode }) => {
-  // Load .env from project root so PORT in .env matches the backend proxy
-  // target. Vite's config function runs before .envDir is processed, so we
-  // need loadEnv explicitly here.
-  const env = loadEnv(mode, path.resolve(__dirname, '..'), '')
+  // Repo root is the canonical local env location (.env.development lives
+  // there per AGENTS.md); without envDir Vite only reads frontend/ and the
+  // dev server boots without VITE_CLERK_PUBLISHABLE_KEY (guard screen).
+  const repoRoot = path.resolve(__dirname, '..')
+  const env = loadEnv(mode, repoRoot, '')
   const backendPort = env.PORT || "8080"
 
   return {
+    envDir: repoRoot,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

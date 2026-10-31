@@ -2,10 +2,26 @@
 # Used for: CDN/edge serving, split deployments, frontend-only testing
 FROM node:24-alpine AS build
 WORKDIR /build
+
+# Vite inlines VITE_* at build time, so the key must be present before
+# `npm run build`. Declared as ARG (build-time) not ENV (runtime): the SPA is
+# static, there is no runtime to read it. Fail the build rather than ship an
+# image whose every route renders "key is not set".
+ARG VITE_CLERK_PUBLISHABLE_KEY
+RUN test -n "$VITE_CLERK_PUBLISHABLE_KEY" || { \
+      echo "ERROR: build-arg VITE_CLERK_PUBLISHABLE_KEY is required." >&2; \
+      echo "Pass it with: podman build --build-arg VITE_CLERK_PUBLISHABLE_KEY=pk_..." >&2; \
+      exit 1; \
+    }
+
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ .
-RUN npm run build
+# Copy the shared bundle guard in, run it against the build output so an
+# un-inlined key fails the image build instead of shipping a broken SPA.
+COPY scripts/frontend-bundle-check.sh /usr/local/bin/frontend-bundle-check.sh
+RUN VITE_CLERK_PUBLISHABLE_KEY="$VITE_CLERK_PUBLISHABLE_KEY" npm run build
+RUN frontend-bundle-check.sh dist
 
 FROM nginx:alpine
 COPY --from=build /build/dist /usr/share/nginx/html
