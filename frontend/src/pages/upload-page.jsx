@@ -56,7 +56,7 @@ export function UploadPage() {
           <h1 className="display">Turn research papers into evidence you can inspect.</h1>
           <p className="hero__copy">PaperViz extracts claims, supporting evidence, and figures from research papers so you can understand, trace, and reuse the underlying research context.</p>
           <div className="cluster cluster--center">
-            <a className="btn btn--dark btn--lg" href="#analyze">Analyze a paper</a>
+            <a className="btn btn--dark btn--lg" href="#analyze-form">Analyze a paper</a>
             <a className="btn btn--outline btn--lg" href="#workflow">See how it works</a>
           </div>
         </div>

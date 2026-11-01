@@ -1,36 +1,43 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
 
 export function AppShell({ active, children }) {
   const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setOpen(false)
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [open])
+
   const nav = [
-    { id: "home", label: "Home", to: "/" },
-    { id: "papers", label: "My Papers", to: "/papers" },
-    { id: "agents", label: "Agents", to: "/agents" },
+    { id: "home", label: "Home", to: "/", icon: "⌂" },
+    { id: "agents", label: "Agents", to: "/agents", icon: "⌘" },
   ]
   const account = [
-    { id: "account", label: "Account", to: "/account" },
-    { id: "settings", label: "Settings", to: "/settings" },
-    { id: "help", label: "Help", to: "/help" },
+    { id: "account", label: "Account", to: "/account", icon: "◎" },
   ]
 
   return (
     <div className="app-shell">
-      <aside className={`sidebar ${open ? "is-open" : ""}`}>
+      <aside id="app-sidebar" inert={!open} className={`sidebar ${open ? "is-open" : ""}`}>
         <div className="sidebar__top">
           <Link to="/" className="brand"><span className="brand__mark">PV</span><span>PaperViz</span></Link>
         </div>
-        <nav className="sidebar__nav" aria-label="Application">
+        <nav id="app-sidebar-nav" className="sidebar__nav" aria-label="Application">
           <span className="nav-label">Workspace</span>
           {nav.map((item) => (
-            <Link key={item.id} to={item.to} className={`side-item ${active === item.id ? "is-active" : ""}`} onClick={() => setOpen(false)}>
-              <span>{item.id === "home" ? "⌂" : item.id === "papers" ? "□" : "⌘"}</span>{item.label}
+            <Link key={item.id} to={item.to} className={`side-item ${active === item.id ? "is-active" : ""}`} aria-current={active === item.id ? "page" : undefined} onClick={() => setOpen(false)}>
+              <span aria-hidden="true">{item.icon}</span>{item.label}
             </Link>
           ))}
           <span className="nav-label nav-label--spaced">Account</span>
           {account.map((item) => (
-            <Link key={item.id} to={item.to} className={`side-item ${active === item.id ? "is-active" : ""}`} onClick={() => setOpen(false)}>
-              <span>{item.id === "account" ? "◎" : item.id === "settings" ? "⚙" : "?"}</span>{item.label}
+            <Link key={item.id} to={item.to} className={`side-item ${active === item.id ? "is-active" : ""}`} aria-current={active === item.id ? "page" : undefined} onClick={() => setOpen(false)}>
+              <span aria-hidden="true">{item.icon}</span>{item.label}
             </Link>
           ))}
         </nav>
@@ -38,7 +45,9 @@ export function AppShell({ active, children }) {
       </aside>
       <div className="app-main">
         <header className="mobile-header">
-          <button className="icon-btn" type="button" aria-label="Open navigation" onClick={() => setOpen((v) => !v)}>☰</button>
+          <button className="icon-btn" type="button" aria-label={open ? "Close navigation" : "Open navigation"} aria-expanded={open} aria-controls="app-sidebar-nav" onClick={() => setOpen((v) => !v)}>
+            <span aria-hidden="true">☰</span>
+          </button>
           <span className="brand brand--compact"><span className="brand__mark">PV</span><span>PaperViz</span></span>
         </header>
         <main className="container app-content">{children}</main>
