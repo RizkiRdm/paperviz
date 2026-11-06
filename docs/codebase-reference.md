@@ -208,6 +208,7 @@ max_open_conns = 1
 | `/signup` | `SignupPage` | Clerk-backed sign-up form |
 | `/account` | `AccountPage` | Account, API key, usage, and stored model keys |
 | `/agents` | `AgentsPage` | Generated agent-client configuration |
+| `/sample` | `SamplePage` | Replaces navigation with the seeded guest sample (`SamplePaperCells`) |
 | `/share/fig/:shareToken` | `ShareFigurePage` | Public figure view |
 | `/share/doc/:shareToken` | `SharePaperPage` | Public paper view |
 | `/:documentId` | `ResultPage` | Processing and result sections |
@@ -274,6 +275,7 @@ Clerk owns signup, sign-in, and sessions (ADR-003); `POST /api/auth/signup` and 
 |---|---|---|
 | `POST/GET /api/credentials/` | Required | Store (encrypted) or list model keys |
 | `POST /api/credentials/{id}/default` | Required | Set default key |
+| `POST /api/credentials/{id}/validate` | Required | Ping provider once with the stored key; returns valid/reason without echoing key material |
 | `DELETE /api/credentials/{id}` | Required | Delete stored key |
 
 ### Account
@@ -438,6 +440,7 @@ Filenames on disk carry a 6-digit prefix (`000001_init.up.sql`); short names bel
 | 020 | `020_user_credentials.sql` | Per-user encrypted model keys |
 | 021 | `021_drop_oauth_billing.sql` | Removes OAuth columns and Stripe columns |
 | 022 | `022_clerk_auth.sql` | Drops `sessions` table and password columns (Clerk) |
+| 023 | `000023_seed_sample.up.sql` | Seeded anonymous guest sample document |
 
 ## Test locations
 
