@@ -125,7 +125,7 @@ export function SignupPage() {
               <button type="submit" className="btn btn--dark btn--full" disabled={disabled}>{isSubmitting ? "Verifying..." : "Verify"}</button>
             </form>
           )}
-          {step !== STEP_CODE && <p className="auth-meta">Already have an account? <Link to="/login">Sign in</Link></p>}
+          {step !== STEP_CODE && <p className="auth-meta">Already have an account? <Link to={redirectTo !== "/account" ? `/login?returnTo=${encodeURIComponent(redirectTo)}` : "/login"}>Sign in</Link></p>}
         </div>
       </div>
     </div>

@@ -14,7 +14,11 @@ export function loadDraft() {
     const raw = sessionStorage.getItem(DRAFT_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === "object" ? parsed : null
+    if (!parsed || typeof parsed !== "object") return null
+    // Unvalidated mode would crash INGEST_TABS.find(...).source in useIngest;
+    // a poisoned draft must be dropped, not rendered into a white screen.
+    if (!["pdf", "paste", "doi", "url"].includes(parsed.mode)) return null
+    return parsed
   } catch (err) {
     console.error("loadDraft failed", err)
     return null
@@ -42,5 +46,5 @@ export function clearDraft() {
 // resolveReturnTo allowlists a post-login destination; anything else (incl.
 // absolute or protocol-relative URLs) falls back, so no open redirect.
 export function resolveReturnTo(value, fallback = "/account") {
-  return ALLOWED_RETURN_TO.includes(value) ? value : value ? "/" : fallback
+  return ALLOWED_RETURN_TO.includes(value) ? value : fallback
 }

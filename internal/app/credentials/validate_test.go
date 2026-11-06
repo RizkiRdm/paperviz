@@ -3,6 +3,7 @@ package credentials
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"paperviz/internal/external"
@@ -82,5 +83,8 @@ func TestValidateNeverEchoesKey(t *testing.T) {
 	}
 	if got.Message == "" || len(got.Message) > 120 {
 		t.Fatalf("message must be a fixed UI string, got %q", got.Message)
+	}
+	if strings.Contains(got.Message, testKey) {
+		t.Fatalf("message echoed the key: %q", got.Message)
 	}
 }
