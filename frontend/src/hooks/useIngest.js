@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { createDocument, importByDOI, importByURL, listCredentials } from "@/lib/api"
+import { createDocument, importByDOI, importByURL } from "@/lib/api"
 import { useApi } from "@/hooks/useApi"
 import { useCurrentUser } from "@/hooks/use-current-user"
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draft"
@@ -100,21 +100,9 @@ export function useIngest({ onIngested, onAuthRequired }) {
       return
     }
     setNeedsCredential(false)
-    // Credential wall: a signed-in user with no model key cannot analyse
-    // anything (BYOK), so fail here with a path forward instead of a 400
-    // from the document endpoint. Input is preserved untouched.
-    try {
-      const creds = await listCredentials()
-      if (!Array.isArray(creds) || creds.length === 0) {
-        setNeedsCredential(true)
-        setError("Add a model key to analyse — PaperViz runs on your own key.")
-        return
-      }
-    } catch (err) {
-      console.error("Credential check failed", err)
-      setError("Could not check your model key. Retry.")
-      return
-    }
+    // Credential wall: backend resolves the BYOK credential before doing
+    // any pipeline work and returns missing_credential, mapped below to
+    // the same inline wall. Input is preserved untouched.
     try {
       await execute()
       clearDraft()

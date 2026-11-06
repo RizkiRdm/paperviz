@@ -90,7 +90,7 @@ func TestCredentialValidate(t *testing.T) {
 			if strings.Contains(rec.Body.String(), testModelKey) {
 				t.Fatalf("response leaked the key: %s", rec.Body.String())
 			}
-			var got validateResponse
+			var got credentials.ValidationResult
 			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 				t.Fatalf("decode: %v", err)
 			}

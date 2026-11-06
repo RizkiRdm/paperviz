@@ -142,14 +142,6 @@ func (h *CredentialHandler) SetDefault(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, nil)
 }
 
-// validateResponse is the wire shape for POST /api/credentials/{id}/validate.
-// It carries only an outcome, never the key or provider internals.
-type validateResponse struct {
-	Valid   bool   `json:"valid"`
-	Reason  string `json:"reason,omitempty"`
-	Message string `json:"message,omitempty"`
-}
-
 // Validate handles POST /api/credentials/{id}/validate. A credential that is
 // absent or owned by someone else is a 404, so ownership is never leaked.
 func (h *CredentialHandler) Validate(w http.ResponseWriter, r *http.Request) {
@@ -171,8 +163,7 @@ func (h *CredentialHandler) Validate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if errors.Is(err, credentials.ErrCredentialUnreadable) {
-		slog.Error("validate credential unreadable", "error", err)
-		writeError(w, http.StatusConflict, "credential_unreadable")
+		writeCredentialError(w, err)
 		return
 	}
 	if err != nil {
@@ -180,7 +171,8 @@ func (h *CredentialHandler) Validate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error")
 		return
 	}
-	writeJSON(w, http.StatusOK, validateResponse{Valid: result.Valid, Reason: result.Reason, Message: result.Message})
+	// ValidationResult is the wire shape: outcome only, never key/provider internals.
+	writeJSON(w, http.StatusOK, result)
 }
 
 // Delete handles DELETE /api/credentials/{id}.

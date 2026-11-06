@@ -1,4 +1,4 @@
--- 023_seed_sample.sql — Seed the guest sample document (Issue 12 Phase 1)
+-- 023_seed_sample.sql — Seed the guest sample document
 -- A real, complete document with user_id NULL so anonymous visitors can read
 -- it via GET /api/documents/:id (DocumentAccessAllowed allows NULL owners).
 -- created_at/last_accessed_at use 'now' so the 7-day expiry (refreshed by

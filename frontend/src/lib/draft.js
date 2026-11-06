@@ -1,9 +1,9 @@
 // draft.js — session-scoped ingest draft + allowlisted post-login destinations
-// for the guest journey (Issue #12 Phase 1, Slice 2). File bytes are never
-// stored: a PDF draft restores only mode/readingLevel and asks for re-pick.
+// for the guest journey. File bytes are never stored: a PDF draft restores
+// only mode/readingLevel and asks for re-pick.
 
 // Session-storage key for the unsaved ingest draft (survives the login trip).
-export const DRAFT_KEY = "paperviz_ingest_draft"
+const DRAFT_KEY = "paperviz_ingest_draft"
 
 // Internal-only destinations a guest may be sent back to after sign-in.
 const ALLOWED_RETURN_TO = ["/", "/sample"]

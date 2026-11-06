@@ -26,7 +26,7 @@ export function AccountPage() {
     removeCredential,
     validateCredential,
     validations,
-    validating,
+    validatingId,
   } = useAccount()
 
   const { signOut } = useClerk()
@@ -90,7 +90,7 @@ export function AccountPage() {
             onRemove={removeCredential}
             onValidate={validateCredential}
             validations={validations}
-            validating={validating}
+            validatingId={validatingId}
           />
 
           <AgentKeyCard

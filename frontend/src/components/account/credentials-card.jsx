@@ -8,7 +8,7 @@ const PROVIDERS = [
   { value: "openai", label: "OpenAI" },
 ]
 
-export function CredentialsCard({ credentials, savingCred, onAdd, onMakeDefault, onRemove, onValidate, validations = {}, validating = false }) {
+export function CredentialsCard({ credentials, savingCred, onAdd, onMakeDefault, onRemove, onValidate, validations = {}, validatingId = null }) {
   const [provider, setProvider] = useState("gemini")
   const [model, setModel] = useState("")
   const [apiKeyInput, setApiKeyInput] = useState("")
@@ -55,10 +55,10 @@ export function CredentialsCard({ credentials, savingCred, onAdd, onMakeDefault,
                   variant="outline"
                   size="sm"
                   onClick={() => onValidate?.(c.id)}
-                  disabled={validating}
+                  disabled={validatingId === c.id}
                   aria-label={`Validate ${c.provider} key`}
                 >
-                  {validating ? "Checking..." : "Validate"}
+                  {validatingId === c.id ? "Checking..." : "Validate"}
                 </Button>
                 {c.is_default ? (
                   <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-xs text-[#0a0a0a]">
