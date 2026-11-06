@@ -329,6 +329,22 @@ export async function removeDocumentFromCollection(collectionId, docId) {
   }
 }
 
+// listCredentials returns the current user's stored credential metadata.
+export async function listCredentials() {
+  const response = await authFetch("/api/credentials")
+  if (!response.ok) throw await parseErrorResponse(response)
+  return response.json()
+}
+
+// validateCredential pings the provider with one stored key and resolves to
+// { valid, reason?, message? }. Provider failures are a 200 with valid:false,
+// never a thrown error, so the UI can show the reason inline.
+export async function validateCredential(id) {
+  const response = await authFetch(`/api/credentials/${id}/validate`, { method: "POST" })
+  if (!response.ok) throw await parseErrorResponse(response)
+  return response.json()
+}
+
 // exportResearchContext downloads the full research context as JSON.
 export async function exportResearchContext(documentId) {
   const response = await authFetch(`/api/documents/${documentId}/export`)

@@ -18,6 +18,7 @@ export function Ingest({ onIngested }) {
     readingLevel, setReadingLevel,
     doi, setDoi, url, setUrl,
     loading, error, setError,
+    needsCredential,
     restored,
     handleSubmit, handleRetry,
   } = useIngest({ onIngested, onAuthRequired: () => navigate("/login?returnTo=/") })
@@ -84,7 +85,16 @@ export function Ingest({ onIngested }) {
       {error && (
         <div className="mt-4 space-y-2">
           <ErrorBanner message={error} />
-          <Button variant="outline" size="lg" onClick={handleRetry} disabled={loading} className="w-full">Retry</Button>
+          {needsCredential ? (
+            <a
+              href="/account#credentials"
+              className="inline-flex w-full items-center justify-center rounded-[8px] border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors"
+            >
+              Add a model key
+            </a>
+          ) : (
+            <Button variant="outline" size="lg" onClick={handleRetry} disabled={loading} className="w-full">Retry</Button>
+          )}
         </div>
       )}
     </div>

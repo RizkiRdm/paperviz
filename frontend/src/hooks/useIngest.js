@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { createDocument, importByDOI, importByURL } from "@/lib/api"
+import { createDocument, importByDOI, importByURL, listCredentials } from "@/lib/api"
 import { useApi } from "@/hooks/useApi"
 import { useCurrentUser } from "@/hooks/use-current-user"
 import { loadDraft, saveDraft, clearDraft } from "@/lib/draft"
@@ -35,6 +35,10 @@ export function useIngest({ onIngested, onAuthRequired }) {
   // Auth status gates submit before any API call: guests save a draft and
   // are sent to sign-in rather than hitting a missing_credential surprise.
   const { user, checked } = useCurrentUser()
+
+  // needsCredential flags the signed-in-but-no-key wall so the component can
+  // link to /account instead of offering a Retry that cannot succeed.
+  const [needsCredential, setNeedsCredential] = useState(false)
 
   // Active tab defines the source_type sent for badge display and routing.
   const sourceType = INGEST_TABS.find((t) => t.id === mode).source
@@ -95,13 +99,33 @@ export function useIngest({ onIngested, onAuthRequired }) {
       onAuthRequired?.()
       return
     }
+    setNeedsCredential(false)
+    // Credential wall: a signed-in user with no model key cannot analyse
+    // anything (BYOK), so fail here with a path forward instead of a 400
+    // from the document endpoint. Input is preserved untouched.
+    try {
+      const creds = await listCredentials()
+      if (!Array.isArray(creds) || creds.length === 0) {
+        setNeedsCredential(true)
+        setError("Add a model key to analyse — PaperViz runs on your own key.")
+        return
+      }
+    } catch (err) {
+      console.error("Credential check failed", err)
+      setError("Could not check your model key. Retry.")
+      return
+    }
     try {
       await execute()
       clearDraft()
     } catch (err) {
       console.error(`ingest failed [${sourceType}]`, err)
       const code = err.code
-      if (code === "fetch_failed") setError(mode === "doi" ? "Could not fetch that DOI. Check ID and retry." : "Could not fetch that URL. Check link and retry.")
+      if (code === "missing_credential") {
+        setNeedsCredential(true)
+        setError("Add a model key to analyse — PaperViz runs on your own key.")
+      }
+      else if (code === "fetch_failed") setError(mode === "doi" ? "Could not fetch that DOI. Check ID and retry." : "Could not fetch that URL. Check link and retry.")
       else if (code === "rate_limited") setError("Too many requests. Wait a moment and retry.")
       else if (code) setError(code.replaceAll("_", " "))
       else setError("Something went wrong. Please retry.")
@@ -117,6 +141,7 @@ export function useIngest({ onIngested, onAuthRequired }) {
   function switchMode(nextMode) {
     setMode(nextMode)
     setError(null)
+    setNeedsCredential(false)
   }
 
   return {
@@ -125,6 +150,7 @@ export function useIngest({ onIngested, onAuthRequired }) {
     readingLevel, setReadingLevel,
     doi, setDoi, url, setUrl,
     loading, error, setError,
+    needsCredential,
     restored,
     handleSubmit, handleRetry,
   }

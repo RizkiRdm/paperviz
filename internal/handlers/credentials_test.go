@@ -74,7 +74,7 @@ func doJSON(t *testing.T, h http.HandlerFunc, method, body, userID string) *http
 // must carry the hint and nothing else that could reconstruct the key.
 func TestCredentialCreateNeverEchoesKey(t *testing.T) {
 	db := openCredentialHandlerDB(t)
-	h := NewCredentialHandler(db, testCipher(t))
+	h := NewCredentialHandler(db, testCipher(t), nil)
 
 	body := `{"provider":"gemini","api_key":"` + testModelKey + `"}`
 	w := doJSON(t, h.Create, http.MethodPost, body, "u1")
@@ -110,7 +110,7 @@ func TestCredentialCreateNeverEchoesKey(t *testing.T) {
 func TestStoredCredentialDecrypts(t *testing.T) {
 	db := openCredentialHandlerDB(t)
 	cipher := testCipher(t)
-	h := NewCredentialHandler(db, cipher)
+	h := NewCredentialHandler(db, cipher, nil)
 
 	w := doJSON(t, h.Create, http.MethodPost, `{"provider":"gemini","model":"gemini-2.5-flash","api_key":"`+testModelKey+`"}`, "u1")
 	if w.Code != http.StatusCreated {
@@ -133,7 +133,7 @@ func TestStoredCredentialDecrypts(t *testing.T) {
 
 func TestCredentialCreateValidation(t *testing.T) {
 	db := openCredentialHandlerDB(t)
-	h := NewCredentialHandler(db, testCipher(t))
+	h := NewCredentialHandler(db, testCipher(t), nil)
 
 	tests := []struct {
 		name     string
@@ -162,7 +162,7 @@ func TestCredentialCreateValidation(t *testing.T) {
 // produces a usable client.
 func TestCredentialCreateDefaultsModel(t *testing.T) {
 	db := openCredentialHandlerDB(t)
-	h := NewCredentialHandler(db, testCipher(t))
+	h := NewCredentialHandler(db, testCipher(t), nil)
 
 	w := doJSON(t, h.Create, http.MethodPost, `{"provider":"gemini","api_key":"`+testModelKey+`"}`, "u1")
 	if w.Code != http.StatusCreated {
@@ -183,7 +183,7 @@ func TestCredentialCreateAcceptsEverySupportedProvider(t *testing.T) {
 	for _, provider := range []string{"gemini", "anthropic", "openai"} {
 		t.Run(provider, func(t *testing.T) {
 			db := openCredentialHandlerDB(t)
-			h := NewCredentialHandler(db, testCipher(t))
+			h := NewCredentialHandler(db, testCipher(t), nil)
 
 			body := `{"provider":"` + provider + `","api_key":"` + testModelKey + `"}`
 			w := doJSON(t, h.Create, http.MethodPost, body, "u1")
@@ -208,7 +208,7 @@ func TestCredentialCreateAcceptsEverySupportedProvider(t *testing.T) {
 // vendor we have no route to is still refused rather than stored.
 func TestCredentialCreateRejectsUnknownProvider(t *testing.T) {
 	db := openCredentialHandlerDB(t)
-	h := NewCredentialHandler(db, testCipher(t))
+	h := NewCredentialHandler(db, testCipher(t), nil)
 
 	w := doJSON(t, h.Create, http.MethodPost, `{"provider":"llama","api_key":"`+testModelKey+`"}`, "u1")
 	if w.Code != http.StatusBadRequest {
@@ -228,7 +228,7 @@ func TestCredentialCreateRejectsUnknownProvider(t *testing.T) {
 
 func TestCredentialListIsUserScoped(t *testing.T) {
 	db := openCredentialHandlerDB(t)
-	h := NewCredentialHandler(db, testCipher(t))
+	h := NewCredentialHandler(db, testCipher(t), nil)
 
 	doJSON(t, h.Create, http.MethodPost, `{"provider":"gemini","api_key":"`+testModelKey+`"}`, "u1")
 
@@ -271,7 +271,7 @@ func TestCredentialListIsUserScoped(t *testing.T) {
 // user's credential id must not let you promote or delete their key.
 func TestCredentialCrossUserAccessDenied(t *testing.T) {
 	db := openCredentialHandlerDB(t)
-	h := NewCredentialHandler(db, testCipher(t))
+	h := NewCredentialHandler(db, testCipher(t), nil)
 
 	w := doJSON(t, h.Create, http.MethodPost, `{"provider":"gemini","api_key":"`+testModelKey+`"}`, "u1")
 	var created credentialResponse

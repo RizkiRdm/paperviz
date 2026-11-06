@@ -16,6 +16,10 @@ export function useAccount() {
   const [credError, setCredError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [savingCred, setSavingCred] = useState(false)
+  // validations maps credential id to its last validate outcome; only a user
+  // click populates it, so rows start with no status badge.
+  const [validations, setValidations] = useState({})
+  const [validating, setValidating] = useState(false)
 
   // loadCredentials refetches the credential list after a mutation.
   const loadCredentials = useCallback(async () => {
@@ -120,6 +124,24 @@ export function useAccount() {
     }
   }
 
+  // validateCredential pings the provider with one stored key and records the
+  // outcome per row. A provider rejection is a result, not an exception.
+  async function validateCredential(id) {
+    setValidating(true)
+    setCredError(null)
+    try {
+      const res = await authFetch(`/api/credentials/${id}/validate`, { method: "POST" })
+      if (!res.ok) throw new Error(`validate ${res.status}`)
+      const result = await res.json()
+      setValidations((prev) => ({ ...prev, [id]: result }))
+    } catch (err) {
+      console.error("Validate credential failed", err)
+      setCredError("Could not check that key. Retry.")
+    } finally {
+      setValidating(false)
+    }
+  }
+
   // makeDefault promotes a stored credential to the active one.
   async function makeDefault(id) {
     setCredError(null)
@@ -161,6 +183,9 @@ export function useAccount() {
     addCredential,
     makeDefault,
     removeCredential,
+    validateCredential,
+    validations,
+    validating,
   }
 }
 
