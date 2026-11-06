@@ -116,6 +116,30 @@ func isDailyQuota(message string) bool {
 		(strings.Contains(msg, "daily") || strings.Contains(msg, "exhaust"))
 }
 
+// IsAuthError reports a provider credential rejection (401/403) so callers can
+// tell the user's key is bad apart from the provider being down.
+func IsAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr *goai.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusUnauthorized || apiErr.StatusCode == http.StatusForbidden
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "status 401") || strings.Contains(msg, "status 403") || strings.Contains(msg, "401 Unauthorized")
+}
+
+// IsQuotaError reports an exhausted-quota failure, which a valid key cannot
+// fix by retrying.
+func IsQuotaError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "quota") || strings.Contains(msg, "status 429")
+}
+
 // retryAfterFromHeaders reads a server-suggested wait from the response
 // headers GoAI preserved. Keys are matched case-insensitively because header
 // casing is not guaranteed across the providers.

@@ -12,6 +12,7 @@ import { ShareFigurePage } from "@/pages/share-figure-page"
 import { SharePaperPage } from "@/pages/share-paper-page"
 import { NotFoundPage } from "@/pages/not-found-page"
 import { AgentsPage } from "@/pages/agents-page"
+import { SamplePage } from "@/pages/sample-page"
 import { ClerkBridge } from "@/components/clerk-bridge"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/sso-callback" element={<SsoCallbackPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/agents" element={<AgentsPage />} />
+          <Route path="/sample" element={<SamplePage />} />
           <Route path="/share/fig/:shareToken" element={<ShareFigurePage />} />
           <Route path="/share/doc/:shareToken" element={<SharePaperPage />} />
           <Route path="/:documentId" element={<ResultPage />} />

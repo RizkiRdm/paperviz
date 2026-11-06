@@ -148,11 +148,12 @@ func NewRouter(db *sql.DB, provider *credentials.Resolver) http.Handler {
 		r.With(authMiddleware.RequireAuth).Post("/apikey/regenerate", apiKeyHandler.RegenerateApiKey)
 	})
 
-	credentialHandler := NewCredentialHandler(db, provider.Cipher())
+	credentialHandler := NewCredentialHandler(db, provider.Cipher(), provider)
 	r.Route("/api/credentials", func(r chi.Router) {
 		r.With(authMiddleware.RequireAuth).Post("/", credentialHandler.Create)
 		r.With(authMiddleware.RequireAuth).Get("/", credentialHandler.List)
 		r.With(authMiddleware.RequireAuth).Post("/{id}/default", credentialHandler.SetDefault)
+		r.With(authMiddleware.RequireAuth).Post("/{id}/validate", credentialHandler.Validate)
 		r.With(authMiddleware.RequireAuth).Delete("/{id}", credentialHandler.Delete)
 	})
 

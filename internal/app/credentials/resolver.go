@@ -64,6 +64,29 @@ func (r *Resolver) For(ctx context.Context, userID string) (*external.LLM, error
 		return nil, fmt.Errorf("load default credential: %w", err)
 	}
 
+	return r.buildClient(stored)
+}
+
+// ForCredential returns a client bound to one of the user's credentials by id.
+// An id that is absent or owned by someone else is ErrNotFound, never a
+// cross-account read.
+func (r *Resolver) ForCredential(ctx context.Context, userID, id string) (*external.LLM, error) {
+	if userID == "" || id == "" {
+		return nil, ErrNotFound
+	}
+	stored, err := repository.NewCredentialRepo(r.db).GetByID(userID, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("load credential: %w", err)
+	}
+	return r.buildClient(stored)
+}
+
+// buildClient decrypts one stored credential and binds it to a model client.
+// The plaintext lives only inside the returned client's backend closure.
+func (r *Resolver) buildClient(stored *repository.Credential) (*external.LLM, error) {
 	provider := external.Provider(stored.Provider)
 	plaintext, err := r.cipher.Decrypt(
 		stored.Ciphertext, stored.Nonce,

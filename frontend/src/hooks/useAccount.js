@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { capture } from "@/lib/analytics"
 import { authFetch } from "@/lib/auth"
+import { validateCredential as validateCredentialApi } from "@/lib/api"
 
 export function useAccount() {
   const navigate = useNavigate()
@@ -16,6 +17,10 @@ export function useAccount() {
   const [credError, setCredError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [savingCred, setSavingCred] = useState(false)
+  // validations maps credential id to its last validate outcome; only a user
+  // click populates it, so rows start with no status badge.
+  const [validations, setValidations] = useState({})
+  const [validatingId, setValidatingId] = useState(null)
 
   // loadCredentials refetches the credential list after a mutation.
   const loadCredentials = useCallback(async () => {
@@ -120,6 +125,22 @@ export function useAccount() {
     }
   }
 
+  // validateCredential pings the provider with one stored key and records the
+  // outcome per row. A provider rejection is a result, not an exception.
+  async function validateCredential(id) {
+    setValidatingId(id)
+    setCredError(null)
+    try {
+      const result = await validateCredentialApi(id)
+      setValidations((prev) => ({ ...prev, [id]: result }))
+    } catch (err) {
+      console.error("Validate credential failed", err)
+      setCredError("Could not check that key. Retry.")
+    } finally {
+      setValidatingId(null)
+    }
+  }
+
   // makeDefault promotes a stored credential to the active one.
   async function makeDefault(id) {
     setCredError(null)
@@ -161,6 +182,9 @@ export function useAccount() {
     addCredential,
     makeDefault,
     removeCredential,
+    validateCredential,
+    validations,
+    validatingId,
   }
 }
 

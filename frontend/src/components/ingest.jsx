@@ -3,19 +3,25 @@ import { UploadDropzone } from "@/components/upload-dropzone"
 import { ReadingLevelSelector } from "@/components/ui/reading-level-selector"
 import { ErrorBanner } from "@/components/ui/status-banners"
 import { ArrowRight } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 import { useIngest, INGEST_TABS } from "@/hooks/useIngest"
 
 // Ingest unifies PDF / paste / DOI / URL into one form: mode switch, explicit
 // source_type badge, per-mode validation, and inline error + Retry (12.1).
 export function Ingest({ onIngested }) {
+  // onAuthRequired navigates guests to sign-in with the allowlisted
+  // returnTo; the hook stays router-agnostic and only saves the draft.
+  const navigate = useNavigate()
   const {
     mode, switchMode, sourceType,
     file, setFile, text, setText,
     readingLevel, setReadingLevel,
     doi, setDoi, url, setUrl,
     loading, error, setError,
+    needsCredential,
+    restored,
     handleSubmit, handleRetry,
-  } = useIngest({ onIngested })
+  } = useIngest({ onIngested, onAuthRequired: () => navigate("/login?returnTo=/") })
 
   return (
     <div className="rounded-[12px] border border-[#e5e5e5] bg-white p-4 sm:p-6">
@@ -36,6 +42,10 @@ export function Ingest({ onIngested }) {
         </div>
         <span className="inline-flex items-center rounded-full border border-[#e5e5e5] bg-[#f5f5f5] px-2.5 py-1 text-[11px] font-mono font-medium text-[#525252]">source: {sourceType}</span>
       </div>
+
+      {restored && mode === "pdf" && !file && (
+        <p className="mb-4 text-xs text-[#525252]">Input restored after sign-in — re-select PDF to continue.</p>
+      )}
 
       <div role="tabpanel">
         {mode === "pdf" && <UploadDropzone file={file} text={text} mode="file" onFileChange={(f) => { setFile(f); setError(null) }} onTextChange={setText} />}
@@ -75,7 +85,16 @@ export function Ingest({ onIngested }) {
       {error && (
         <div className="mt-4 space-y-2">
           <ErrorBanner message={error} />
-          <Button variant="outline" size="lg" onClick={handleRetry} disabled={loading} className="w-full">Retry</Button>
+          {needsCredential ? (
+            <a
+              href="/account#credentials"
+              className="inline-flex w-full items-center justify-center rounded-[8px] border border-[#e5e5e5] bg-white px-4 py-2 text-sm font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors"
+            >
+              Add a model key
+            </a>
+          ) : (
+            <Button variant="outline" size="lg" onClick={handleRetry} disabled={loading} className="w-full">Retry</Button>
+          )}
         </div>
       )}
     </div>

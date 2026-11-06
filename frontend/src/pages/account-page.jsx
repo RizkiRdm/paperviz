@@ -24,6 +24,9 @@ export function AccountPage() {
     addCredential,
     makeDefault,
     removeCredential,
+    validateCredential,
+    validations,
+    validatingId,
   } = useAccount()
 
   const { signOut } = useClerk()
@@ -85,6 +88,9 @@ export function AccountPage() {
             onAdd={addCredential}
             onMakeDefault={makeDefault}
             onRemove={removeCredential}
+            onValidate={validateCredential}
+            validations={validations}
+            validatingId={validatingId}
           />
 
           <AgentKeyCard

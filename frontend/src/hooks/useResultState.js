@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import { useDocumentPoll } from "@/hooks/use-document-poll"
 import { capture } from "@/lib/analytics"
 import { generateDocumentShare, updateDocumentVisibility, addDocumentToCollection, listCollections } from "@/lib/api"
+import { useCurrentUser } from "@/hooks/use-current-user"
 
 const COPY_FEEDBACK_MS = 2000
 
@@ -44,6 +45,9 @@ export function useResultState(documentId, navigate) {
   const [showAnnotations, setShowAnnotations] = useState(false)
   const copyTimerRef = useRef(null)
   const lastCollectionRef = useRef(null)
+  // Guest guard: collections are authenticated-only, so a guest viewing a
+  // result (e.g. /sample) must not fire a request that 401s into an error UI.
+  const { user, checked } = useCurrentUser()
 
   // Route-shape + state machine: empty = unknown document (404 view),
   // retryable-error = poll failure or timeout (retry refetches), error =
@@ -92,7 +96,9 @@ export function useResultState(documentId, navigate) {
   }, [doc, activeChapter])
 
   // Fetch user's collections on mount; failure surfaces inline with Retry.
+  // Guests skip the fetch entirely rather than rendering a 401 as an error.
   useEffect(() => {
+    if (!checked || !user) return
     let cancelled = false
     async function fetchCollections() {
       try {
@@ -108,7 +114,7 @@ export function useResultState(documentId, navigate) {
     }
     fetchCollections()
     return () => { cancelled = true }
-  }, [collectionsNonce])
+  }, [collectionsNonce, checked, user])
 
   // onBack navigates to upload page.
   const onBack = useCallback(() => navigate("/"), [navigate])

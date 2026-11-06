@@ -33,8 +33,8 @@ func NewAnalyticsRepo(db *sql.DB) *AnalyticsRepo {
 func (r *AnalyticsRepo) GetSummary() (*AnalyticsSummary, error) {
 	s := &AnalyticsSummary{}
 
-	// Total number of processed papers.
-	if err := r.db.QueryRow(`SELECT COUNT(*) FROM documents`).Scan(&s.TotalPapers); err != nil {
+	// Total number of processed papers (excludes seeded demo doc, user_id NULL).
+	if err := r.db.QueryRow(`SELECT COUNT(*) FROM documents WHERE user_id IS NOT NULL`).Scan(&s.TotalPapers); err != nil {
 		return nil, fmt.Errorf("count documents: %w", err)
 	}
 
@@ -78,9 +78,9 @@ func (r *AnalyticsRepo) GetSummary() (*AnalyticsSummary, error) {
 		return nil, fmt.Errorf("count comparisons: %w", err)
 	}
 
-	// Pipeline success rate (completed documents over all documents).
+	// Pipeline success rate (completed user documents over all user documents).
 	var completed, total int
-	if err := r.db.QueryRow(`SELECT COUNT(CASE WHEN status = 'complete' THEN 1 END), COUNT(*) FROM documents`).Scan(&completed, &total); err != nil {
+	if err := r.db.QueryRow(`SELECT COUNT(CASE WHEN status = 'complete' THEN 1 END), COUNT(*) FROM documents WHERE user_id IS NOT NULL`).Scan(&completed, &total); err != nil {
 		return nil, fmt.Errorf("compute success rate: %w", err)
 	}
 	if total > 0 {

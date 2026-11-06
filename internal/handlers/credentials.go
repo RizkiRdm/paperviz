@@ -19,12 +19,20 @@ import (
 // data it stores. Two rules govern every method here: the plaintext key is
 // never written to a log, and never returned in a response.
 type CredentialHandler struct {
-	store *credentials.Store
+	store     *credentials.Store
+	validator *credentials.Validator
 }
 
-// NewCredentialHandler creates a CredentialHandler bound to a cipher.
-func NewCredentialHandler(db *sql.DB, cipher *external.Cipher) *CredentialHandler {
-	return &CredentialHandler{store: credentials.NewStore(db, cipher)}
+// NewCredentialHandler creates a CredentialHandler bound to a cipher. The
+// resolver shares that cipher so validate can decrypt rows it stored.
+func NewCredentialHandler(db *sql.DB, cipher *external.Cipher, resolver *credentials.Resolver) *CredentialHandler {
+	return &CredentialHandler{store: credentials.NewStore(db, cipher), validator: credentials.NewValidator(resolver, nil)}
+}
+
+// newCredentialHandlerWithValidator builds a handler with a stubbed ping for
+// tests, so validation is exercised without contacting a provider.
+func newCredentialHandlerWithValidator(db *sql.DB, cipher *external.Cipher, resolver *credentials.Resolver, ping credentials.PingFunc) *CredentialHandler {
+	return &CredentialHandler{store: credentials.NewStore(db, cipher), validator: credentials.NewValidator(resolver, ping)}
 }
 
 // createCredentialRequest is the wire shape for POST /api/credentials.
@@ -132,6 +140,39 @@ func (h *CredentialHandler) SetDefault(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, nil)
+}
+
+// Validate handles POST /api/credentials/{id}/validate. A credential that is
+// absent or owned by someone else is a 404, so ownership is never leaked.
+func (h *CredentialHandler) Validate(w http.ResponseWriter, r *http.Request) {
+	userID := UserIDFromContext(r.Context())
+	if userID == "" {
+		writeError(w, http.StatusUnauthorized, "unauthenticated")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "missing_id")
+		return
+	}
+
+	result, err := h.validator.Validate(r.Context(), userID, id)
+	if errors.Is(err, credentials.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "credential_not_found")
+		return
+	}
+	if errors.Is(err, credentials.ErrCredentialUnreadable) {
+		writeCredentialError(w, err)
+		return
+	}
+	if err != nil {
+		slog.Error("validate credential failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	// ValidationResult is the wire shape: outcome only, never key/provider internals.
+	writeJSON(w, http.StatusOK, result)
 }
 
 // Delete handles DELETE /api/credentials/{id}.

@@ -240,6 +240,65 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/credentials/{id}/validate:
+    post:
+      operationId: validateCredential
+      summary: "Check a stored model key against its provider"
+      description: |
+        Resolves the credential scoped to the authenticated user and makes one
+        tiny live call (1 token) through the shared transport. A credential
+        that is absent or owned by someone else is a 404, so ownership is
+        never leaked.
+
+        Provider auth failures (401/403) return `valid: false` with
+        `reason: invalid_key`; exhausted quota returns `quota_exceeded`;
+        network and timeout failures return `unavailable`. The response never
+        contains the key or the provider's raw error body.
+      tags: ["Credentials"]
+      security:
+        - clerkSessionToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "Validation outcome"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [valid]
+                properties:
+                  valid:
+                    type: boolean
+                  reason:
+                    type: string
+                    enum: [invalid_key, quota_exceeded, unavailable]
+                  message:
+                    type: string
+                    description: "UI-safe explanation. Never contains the key."
+        "401":
+          description: "Not authenticated"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "No such credential for this user"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "Stored credential could not be read"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /api/documents:
     post:
       operationId: createDocument

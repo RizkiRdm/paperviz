@@ -8,7 +8,7 @@ const PROVIDERS = [
   { value: "openai", label: "OpenAI" },
 ]
 
-export function CredentialsCard({ credentials, savingCred, onAdd, onMakeDefault, onRemove }) {
+export function CredentialsCard({ credentials, savingCred, onAdd, onMakeDefault, onRemove, onValidate, validations = {}, validatingId = null }) {
   const [provider, setProvider] = useState("gemini")
   const [model, setModel] = useState("")
   const [apiKeyInput, setApiKeyInput] = useState("")
@@ -23,7 +23,7 @@ export function CredentialsCard({ credentials, savingCred, onAdd, onMakeDefault,
   const hasCredential = credentials.length > 0
 
   return (
-    <div className="rounded-[12px] border border-[#e5e5e5] bg-white p-6">
+    <div id="credentials" className="rounded-[12px] border border-[#e5e5e5] bg-white p-6">
       <h2 className="text-sm font-medium text-[#0a0a0a] mb-1">Model API key</h2>
       <p className="text-xs text-[#737373] mb-4">
         PaperViz runs on your own key, so nothing is billed to us. Add one to
@@ -42,8 +42,24 @@ export function CredentialsCard({ credentials, savingCred, onAdd, onMakeDefault,
                 <p className="text-xs text-[#737373] font-mono">
                   {c.model} ····{c.key_hint}
                 </p>
+                {validations[c.id] && (
+                  <p className={`mt-1 text-xs ${validations[c.id].valid ? "text-[#16a34a]" : "text-[#ea580c]"}`}>
+                    {validations[c.id].valid
+                      ? "Valid — the provider accepted this key."
+                      : validations[c.id].message || "Invalid key."}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onValidate?.(c.id)}
+                  disabled={validatingId === c.id}
+                  aria-label={`Validate ${c.provider} key`}
+                >
+                  {validatingId === c.id ? "Checking..." : "Validate"}
+                </Button>
                 {c.is_default ? (
                   <span className="rounded-full bg-[#dcfce7] px-2 py-0.5 text-xs text-[#0a0a0a]">
                     Default

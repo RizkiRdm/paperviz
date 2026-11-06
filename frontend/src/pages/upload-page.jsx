@@ -56,9 +56,10 @@ export function UploadPage() {
           <h1 className="display">Turn research papers into evidence you can inspect.</h1>
           <p className="hero__copy">PaperViz extracts claims, supporting evidence, and figures from research papers so you can understand, trace, and reuse the underlying research context.</p>
           <div className="cluster cluster--center">
-            <a className="btn btn--dark btn--lg" href="#analyze-form">Analyze a paper</a>
-            <a className="btn btn--outline btn--lg" href="#workflow">See how it works</a>
+            <Link className="btn btn--dark btn--lg" to="/sample">See sample</Link>
+            <a className="btn btn--outline btn--lg" href="#analyze-form">Analyze a paper</a>
           </div>
+          <p className="helper centered">The sample is a real PaperViz document — a seeded paper with claims and evidence, not a mockup.</p>
         </div>
 
         <div className="container product-frame" id="analyze">
@@ -67,36 +68,11 @@ export function UploadPage() {
             <span className="mono muted">paperviz / paper workspace</span>
             <span className="status status--source">source-backed</span>
           </div>
-          <div className="mock-shell">
-            <aside className="mock-sidebar">
-              <div className="mock-sidebar__brand"><span className="brand__mark">PV</span><span>PaperViz</span></div>
-              <div className="mock-sidebar__group">
-                <span className="nav-label">Workspace</span>
-                <span className="side-item is-active"><span>⌂</span>Home</span>
-                <span className="side-item"><span>□</span>My Papers</span>
-                <span className="side-item"><span>⌘</span>Agents</span>
-              </div>
-              <div className="mock-sidebar__group">
-                <span className="nav-label nav-label--spaced">Account</span>
-                <span className="side-item"><span>◎</span>Account</span>
-                <span className="side-item"><span>⚙</span>Settings</span>
-                <span className="side-item"><span>?</span>Help</span>
-              </div>
-            </aside>
-            <div className="mock-main">
-              <div className="mock-breadcrumb">Home <span>/</span> Paper workspace</div>
-              <div className="mock-title-row">
-                <div><span className="status status--source">SOURCE</span><h2>A practical framework for evaluating retrieval-augmented generation systems</h2><p className="muted">Example paper • 2025 • demo data</p></div>
-                <button className="btn btn--outline">Share</button>
-              </div>
-              <div className="mock-tabs"><button className="is-active">Overview</button><button>Claims</button><button>Evidence</button><button>Figures</button><button>Notes</button></div>
-              <div className="mock-grid">
-                <article className="card card--reading"><div className="section-kicker">AI-DERIVED</div><h3>Paper summary</h3><p>This demonstration summary explains the paper in plain language. It is explicitly presented as interpretation, not as a replacement for the source.</p><div className="callout callout--source"><b>Trace:</b> compare this interpretation with the original source below.</div></article>
-                <article className="card"><div className="section-kicker">SOURCE</div><h3>Key claim</h3><p>Retrieval quality changes the reliability of downstream answers.</p><div className="meta-line"><span>Evidence 03</span><span>Page 7</span></div></article>
-                <article className="card"><div className="section-kicker">EVIDENCE</div><h3>Supporting text</h3><p>Source excerpt with section and page context shown beside the interpretation.</p><div className="source-ref">Results · p. 7</div></article>
-              </div>
-            </div>
+          <div className="cluster cluster--center">
+            <Link className="btn btn--dark btn--lg" to="/sample">See sample</Link>
+            <a className="btn btn--outline btn--lg" href="#analyze-form">Analyze a paper</a>
           </div>
+          <p className="helper centered">Open the seeded sample to see a real document workspace — simplified text, claims, and evidence.</p>
         </div>
       </div>
 
