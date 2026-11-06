@@ -16,7 +16,7 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-10-18 — master refactor waves + CI/CD deploy pipeline
+**Last updated:** 2026-11-07 — Issue #12 guest journey merged to main (PR #14) + docs/README refresh
 
 > **Documentation verification note (2026-09-25):** entries below preserve project history and may describe earlier tool counts, routes, or validation results. For current behavior, verify `internal/mcp/tools.go`, `internal/handlers/router.go`, `frontend/src/App.jsx`, and the focused architecture/product documents. The current MCP surface has five deterministic tools; web ingestion runs the full pipeline in an in-process goroutine.
 
@@ -25,12 +25,11 @@
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Master refactor (P01–P61, plan `.omo/plans/paperviz_master_refactor_plan.md`) on branch `refactor/master`, all committed+pushed. Landed: P01–P03 (inventory, canonical flow, routing/IA), P04–P06 (`ae56066` — result-page split), P07–P10 (`98e0def` — app services; handlers no longer import `internal/repository`), P08 (`b7c880c` — documents handlers split into 8 files), P28 (`a58f1d6` — MCP: `internal/mcp/server.go` has no LLM field, `cmd/mcp` no longer reads `GEMINI_API_KEY`), P40–P41 (`2ca3011` — account/annotation splits; dead `collections-panel.jsx` + `useCollections.js` deleted), P44–P49 (`e915130`) + ownership guard (`8879d63` — 7 section GETs + relationships routes behind `OptionalAuth` + `RequireDocAccess`, test `TestSectionRoutesRespectOwnershipOverRouter`)
-- **CI/CD (decided 2026-10-17, `3dc099e`/`dbfa751`, logged in `docs/decisions.md`):** `go-ci.yml` owns all gates (go, frontend lint+build, containers, e2e, MCP handshake); its `deploy` job runs on push to `main` or `refs/tags/v*` and deploys to Render prod via `.github/actions/render-deploy` (poll to live, then assert `/healthz` 200, `/api/collections` 401, `/api/auth/me` 401). `frontend-ci.yml` and `e2e.yml` deleted (folded into `go-ci.yml`). `release.yml` = workflow_dispatch SemVer tag cut (validates `x.y.z`, asserts green main HEAD, creates annotated tag, deploys directly because `GITHUB_TOKEN` pushes cannot trigger other workflows). GitHub secrets: `RENDER_API_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
-- **Wave H (P50–P61) complete:** all audit results + the P56 ownership table live in `docs/master-refactor-audit.md` (file-size gate, dep-direction, MCP smoke `scripts/mcp-smoke.sh` green over stdio with fake gemini key, E2E green in CI, P43 closed as deliberate no-op — API payloads render directly). Docs pass landed as `1377f8e` (14 files synced + `INSTALLATION_AND_SETUP.md` deleted).
-- **Active task file:** `.omo/plans/paperviz_master_refactor_plan.md`
+- **Working on:** Issue #12 guest journey — **merged to `main` via PR #14** (`99ebe2b`, branch `feat/issue-12-guest-journey` deleted). Landed: landing hero now links to a real seeded sample (`/sample` → `SamplePaperCells`, migration 023, `user_id NULL`, anonymous-readable) instead of a static mock; pre-submit auth gate (guest input saved to sessionStorage draft, restored after Clerk sign-in with `returnTo` allowlist, PDF re-pick note); credential wall on `missing_credential` + `POST /api/credentials/{id}/validate` (RequireAuth, 1-token ping through shared Transport, no key echo, openapi updated). Review pass: ce-simplify-code (6 applied) + ce-code-review (Ready with fixes, 4 applied in `16d520c`). Full verification gate green (go build/test/vet/gofmt, mcp-handshake 5 tools, frontend lint, `make frontend/dist`).
+- **Docs refresh (2026-11-07):** README rewritten with new landing screenshot (`assets/landing-page.png`, 1440×900 playwright capture of dev server) + conversion copywriting; `docs/codebase-reference.md` gained `/sample` route, validate endpoint, migration 023 rows.
+- **Active task file:** none (Issue #12 closed)
 - **Blocked on / pending decision:** none
-- **Next action if resuming:** PR `refactor/master` → `main` (merge triggers the go-ci deploy job → Render prod); optionally dispatch `release.yml` for a SemVer tag. P11–P14 and P15–P24 were audited as already satisfied (pipeline already split, zero `time.Sleep`, charts already decomposed into `charts_llm.go`/`grounding.go`/`evidence_extract.go`).
+- **Next action if resuming:** CI/CD `go-ci.yml` deploys this merge to Render on push to `main` — verify `/healthz` 200 + `/api/collections` 401 + `/api/auth/me` 401 after live. Optional: SemVer tag via `release.yml` (MINOR — new endpoint + new route = pre-1.0 breaking-allowed feature bump).
 
 ---
 
@@ -45,6 +44,8 @@
 *(Features that are DONE and shouldn't be reconsidered. This exists so an
 AI starting fresh doesn't propose redoing something finished, or touching
 something that should stay frozen.)*
+
+- Issue #12 guest journey (sample → auth gate → credential wall) — done 2026-11-07, PR #14 (`99ebe2b`): `/sample` route + migration 023 seeded anonymous doc `SamplePaperCells`; landing hero CTAs "See sample"/"Analyze a paper" (mock hero removed); pre-submit gate saves guest input to sessionStorage draft and restores after Clerk sign-in (`resolveReturnTo` allowlist `/`,`/sample`, fallback `/account`; PDF requires re-pick); `missing_credential` renders a credential wall; `POST /api/credentials/{id}/validate` (RequireAuth) pings provider with 1 token, returns valid/reason, never echoes key; analytics excludes seed/anonymous docs from TotalPapers+SuccessRate. Residuals accepted in review: validate shares the single Transport semaphore with pipelines, guest Share/visibility/export still 401 inline, seed follows 7-day expiry.
 
 - Phases 1–3 (Trust & Core Value, Activation & Retention, Multi-Paper Intelligence) — done, omitted from active roadmap
 - Chunk 4.1 Shareable Figure Explanation — done 2026-08-24, known limitation: no interactive Recharts on share page (image + text only)
@@ -99,6 +100,9 @@ it.)*
 - Interactive Recharts render on share pages — why deferred: avoid scope creep in 4.1; image + text explanation suffices for MVP
 - Revoke UI for document share links — why deferred: `revokeDocumentShare` exists in api.js; no button requested by chunk scope
 - Visibility in GET /api/documents/:id payload — why deferred: frontend selector initializes locally to "private"; add field when needed
+- Seeded sample re-seed after expiry — why deferred: seed expires 7 days after last visit (normal sweep, migration 023 does not re-run); revisit within window refreshes it, a long-idle deploy needs manual reinsert. Exemption/reseed proposed in review, not built.
+- Guest share/visibility/collection/export gating — why deferred: review found these still fire authenticated calls as guests and surface 401 with dead Retry; collections fetch was guarded but action layer was not; left as inline-error known issue.
+- Frontend unit test harness — why deferred: no vitest/jest in repo; draft/returnTo/credential-wall branches verified by lint+build+E2E only (deliberate, recorded in ce-code-review receipt).
 
 ---
 
@@ -238,6 +242,9 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Agents page: `frontend/src/pages/agents-page.jsx`
 - Account page: `frontend/src/pages/account-page.jsx`
 - Landing page: `frontend/src/pages/upload-page.jsx` (minimal 2-CTA version)
+- Guest sample: `frontend/src/pages/sample-page.jsx` + `frontend/src/lib/sample.js` (ID `SamplePaperCells`), seed `migrations/000023_seed_sample.up.sql`
+- Guest draft/auth gate: `frontend/src/lib/draft.js`, `frontend/src/hooks/useIngest.js` (`onAuthRequired`, needsCredential wall)
+- Credential validate: `internal/app/credentials/validate.go`, `internal/handlers/credentials.go` (`POST /api/credentials/{id}/validate`)
 - Security posture: `docs/SECURITY.md` (auth/session/rate-limit/SSRF, 16 sections from code)
 - Reliability mechanisms: `docs/RELIABILITY.md` (timeouts/retries/idempotency)
 - Data pipeline: `docs/DATA_PIPELINE.md` (evidence 5 patterns → dataset metric||unit → grounding 10 rules)

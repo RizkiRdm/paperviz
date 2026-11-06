@@ -2,9 +2,13 @@
 
 ![PaperViz landing page](assets/landing-page.png)
 
-PaperViz turns academic papers into simplified explanations, verified claims, and evidence-grounded figures. It is designed for AI agents that need structured research data, with a web app for account management and manual paper upload.
+**Turn research papers into evidence you can inspect.**
 
-PaperViz holds no model vendor account and no billing account: users bring their own model key, which is encrypted at rest, and model spend belongs to the user. Authentication is handled by Clerk, which makes PaperViz's identity a SaaS dependency — a trade documented in [`ADR-003`](docs/DECISIONS/ADR-003-clerk-auth.md), along with the lock-in risk it accepts.
+Give PaperViz a paper — PDF, pasted text, DOI, or URL — and get back a plain-language explanation, claims checked against the original, and figures built only from numbers the paper actually reports. Every claim links back to its source, so you can trust it, cite it, or hand it to an agent.
+
+You can see all of that on a real document in one click: the landing page's **See sample** button opens a seeded paper workspace — simplified text, claims, evidence, no sign-up required.
+
+PaperViz holds no model vendor account and no billing account: you bring your own model key, it is encrypted at rest, and model spend belongs to you. Sign-in runs on Clerk, which makes PaperViz's identity a SaaS dependency — a trade documented in [`ADR-003`](docs/DECISIONS/ADR-003-clerk-auth.md), along with the lock-in risk it accepts.
 
 > **Current architecture note:** the web ingestion path runs the full LLM-backed processing pipeline using the requesting user's own model key. The repository's MCP server currently exposes five deterministic data tools over stdio; its `ingest_document` tool stores text but does not start the LLM pipeline. See [Current limitations](#current-limitations) before relying on the agent workflow.
 
@@ -34,8 +38,10 @@ The React application supports:
 - Simplified explanations and claim verification
 - Evidence-grounded chart generation
 - Claims, evidence, methods, results, tables, and citations
-- Authentication, model key management, collections, annotations, and exports
+- Authentication, model key management (with a per-key **Validate** check), collections, annotations, and exports
 - Ephemeral document and figure sharing
+
+The guest journey is deliberate: browse the seeded sample first, sign in when you want to analyse your own paper — your input is carried across sign-in — then add a model key when asked. No dead ends.
 
 ## Trust Model
 
@@ -205,7 +211,7 @@ paperviz/
 │   ├── models/              # shared chart and research value types
 │   ├── apperr/              # shared application errors
 │   └── infra/               # infrastructure helpers
-├── migrations/              # 22 ordered SQL migrations
+├── migrations/              # 23 ordered SQL migrations
 ├── frontend/                # React SPA
 ├── e2e/                     # Playwright tests
 ├── docs/                    # Product, architecture, operations, and API docs
@@ -233,7 +239,9 @@ Start with [`docs/README.md`](docs/README.md) for reading paths and source-of-tr
 
 - Scanned-image PDFs are not supported; input PDFs need a text layer.
 - `ingest_document` performs deterministic text intake only. It does not invoke a model, start the web processing pipeline, or wait for simplified output.
-- Analysing a paper requires an account with a model key configured. Because the server holds no model credential of its own, there is no anonymous or free-tier path to a processed document: uploads without a usable key fail with `missing_credential`.
+- Analysing a paper requires an account with a model key configured. Because the server holds no model credential of its own, there is no anonymous or free-tier path to a processed document: uploads without a usable key fail with `missing_credential` (the UI turns this into a sign-in-and-add-key wall instead of a silent failure).
+- Browsing needs no account: the seeded sample is readable by anyone, but Share, visibility, collections, and export require sign-in.
+- The seeded sample follows the normal 7-day document expiry, refreshed by each visit; an idle deployment for longer than that deletes it until the migration re-seeds it.
 - Model keys work for Gemini, Anthropic Claude, and OpenAI. Provider protocol comes from `github.com/zendev-sh/goai`; retry, concurrency, and JSON recovery are PaperViz's own.
 - Service API keys are returned exactly once, at issue time, and stored only as a SHA-256 digest. A lost key cannot be recovered, only replaced.
 - Password recovery is Clerk's self-service flow. To cut off a compromised account from the CLI, use `go run ./cmd/admin revoke-sessions <email>`.
