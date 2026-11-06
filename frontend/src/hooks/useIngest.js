@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { createDocument, importByDOI, importByURL } from "@/lib/api"
 import { useApi } from "@/hooks/useApi"
+import { useCurrentUser } from "@/hooks/use-current-user"
+import { loadDraft, saveDraft, clearDraft } from "@/lib/draft"
 
 // Tab config drives the mode switch and the explicit source_type badge (P05).
 export const INGEST_TABS = [
@@ -13,13 +15,26 @@ export const INGEST_TABS = [
 // useIngest owns mode state, per-mode validation and submit for all four
 // ingestion sources — one form, explicit source_type routing, and no
 // PDF-only operations leaking into pasted_text (file stays null there).
-export function useIngest({ onIngested }) {
-  const [mode, setMode] = useState("pdf")
+// State initialises from a sessionStorage draft saved by the pre-submit
+// auth gate, so a guest returns from sign-in to their input. Navigation
+// stays router-agnostic: guests are handed to onAuthRequired (wired by
+// the component) instead of navigating inside the hook.
+export function useIngest({ onIngested, onAuthRequired }) {
+  const [draft] = useState(loadDraft)
+  const [mode, setMode] = useState(draft?.mode || "pdf")
   const [file, setFile] = useState(null)
-  const [text, setText] = useState("")
-  const [readingLevel, setReadingLevel] = useState("simplified")
-  const [doi, setDoi] = useState("")
-  const [url, setUrl] = useState("")
+  const [text, setText] = useState(draft?.text || "")
+  const [readingLevel, setReadingLevel] = useState(draft?.readingLevel || "simplified")
+  const [doi, setDoi] = useState(draft?.doi || "")
+  const [url, setUrl] = useState(draft?.url || "")
+
+  // restored flags a draft was present at mount; PDF bytes are never
+  // restorable, so the component prompts for a re-pick when mode is pdf.
+  const restored = draft !== null
+
+  // Auth status gates submit before any API call: guests save a draft and
+  // are sent to sign-in rather than hitting a missing_credential surprise.
+  const { user, checked } = useCurrentUser()
 
   // Active tab defines the source_type sent for badge display and routing.
   const sourceType = INGEST_TABS.find((t) => t.id === mode).source
@@ -62,15 +77,27 @@ export function useIngest({ onIngested }) {
     return null
   }
 
-  // handleSubmit validates first, then maps backend codes to inline copy.
+  // handleSubmit validates, then runs the pre-submit auth gate, then
+  // submits. Guests' draft is saved before onAuthRequired navigates away.
   async function handleSubmit() {
     const msg = validate()
     if (msg) {
       setError(msg)
       return
     }
+    if (!checked) {
+      setError("Checking sign-in…")
+      return
+    }
+    if (!user) {
+      saveDraft({ mode, text, doi, url, readingLevel })
+      setError("Sign in to analyse — your input is saved")
+      onAuthRequired?.()
+      return
+    }
     try {
       await execute()
+      clearDraft()
     } catch (err) {
       console.error(`ingest failed [${sourceType}]`, err)
       const code = err.code
@@ -98,6 +125,7 @@ export function useIngest({ onIngested }) {
     readingLevel, setReadingLevel,
     doi, setDoi, url, setUrl,
     loading, error, setError,
+    restored,
     handleSubmit, handleRetry,
   }
 }

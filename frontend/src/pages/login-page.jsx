@@ -1,10 +1,15 @@
 import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useSignIn } from "@clerk/clerk-react"
 import { clerkErrorMessage } from "@/lib/auth"
+import { resolveReturnTo } from "@/lib/draft"
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Post-login destination: allowlisted returnTo from the auth gate, else
+  // the existing /account landing so the normal flow is unchanged.
+  const redirectTo = resolveReturnTo(searchParams.get("returnTo"))
   const { signIn, isLoaded } = useSignIn()
   const [error, setError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -16,7 +21,7 @@ export function LoginPage() {
       await signIn.authenticateWithRedirect({
         strategy: "oauth_google",
         redirectUrl: "/sso-callback",
-        redirectUrlComplete: "/account",
+        redirectUrlComplete: redirectTo,
       })
     } catch (err) {
       if (import.meta.env.DEV) console.error("google sign-in failed", err)
@@ -43,7 +48,7 @@ export function LoginPage() {
         password,
       })
       if (attempt.status === "complete") {
-        navigate("/account")
+        navigate(redirectTo)
         return
       }
       setError(clerkErrorMessage(attempt.error, "Sign-in needs an extra step this page does not support."))
@@ -71,7 +76,7 @@ export function LoginPage() {
             {error && <div className="alert alert--error">{error}</div>}
             <button type="submit" className="btn btn--dark btn--full" disabled={isSubmitting || !isLoaded}>{isSubmitting ? "Signing in..." : "Sign in"}</button>
           </form>
-          <p className="auth-meta">Don't have an account? <Link to="/signup">Sign up</Link></p>
+          <p className="auth-meta">Don't have an account? <Link to={redirectTo !== "/account" ? `/signup?returnTo=${encodeURIComponent(redirectTo)}` : "/signup"}>Sign up</Link></p>
         </div>
       </div>
     </div>

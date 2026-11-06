@@ -1,14 +1,19 @@
 import { useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useSignUp, useClerk } from "@clerk/clerk-react"
 import { clerkErrorMessage } from "@/lib/auth"
 import { capture, identify } from "@/lib/analytics"
+import { resolveReturnTo } from "@/lib/draft"
 
 const STEP_DETAILS = "details"
 const STEP_CODE = "code"
 
 export function SignupPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Post-signup destination: allowlisted returnTo from the auth gate,
+  // else the existing /account landing.
+  const redirectTo = resolveReturnTo(searchParams.get("returnTo"))
   const { signUp, isLoaded } = useSignUp()
   const { setActive } = useClerk()
 
@@ -24,7 +29,7 @@ export function SignupPage() {
       await signUp.authenticateWithRedirect({
         strategy: "oauth_google",
         redirectUrl: "/sso-callback",
-        redirectUrlComplete: "/account",
+        redirectUrlComplete: redirectTo,
       })
     } catch (err) {
       if (import.meta.env.DEV) console.error("google sign-up failed", err)
@@ -36,7 +41,7 @@ export function SignupPage() {
     await setActive({ session: signUp.session?.id })
     identify(email)
     capture("signup_completed")
-    navigate("/account")
+    navigate(redirectTo)
   }
 
   async function submitDetails(e) {
