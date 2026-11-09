@@ -99,6 +99,7 @@ export function ResultOverlays({ documentId, showResearchMap, setShowResearchMap
 }
 
 // Render management actions — collections, export, navigation, DESIGN.md compact density.
+// Collection/export are account-only: guests see only navigation actions.
 export function ResultActions({
   documentId,
   collections = [],
@@ -109,6 +110,7 @@ export function ResultActions({
   showAddToCollection,
   setShowAddToCollection,
   onAddToCollection,
+  isGuest,
 }) {
   const [exportError, setExportError] = useState(false)
 
@@ -127,6 +129,7 @@ export function ResultActions({
     <div className="mt-12 rounded-[12px] border border-[#e5e5e5] bg-[#fafafa] p-6">
       <h3 className="text-sm font-medium text-[#0a0a0a] mb-3">What&apos;s next?</h3>
       <div className="flex flex-wrap gap-3">
+        {!isGuest && (
         <div
           className="relative"
           onKeyDown={(e) => { if (e.key === "Escape") setShowAddToCollection(false) }}
@@ -169,12 +172,15 @@ export function ResultActions({
             </div>
           )}
         </div>
+        )}
         <Link
           to="/"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#0a0a0a] rounded-full hover:bg-[#262626] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]/20"
         >
           Upload Another <ArrowRight className="h-3.5 w-3.5" />
         </Link>
+        {!isGuest && (
+        <>
         <Link
           to="/account"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#737373] bg-white border border-[#e5e5e5] rounded-full hover:bg-[#f5f5f5] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]/20"
@@ -187,6 +193,8 @@ export function ResultActions({
         >
           Export Research Data
         </button>
+        </>
+        )}
       </div>
       {collectionAddError && (
         <p role="alert" className="mt-3 text-[11px] text-[#ea580c]">

@@ -2,16 +2,15 @@ import { useState } from "react"
 import { AppShell } from "@/components/app-shell"
 
 // PaperViz ships a stdio MCP server (cmd/mcp). It runs on the user's own
-// machine, against their own SQLite file, calling the provider with their own
-// key. There is no hosted MCP endpoint, so every client gets the same stdio
-// command block; only the destination file differs.
+// machine, against their own SQLite file, and calls no model provider.
+// A StreamableHTTP remote exists only when cmd/mcp is run with MCP_HTTP_ADDR
+// set (self-hosted); there is no hosted MCP endpoint by default, so every
+// client gets the same stdio command block; only the destination file differs.
 const STDIO_CONFIG = `{
   "mcpServers": {
     "paperviz": {
       "command": "/absolute/path/to/paperviz-mcp",
       "env": {
-        "GEMINI_API_KEY": "your-gemini-key",
-        "GEMINI_MODEL": "gemini-3.1-flash-lite",
         "DATABASE_PATH": "/absolute/path/to/paperviz.db",
         "MIGRATIONS_DIR": "/absolute/path/to/migrations",
         "PAPERVIZ_API_KEY": "a-local-key-of-your-choice"
@@ -43,7 +42,7 @@ const CLIENTS = [
     id: "chatgpt",
     name: "ChatGPT",
     supported: false,
-    destination: "ChatGPT connects to remote MCP servers only. PaperViz does not expose a hosted MCP endpoint, so there is nothing to paste here.",
+    destination: "ChatGPT connects to remote MCP servers only. PaperViz has no hosted MCP endpoint by default (a StreamableHTTP remote exists only if you self-host cmd/mcp with MCP_HTTP_ADDR), so there is nothing to paste here.",
   },
 ]
 
@@ -74,7 +73,7 @@ export function AgentsPage() {
       <div className="page-intro">
         <p className="eyebrow">AGENTS / MCP</p>
         <h1>Add PaperViz to your agent</h1>
-        <p className="muted">PaperViz ships a local stdio MCP server. Setup is intentionally explicit because the current repository does not expose a hosted MCP transport.</p>
+        <p className="muted">PaperViz ships a local stdio MCP server. Setup is intentionally explicit because the repository exposes no hosted MCP transport — a StreamableHTTP remote exists only when you run cmd/mcp with MCP_HTTP_ADDR.</p>
       </div>
 
         <div className="rounded-[12px] border border-[#e5e5e5] bg-white">

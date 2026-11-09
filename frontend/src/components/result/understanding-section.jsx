@@ -32,6 +32,7 @@ export function UnderstandingSection({
   setShowResearchMap,
   showAnnotations,
   setShowAnnotations,
+  isGuest,
 }) {
   const displayedText = showOriginal ? doc.original_text : doc.simplified_text
   const levelLabel = doc.reading_level === "eli5" ? "ELI5" : doc.reading_level === "simplified" ? "Simplified" : doc.reading_level
@@ -65,6 +66,7 @@ export function UnderstandingSection({
             </TooltipTrigger>
             <TooltipContent>View how this paper relates to others</TooltipContent>
           </Tooltip>
+          {!isGuest && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -80,6 +82,7 @@ export function UnderstandingSection({
             </TooltipTrigger>
             <TooltipContent>Add personal notes to this paper</TooltipContent>
           </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="secondary" onClick={handleCopyText} aria-label={textCopied ? "Copied" : "Copy text"} className="h-8 px-2.5 text-xs gap-1.5 font-medium">
@@ -223,7 +226,7 @@ export function UnderstandingSection({
               </div>
               <div className="flex flex-col gap-4">
                 {chapterCharts.map((chart) => (
-                  <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} evidence={evidenceFor(chart.id)} documentId={documentId} />
+                  <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} evidence={evidenceFor(chart.id)} documentId={documentId} isGuest={isGuest} />
                 ))}
               </div>
             </section>

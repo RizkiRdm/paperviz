@@ -1,18 +1,29 @@
 # MCP ↔ REST API Parity Map
 
-**Chunk 7.5 — Human/Agent Capability Parity (updated Chunk 12.5 — 2026-09-21, matches 5 actual tools in `internal/mcp/tools.go`)**
+**Chunk 7.5 — Human/Agent Capability Parity (updated Issue #13 U6 — remote StreamableHTTP transport)**
+
+## Transports
+
+PaperViz ships two MCP transports from the same `cmd/mcp` binary:
+
+| Transport | How it runs | Auth / scoping |
+|---|---|---|
+| stdio (default) | 2026 `cmd/mcp` without `MCP_HTTP_ADDR`; speaks MCP over stdin/stdout | `PAPERVIZ_API_KEY` checked at startup; `search_documents` is global stateless title search |
+| StreamableHTTP remote | `cmd/mcp` with `MCP_HTTP_ADDR` set (`internal/mcp/http.go`); stateless, per-request | Bearer `PAPERVIZ_API_KEY` per request, resolved via `users.api_key_hash` digest lookup; all tools owner-scoped (search via `SearchByTitleForUser`) |
+
+The server router (`internal/handlers/router.go`) exposes no MCP route by design — neither `/api/mcp` nor any other HTTP MCP endpoint. Remote MCP is the separate `cmd/mcp` process, self-hosted.
 
 ## MCP Tools → REST Endpoints
 
 | MCP Tool | REST Endpoint | Parity Status | Notes |
 |----------|---------------|---------------|-------|
-| `ingest_document` | `POST /api/documents` | ⚠️ Partial | MCP=text only, deterministic extraction only (no LLM, no pipeline); REST supports PDF+text. Intentional: agents paste text, not upload PDFs |
-| `search_documents` | `GET /api/documents/` (list) | ⚠️ Partial | MCP=global title search, stateless, no auth scoping; REST=per-user library (requires auth). See Scope note below |
-| `get_document` | `GET /api/documents/:id` | ✅ Full | Same document data; MCP supports selective `include` (metadata,sections,evidence,figures) |
+| `ingest_document` | `POST /api/documents` | ⚠️ Partial | Both transports=text only, deterministic extraction only (no LLM, no `RunPipelineAndPersist`, no pipeline); REST supports PDF+text via web path. Intentional: agents paste text, not upload PDFs |
+| `search_documents` | `GET /api/documents/` (list) | ⚠️ Partial | stdio=global title search, stateless, no auth scoping; remote=owner-scoped via Bearer key (`SearchByTitleForUser`); REST=per-user library (requires auth). See Scope note below |
+| `get_document` | `GET /api/documents/:id` | ✅ Full | Same document data; MCP supports selective `include` (metadata,sections,evidence,figures). Remote enforces owner scope; stdio per pre-U4 behavior |
 | `get_figures` | `GET /api/documents/:id` | ✅ Full | MCP includes base64 `image_url` for image_fallback charts; same provenance `source_text`/`page_number`/`chapter_id` |
 | `get_evidence` | `GET /api/documents/:id/evidence-graph` + `GET /api/documents/:id/claims` | ✅ Full | MCP merges evidence+claims with `claim_evidence` links and provenance; same as REST evidence graph |
 
-**Scope note for `search_documents`:** stateless, global search across all ingested documents (ephemeral, 7-day expiry). Not scoped to API-key-owned documents, not per-user. This is intentional for MVP: MCP has no session/auth to scope listing, and document data is ephemeral anyway. See Key Decisions Log in `docs/PROJECT_STATE.md` (2026-09-21 entry). If per-user scoping is needed later, `search_documents` will need to accept auth context and filter by `user_id`.
+**Scope note for `search_documents` (stdio):** stateless, global search across all ingested documents (ephemeral, 7-day expiry). Not scoped to API-key-owned documents, not per-user. This is the stdio behavior; the remote StreamableHTTP transport is owner-scoped via Bearer auth. See PROJECT_STATE Key Decisions Log (2026-09-21 entry, superseded for remote 2026-11-09).
 
 ### Tools Not Implemented (by design)
 
@@ -24,15 +35,17 @@
 
 Former doc listed `analyze_paper`, `get_summary`, `get_claims`, `compare_papers` — none exist in `internal/mcp/tools.go` as of 2026-09-21. This table matches the 5 registered tools.
 
-**How the count is verified:** `scripts/mcp-handshake-check.sh` builds `cmd/mcp`, runs a real `initialize` + `tools/list` handshake over stdio, and asserts exactly those 5 tool names. It runs in CI on every push.
+**How the count is verified:** `scripts/mcp-handshake-check.sh` builds `cmd/mcp`, runs a real `initialize` + `tools/list` handshake over stdio, and asserts exactly those 5 tool names. It runs in CI on every push. Remote transport is covered separately by `internal/mcp/http_test.go` (Bearer auth, owner isolation, body-size cap).
 
 Do **not** verify this table with `grep -c "Name:" internal/mcp/tools.go`. That check passes on a server that panics before serving a single tool — which is exactly what happened until 2026-10-08, when a malformed `jsonschema` struct tag took down the entire agent surface while 641 tests stayed green. A grep counts text; the handshake proves the server boots.
 
-## Operations Intentionally Unavailable to Agents
+## Operations Intentionally Unavailable to Agents (stdio transport)
 
-| REST Endpoint | Why Unavailable | Rationale |
+On stdio there is no user context, so the following remain unavailable. On the remote StreamableHTTP transport these owner-scoped reads exist implicitly via the five tools, but user library management (save/rename/delete/share) stays REST-only by design.
+
+| REST Endpoint | Why Unavailable (stdio) | Rationale |
 |---------------|-----------------|-----------|
-| `GET /api/documents/` (list) | No user context | MCP is stateless; no session/auth to scope listing — `search_documents` provides global title search instead |
+| `GET /api/documents/` (list) | No user context | MCP stdio is stateless; no session/auth to scope listing — `search_documents` provides global title search instead |
 | `GET /api/documents/stats` | No user context | Same as above |
 | `PUT /api/documents/:id/save` | User preference | Agents don't manage user libraries |
 | `PATCH /api/documents/:id` | User preference | Agents don't rename user documents |
@@ -57,7 +70,7 @@ All MCP responses preserve these research semantics (matching REST):
 
 Both REST and MCP handlers read from the same repository layer and return the same underlying data structures. No duplicated business logic.
 
-## P35 Dependency Direction (Verified 2026-09-15)
+## P35 Dependency Direction (Verified 2026-09-15, remote added Issue #13 U4)
 
 **Allowed:** `MCP → Data/Tools → Repo/Infra`
 
@@ -65,6 +78,10 @@ Both REST and MCP handlers read from the same repository layer and return the sa
 internal/mcp/tools.go imports:
   paperviz/internal/repository   ← data layer (Repo)
   paperviz/internal/services     ← app services (Tools)
+
+internal/mcp/http.go imports:
+  paperviz/internal/repository   ← users.api_key_hash digest lookup, SearchByTitleForUser
+  paperviz/internal/app/documents ← document app service (owner-scoped reads)
 ```
 
 **Forbidden (verified zero hits):**

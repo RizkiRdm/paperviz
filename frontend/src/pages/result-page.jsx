@@ -25,7 +25,7 @@ export function ResultPage() {
     collectionAddError, retryAddToCollection,
     showAddToCollection, setShowAddToCollection, handleAddToCollection,
     showResearchMap, setShowResearchMap, showAnnotations, setShowAnnotations,
-    handleShare, handleVisibilityChange,
+    handleShare, handleVisibilityChange, isGuest,
   } = useResultState(documentId, navigate)
 
   if (state === "empty") return <NotFoundPage />
@@ -56,6 +56,7 @@ export function ResultPage() {
         onVisibilityChange={handleVisibilityChange}
         onShare={handleShare}
         onToggleClaims={() => setShowClaims(v => !v)}
+        isGuest={isGuest}
       />
 
       <main className="container workspace-content">
@@ -113,6 +114,7 @@ export function ResultPage() {
           setShowResearchMap={setShowResearchMap}
           showAnnotations={showAnnotations}
           setShowAnnotations={setShowAnnotations}
+          isGuest={isGuest}
         />
 
         <EvidenceSection evidence={doc.evidence} />
@@ -126,6 +128,7 @@ export function ResultPage() {
             activeChapter={activeChapter}
             documentId={documentId}
             chartExtractionDegraded={doc.chart_extraction_degraded}
+            isGuest={isGuest}
           />
         )}
 
@@ -142,6 +145,7 @@ export function ResultPage() {
             showAddToCollection={showAddToCollection}
             setShowAddToCollection={setShowAddToCollection}
             onAddToCollection={handleAddToCollection}
+            isGuest={isGuest}
           />
         )}
       </main>

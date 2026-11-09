@@ -319,14 +319,31 @@ func (r *DocumentRepo) SetProcessingTime(id string, ms int) error {
 
 // SearchByTitle returns documents whose title contains the query, ordered by recency.
 func (r *DocumentRepo) SearchByTitle(query string, limit int) ([]Document, error) {
+	return r.searchByTitle(query, "", false, limit)
+}
+
+// SearchByTitleForUser is the owner-scoped variant of SearchByTitle: only
+// documents owned by userID are returned. Used by the remote MCP transport
+// so one user's search can never surface another user's documents.
+func (r *DocumentRepo) SearchByTitleForUser(query, userID string, limit int) ([]Document, error) {
+	return r.searchByTitle(query, userID, true, limit)
+}
+
+// searchByTitle runs the title LIKE query, optionally restricted to one owner.
+func (r *DocumentRepo) searchByTitle(query, userID string, scoped bool, limit int) ([]Document, error) {
 	if limit <= 0 || limit > 50 {
 		limit = 10
 	}
-	rows, err := r.db.Query(
-		`SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, saved, visibility, share_token, processing_time_ms
-		FROM documents WHERE title LIKE ? ORDER BY created_at DESC LIMIT ?`,
-		"%"+query+"%", limit,
-	)
+	q := `SELECT id, created_at, last_accessed_at, status, source_type, reading_level, title, original_text, simplified_text, error_message, chart_extraction_degraded, processing_stage, user_id, saved, visibility, share_token, processing_time_ms
+		FROM documents WHERE title LIKE ?`
+	args := []any{"%" + query + "%"}
+	if scoped {
+		q += ` AND user_id = ?`
+		args = append(args, userID)
+	}
+	q += ` ORDER BY created_at DESC LIMIT ?`
+	args = append(args, limit)
+	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("search documents: %w", err)
 	}

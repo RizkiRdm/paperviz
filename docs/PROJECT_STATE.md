@@ -16,7 +16,7 @@
 > what you find in the actual code, say so explicitly instead of silently
 > trusting this file — it's maintained by hand and can lag behind reality.
 
-**Last updated:** 2026-11-07 — Issue #12 guest journey merged to main (PR #14) + docs/README refresh
+**Last updated:** 2026-11-09 — Issue #13 beta stabilization U1–U6 done, full gate passed, PR pending, deploy pending approval
 
 > **Documentation verification note (2026-09-25):** entries below preserve project history and may describe earlier tool counts, routes, or validation results. For current behavior, verify `internal/mcp/tools.go`, `internal/handlers/router.go`, `frontend/src/App.jsx`, and the focused architecture/product documents. The current MCP surface has five deterministic tools; web ingestion runs the full pipeline in an in-process goroutine.
 
@@ -25,11 +25,16 @@
 ## Current Focus
 *(The section that changes most — safe to fully rewrite every session.)*
 
-- **Working on:** Issue #12 guest journey — **merged to `main` via PR #14** (`99ebe2b`, branch `feat/issue-12-guest-journey` deleted). Landed: landing hero now links to a real seeded sample (`/sample` → `SamplePaperCells`, migration 023, `user_id NULL`, anonymous-readable) instead of a static mock; pre-submit auth gate (guest input saved to sessionStorage draft, restored after Clerk sign-in with `returnTo` allowlist, PDF re-pick note); credential wall on `missing_credential` + `POST /api/credentials/{id}/validate` (RequireAuth, 1-token ping through shared Transport, no key echo, openapi updated). Review pass: ce-simplify-code (6 applied) + ce-code-review (Ready with fixes, 4 applied in `16d520c`). Full verification gate green (go build/test/vet/gofmt, mcp-handshake 5 tools, frontend lint, `make frontend/dist`).
-- **Docs refresh (2026-11-07):** README rewritten with new landing screenshot (`assets/landing-page.png`, 1440×900 playwright capture of dev server) + conversion copywriting; `docs/codebase-reference.md` gained `/sample` route, validate endpoint, migration 023 rows.
-- **Active task file:** none (Issue #12 closed)
-- **Blocked on / pending decision:** none
-- **Next action if resuming:** CI/CD `go-ci.yml` deploys this merge to Render on push to `main` — verify `/healthz` 200 + `/api/collections` 401 + `/api/auth/me` 401 after live. Optional: SemVer tag via `release.yml` (MINOR — new endpoint + new route = pre-1.0 breaking-allowed feature bump).
+- **Working on:** Issue #13 "Beta Stabilization: Anonymous Access, MCP Usability & Repository Audit" (OPEN). Approved plan at `/home/rizki/.plannotator/plans/beta-stabilization-plan-issue--2026-11-08-approved.md`; branch `chore/beta-stabilization-issue-13`. Plan units: U1 CI fix (done), U2 audit + branch cleanup (done), U3 anon hardening (done), U4 remote MCP StreamableHTTP (done), U5 ads deferral (done), U6 docs sync + full gate (done). PR pending; deploy to Render pending separate approval — do not merge/deploy without it.
+- **U1 (done):** `scripts/frontend-bundle-check.sh` shebang `bash` → `sh` (POSIX, `set -eu`, no pipefail) + `$ENV_FILE` default. CI `build-frontend-image` should go green on push.
+- **U2 (done):** deleted 3 fully-merged branches (`feat/google-oauth-spa`, `fix/clerk-build-key`, `refactor/master`) locally + remote. `wip/pre-platform-foundation` (1 unique commit `d77cc10`) left untouched — owner to cherry-pick-or-archive. Issue #12 still shows OPEN on GitHub though PROJECT_STATE records merged via PR #14 — not silently closed.
+- **U3 (done):** result-page share/visibility/collection/export/annotation/chart-share controls now hidden for guests (`isGuest` gate through `useResultState` → `ResultHeader`, `ResultActions`, `UnderstandingSection`, `FiguresSection`, `ChartCard`); handlers never fire for guests. Collections fetch already guarded.
+- **U4 (done):** `internal/mcp/http.go` (stateless StreamableHTTP, per-request Bearer-key auth, `users.api_key_hash` digest lookup, 8MB body cap, shared `RateLimiter`/`JobLimiter`), `cmd/mcp/main.go` second mode via `MCP_HTTP_ADDR`. `server.go` now carries `userID`/`scoped` + `newServerWithDeps`. Tools `ingest_document`/`search_documents`/`get_document`/`get_figures`/`get_evidence` are owner-scoped on remote (search via new `SearchByTitleForUser`). Tests `http_test.go` green (incl. oversized-body 413 + owner-isolation fixes).
+- **U5 (done):** ads deferred post-beta — no ad SDKs/tracking/UI shipped; revisit after traffic + network eligibility (see Known Gaps).
+- **U6 (done):** docs sync (`docs/mcp-parity.md`, `README.md`, `docs/getting-started.md`, `/agents` stdio config) + full verification gate passed 2026-11-09: `go build ./cmd/server ./cmd/mcp ./cmd/admin` ok, `go test ./...` ok (15 pkgs), `go vet ./...` clean, `gofmt -l .` empty, `scripts/mcp-handshake-check.sh` ok (5 tools), `npm --prefix frontend run lint` ok, `make frontend/dist` ok (Clerk bundle check OK).
+- **Active task file:** Issue #13 (plan approved, in execution)
+- **Blocked on / pending decision:** PR creation; Render deploy pending explicit approval
+- **Next action if resuming:** open PR for `chore/beta-stabilization-issue-13`; wait for approval before merge or Render deploy.
 
 ---
 
@@ -101,8 +106,10 @@ it.)*
 - Revoke UI for document share links — why deferred: `revokeDocumentShare` exists in api.js; no button requested by chunk scope
 - Visibility in GET /api/documents/:id payload — why deferred: frontend selector initializes locally to "private"; add field when needed
 - Seeded sample re-seed after expiry — why deferred: seed expires 7 days after last visit (normal sweep, migration 023 does not re-run); revisit within window refreshes it, a long-idle deploy needs manual reinsert. Exemption/reseed proposed in review, not built.
-- Guest share/visibility/collection/export gating — why deferred: review found these still fire authenticated calls as guests and surface 401 with dead Retry; collections fetch was guarded but action layer was not; left as inline-error known issue.
 - Frontend unit test harness — why deferred: no vitest/jest in repo; draft/returnTo/credential-wall branches verified by lint+build+E2E only (deliberate, recorded in ce-code-review receipt).
+- Advertising / ads — why deferred: post-beta, no ad SDKs, tracking, or ad UI; revisit after organic traffic exists and ad-network eligibility is established.
+- `wip/pre-platform-foundation` branch undecided — why deferred: holds 1 unique commit `d77cc10` (Oct 7 pre-platform snapshot: BYOK env cleanup, SIGTERM drain, container fixes — partly already in `main`); audit (Issue #13) recommends cherry-pick-or-archive after diff vs `main`; not merged without owner decision. The 3 fully-merged branches (`feat/google-oauth-spa`, `fix/clerk-build-key`, `refactor/master`) were deleted 2026-11-09 per approved audit with zero commits ahead of `main`.
+- Issue #12 GitHub state discrepancy — GitHub shows #12 OPEN while PROJECT_STATE records it merged via PR #14 (2026-11-07); left OPEN on GitHub, not silently closed — owner to verify/close on GitHub.
 
 ---
 
@@ -149,7 +156,7 @@ something you already rejected for a clear reason.)*
 | 2026-09-08 | Scatter requires numeric X/Y | No categorical labels as X-axis for scatter charts |
 | 2026-09-08 | Pie only for parts-of-whole | Reject pie when data doesn't represent a whole |
 | 2026-09-12 | Auth session: single-session on login + strict complexity (upper/lower/digit/special) + rate-limiter TTL 5m | Closes fixation/CSRF, bounds memory without new dep; single-session breaks multi-device (see ADR-001) |
-| 2026-09-21 | `search_documents` is global stateless title search, not per-user | MCP has no session/auth to scope listing (stateless by design); global search across ephemeral docs, per-user scoping deferred — see `docs/mcp-parity.md` scope note |
+| 2026-09-21 | `search_documents` is global stateless title search, not per-user | MCP has no session/auth to scope listing (stateless by design); global search across ephemeral docs, per-user scoping deferred — see `docs/mcp-parity.md` scope note. Superseded for remote 2026-11-09 (Issue #13 U4): remote StreamableHTTP is owner-scoped via Bearer `users.api_key_hash` lookup + `SearchByTitleForUser`; stdio stays global |
 | 2026-09-21 | Deploy env vars fail-loud at startup (12.2) | `GOOGLE_CLIENT_ID/SECRET/REDIRECT_URL` + `STRIPE_SECRET_KEY/WEBHOOK_SECRET` + `FRONTEND_URL` now `slog.Error` + `os.Exit(1)` like `GEMINI_API_KEY`; exact missing var logged |
 | 2026-09-21 | Migrations single source `internal/repository/migrations.go` (12.1) | `LoadMigrations` extracted from `cmd/server`+`cmd/mcp` duplication; both binaries import same map; test asserts 19 + fails on future drift |
 
@@ -184,7 +191,7 @@ just a fast map: "if I need to change X, which file do I open".)*
 - Structured Research API docs: `docs/structured-research-api.md`
 - Canonical Research Output Contract: `docs/canonical-research-output-contract.md`
 - OpenAPI spec: `docs/openapi.yaml`
-- MCP server: `cmd/mcp/main.go`, `internal/mcp/server.go`, `internal/mcp/tools.go`, `internal/mcp/errors.go`, `internal/mcp/ratelimit.go`, `internal/mcp/jobs.go`
+- MCP server: `cmd/mcp/main.go` (stdio default; StreamableHTTP remote when `MCP_HTTP_ADDR` set), `internal/mcp/http.go`, `internal/mcp/server.go`, `internal/mcp/tools.go`, `internal/mcp/errors.go`, `internal/mcp/ratelimit.go`, `internal/mcp/jobs.go`
 - MCP↔REST parity map: `docs/mcp-parity.md`
 - Structured research objects migration: `migrations/014_structured_research_objects.sql`
 - Structured research repos: `internal/repository/claims.go`, `internal/repository/tables.go`, `internal/repository/methods.go`, `internal/repository/results.go`, `internal/repository/citations.go`

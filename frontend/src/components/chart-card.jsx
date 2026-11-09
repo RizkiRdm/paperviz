@@ -103,7 +103,7 @@ function ShareFigureDialog({ url, onClose }) {
   )
 }
 
-export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
+export function ChartCard({ chart, chapterTitle, evidence = [], documentId, isGuest }) {
   const [shareUrl, setShareUrl] = useState(null)
   const [sharing, setSharing] = useState(false)
   const [shareError, setShareError] = useState(null)
@@ -130,8 +130,9 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
     }
   }, [chart.chart_data, isDataExtracted])
 
+  // Figure share is account-only: guests never fire the call (401 before it).
   async function handleShare() {
-    if (sharing) return
+    if (sharing || isGuest) return
     setSharing(true)
     setShareError(null)
     try {
@@ -215,7 +216,7 @@ export function ChartCard({ chart, chapterTitle, evidence = [], documentId }) {
               </TooltipTrigger>
               <TooltipContent>AI-generated interpretation of the original figure</TooltipContent>
             </Tooltip>
-            {documentId && (
+            {documentId && !isGuest && (
               <button
                 onClick={handleShare}
                 disabled={sharing}

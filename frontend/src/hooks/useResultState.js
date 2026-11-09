@@ -48,6 +48,9 @@ export function useResultState(documentId, navigate) {
   // Guest guard: collections are authenticated-only, so a guest viewing a
   // result (e.g. /sample) must not fire a request that 401s into an error UI.
   const { user, checked } = useCurrentUser()
+  // isGuest gates every account-only action below: guests never fire a
+  // request that must 401 into a dead Retry.
+  const isGuest = checked && !user
 
   // Route-shape + state machine: empty = unknown document (404 view),
   // retryable-error = poll failure or timeout (retry refetches), error =
@@ -141,8 +144,9 @@ export function useResultState(documentId, navigate) {
   }
 
   // handleShare mints a share link then opens the dialog; failures surface
-  // inline near the header button.
+  // inline near the header button. Guests never fire the call (401 before it).
   async function handleShare() {
+    if (isGuest) return
     setShareError(false)
     try {
       const { share_url } = await generateDocumentShare(documentId)
@@ -155,7 +159,9 @@ export function useResultState(documentId, navigate) {
   }
 
   // handleVisibilityChange applies optimistically, reverts if the PATCH fails.
+  // Guests never fire the PATCH (401 before it).
   async function handleVisibilityChange(next) {
+    if (isGuest) return
     const previous = visibility
     setVisibility(next)
     setVisibilityError(false)
@@ -169,8 +175,10 @@ export function useResultState(documentId, navigate) {
   }
 
   // handleAddToCollection adds the document to a collection; failure keeps
-  // the menu open with an inline Retry.
+  // the menu open with an inline Retry. Guests cannot reach the menu (no
+  // collections), but the guard never lets the call fire.
   async function handleAddToCollection(colId) {
+    if (isGuest) return
     lastCollectionRef.current = colId
     setCollectionAddError(null)
     try {
@@ -201,5 +209,6 @@ export function useResultState(documentId, navigate) {
     showResearchMap, setShowResearchMap,
     showAnnotations, setShowAnnotations,
     handleCopyText, handleShare, handleVisibilityChange, handleAddToCollection,
+    isGuest,
   }
 }
