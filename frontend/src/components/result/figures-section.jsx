@@ -15,7 +15,7 @@ function failureCopy(category) {
 }
 
 // Render figures section — chapter-aware ChartCard map with grounding badges and failure states.
-export function FiguresSection({ charts = [], evidence = [], chapters = [], activeChapter = -1, documentId, chartExtractionDegraded = false, failureCategory }) {
+export function FiguresSection({ charts = [], evidence = [], chapters = [], activeChapter = -1, documentId, chartExtractionDegraded = false, failureCategory, isGuest }) {
   const hasChapters = chapters && chapters.length > 1
   const activeChapterData = hasChapters ? chapters[activeChapter] : null
   const evidenceFor = (chartId) => (evidence || []).filter((e) => e.figure_id === chartId)
@@ -34,7 +34,7 @@ export function FiguresSection({ charts = [], evidence = [], chapters = [], acti
         {chapterCharts.length > 0 ? (
           <div className="flex flex-col gap-4">
             {chapterCharts.map((chart) => (
-              <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} evidence={evidenceFor(chart.id)} documentId={documentId} />
+              <ChartCard key={chart.id} chart={chart} chapterTitle={activeChapterData?.title} evidence={evidenceFor(chart.id)} documentId={documentId} isGuest={isGuest} />
             ))}
           </div>
         ) : chartExtractionDegraded || degradedMsg ? (
@@ -61,7 +61,7 @@ export function FiguresSection({ charts = [], evidence = [], chapters = [], acti
         </div>
         <div className="flex flex-col gap-4">
           {charts.map((chart) => (
-            <ChartCard key={chart.id} chart={chart} evidence={evidenceFor(chart.id)} documentId={documentId} />
+            <ChartCard key={chart.id} chart={chart} evidence={evidenceFor(chart.id)} documentId={documentId} isGuest={isGuest} />
           ))}
         </div>
       </section>

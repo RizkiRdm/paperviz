@@ -207,9 +207,9 @@ get_evidence
 
 It does **not** call `RunPipelineAndPersist`, Gemini, claim verification, or chart generation. No queue exists to advance that document later. Use the web ingestion path when you need the complete processing pipeline.
 
-### Why `/agents` is not the local MCP setup
+### Remote StreamableHTTP mode and `/agents`
 
-`frontend/src/pages/agents-page.jsx` currently generates remote configuration using `@anthropic-ai/mcp-remote` and `https://paperviz.com/api/mcp`. The current `internal/handlers/router.go` does not register `/api/mcp`. For this repository, configure an MCP client to launch the local stdio binary instead, or deploy a compatible remote transport before using that page's generated configuration.
+`/agents` (`frontend/src/pages/agents-page.jsx`) generates stdio configuration for the local `cmd/mcp` binary. A remote mode exists only when you run `cmd/mcp` with `MCP_HTTP_ADDR` set: it serves the same five tools over StreamableHTTP, requiring a per-request Bearer `PAPERVIZ_API_KEY` (resolved via the `users.api_key_hash` digest) and scoping every tool to that owner. It is self-hosted — no hosted MCP endpoint ships by default, and `internal/handlers/router.go` registers no `/api/mcp` route by design. The `ingest_document` honesty note above applies to both transports: extraction-only, no `RunPipelineAndPersist`, no model call.
 
 ## 8. Build production-style local binary
 
@@ -275,7 +275,7 @@ BASE_URL=http://localhost:8080 npm --prefix e2e test
 | Frontend loads but API calls fail | Backend not running or `PORT` mismatch | Confirm backend health and Vite `PORT` value |
 | PDF returns `no_text_layer` | No selectable PDF text | Use OCR externally, then paste or import extracted text |
 | MCP document remains `processing` | Expected current behavior for MCP-only intake | Use web ingestion for full pipeline |
-| Generated `/agents` config cannot connect | Remote MCP transport is not implemented in current router | Use local stdio MCP configuration |
+| Generated `/agents` config cannot connect | `/agents` emits stdio config; no hosted remote exists by default and the server router registers no `/api/mcp` | Run local stdio MCP, or self-host remote with `MCP_HTTP_ADDR` on `cmd/mcp` |
 
 ## Next steps
 

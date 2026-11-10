@@ -10,13 +10,13 @@ You can see all of that on a real document in one click: the landing page's **Se
 
 PaperViz holds no model vendor account and no billing account: you bring your own model key, it is encrypted at rest, and model spend belongs to you. Sign-in runs on Clerk, which makes PaperViz's identity a SaaS dependency — a trade documented in [`ADR-003`](docs/DECISIONS/ADR-003-clerk-auth.md), along with the lock-in risk it accepts.
 
-> **Current architecture note:** the web ingestion path runs the full LLM-backed processing pipeline using the requesting user's own model key. The repository's MCP server currently exposes five deterministic data tools over stdio; its `ingest_document` tool stores text but does not start the LLM pipeline. See [Current limitations](#current-limitations) before relying on the agent workflow.
+> **Current architecture note:** the web ingestion path runs the full LLM-backed processing pipeline using the requesting user's own model key. The repository's MCP server exposes five deterministic data tools over stdio by default; its optional StreamableHTTP remote (`MCP_HTTP_ADDR` on `cmd/mcp`) serves the same five tools owner-scoped via Bearer key. On both transports its `ingest_document` tool stores text but does not start the LLM pipeline. See [Current limitations](#current-limitations) before relying on the agent workflow.
 
 ## Product Surfaces
 
 ### Agent interface
 
-The local MCP server exposes five tools:
+The MCP server exposes five tools over stdio by default, or over a self-hosted StreamableHTTP remote when `cmd/mcp` runs with `MCP_HTTP_ADDR` (Bearer `PAPERVIZ_API_KEY`, owner-scoped, no model call, extraction-only):
 
 | Tool | Purpose |
 |---|---|
@@ -26,7 +26,7 @@ The local MCP server exposes five tools:
 | `get_figures` | Retrieve chart data, source locations, and provenance |
 | `get_evidence` | Retrieve evidence and linked claims |
 
-MCP and REST share the same SQLite database when configured with the same `DATABASE_PATH`. All five tools are deterministic: the MCP process calls no model provider, so no credential of any kind passes through it.
+MCP and REST share the same SQLite database when configured with the same `DATABASE_PATH`. All five tools are deterministic on both transports: the MCP process calls no model provider. The stdio transport needs only the startup key; the remote resolves the per-request Bearer key to its owner and scopes every tool to that owner.
 
 ### Web interface
 
@@ -85,7 +85,7 @@ MCP client → MCP tools → app/domain services and repositories
 Domain services → external providers
 ```
 
-The production runtime is one Go binary serving both API routes and built frontend assets. The MCP process is a separate stdio entrypoint and can share the same database file.
+The production runtime is one Go binary serving both API routes and built frontend assets. The MCP process is a separate entrypoint (stdio by default, StreamableHTTP when `MCP_HTTP_ADDR` is set) and can share the same database file.
 
 ## Technology
 
@@ -94,7 +94,7 @@ The production runtime is one Go binary serving both API routes and built fronte
 | Backend | Go 1.25, `chi`, raw `database/sql` |
 | Database | SQLite through `modernc.org/sqlite`, WAL enabled, no CGO |
 | Frontend | React 19, Vite 8, Tailwind CSS 4, shadcn/ui, Recharts |
-| Agent interface | Model Context Protocol over stdio |
+| Agent interface | Model Context Protocol over stdio or StreamableHTTP (`MCP_HTTP_ADDR`) |
 | LLM | `github.com/zendev-sh/goai` for Gemini, Anthropic, and OpenAI protocol; own retry, concurrency, and JSON recovery. Key supplied per request (BYOK) |
 | PDF | `pdfcpu` and `ledongthuc/pdf`, processed in memory |
 | Validation | Go tests, frontend lint/build, Playwright E2E |
@@ -245,8 +245,8 @@ Start with [`docs/README.md`](docs/README.md) for reading paths and source-of-tr
 - Model keys work for Gemini, Anthropic Claude, and OpenAI. Provider protocol comes from `github.com/zendev-sh/goai`; retry, concurrency, and JSON recovery are PaperViz's own.
 - Service API keys are returned exactly once, at issue time, and stored only as a SHA-256 digest. A lost key cannot be recovered, only replaced.
 - Password recovery is Clerk's self-service flow. To cut off a compromised account from the CLI, use `go run ./cmd/admin revoke-sessions <email>`.
-- `/agents` currently generates remote MCP configuration for `https://paperviz.com/api/mcp`, but the current server router does not expose that HTTP MCP transport. The repository ships a local stdio MCP entrypoint.
-- MCP search is global and stateless; it is not scoped to an authenticated user's library.
+- `/agents` generates stdio MCP configuration. The repository ships a local stdio MCP entrypoint and an optional self-hosted StreamableHTTP remote (`MCP_HTTP_ADDR` on `cmd/mcp`); the server router exposes no `/api/mcp` by design, and no hosted MCP endpoint ships by default.
+- MCP search differs by transport: stdio search is global and stateless, not scoped to an authenticated user's library; the remote StreamableHTTP transport is owner-scoped via Bearer key.
 - SQLite uses one open connection, and the architecture is designed for a single low-concurrency instance rather than horizontal scaling.
 - Some public static SEO pages and screenshot assets predate the current route cuts. Product navigation follows `frontend/src/App.jsx`, not those artifacts.
 

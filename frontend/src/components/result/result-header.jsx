@@ -5,7 +5,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { ArrowLeft, Link2 } from "lucide-react"
 
 // Render sticky top bar with nav, verification, visibility — DESIGN.md Dub tokens.
-export function ResultHeader({ doc, visibility, visibilityError, shareError, showClaims, onBack, onVisibilityChange, onShare, onToggleClaims }) {
+// Share/visibility are account-only: guests never see the controls at all.
+export function ResultHeader({ doc, visibility, visibilityError, shareError, showClaims, onBack, onVisibilityChange, onShare, onToggleClaims, isGuest }) {
   return (
     <header className="border-b border-[#e5e5e5] bg-white/80 backdrop-blur-xs sticky top-0 z-10">
       <div className="mx-auto flex max-w-[1200px] items-center justify-between px-6 py-3.5">
@@ -42,25 +43,29 @@ export function ResultHeader({ doc, visibility, visibilityError, shareError, sho
                 <TooltipContent>Claims checked against the original text. Click to compare.</TooltipContent>
               </Tooltip>
             )}
-            <select
-              value={visibility}
-              onChange={(e) => onVisibilityChange(e.target.value)}
-              aria-label="Who can view this summary"
-              className="h-9 cursor-pointer rounded-[8px] border border-[#e5e5e5] bg-white px-2 text-xs font-medium text-[#171717] transition-colors hover:bg-[#f5f5f5] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 disabled:text-[#a3a3a3]"
-              disabled={doc?.status !== "complete"}
-            >
-              <option value="private">Private</option>
-              <option value="unlisted">Unlisted</option>
-              <option value="public">Public</option>
-            </select>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="secondary" onClick={onShare} aria-label="Share document" className="h-9 px-3 text-xs gap-1.5 font-medium">
-                  <Link2 className="h-3.5 w-3.5 text-[#737373]" aria-hidden="true" /> Share
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Share via a link that expires after 7 days of inactivity.</TooltipContent>
-            </Tooltip>
+            {!isGuest && (
+              <>
+                <select
+                  value={visibility}
+                  onChange={(e) => onVisibilityChange(e.target.value)}
+                  aria-label="Who can view this summary"
+                  className="h-9 cursor-pointer rounded-[8px] border border-[#e5e5e5] bg-white px-2 text-xs font-medium text-[#171717] transition-colors hover:bg-[#f5f5f5] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 disabled:text-[#a3a3a3]"
+                  disabled={doc?.status !== "complete"}
+                >
+                  <option value="private">Private</option>
+                  <option value="unlisted">Unlisted</option>
+                  <option value="public">Public</option>
+                </select>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="secondary" onClick={onShare} aria-label="Share document" className="h-9 px-3 text-xs gap-1.5 font-medium">
+                      <Link2 className="h-3.5 w-3.5 text-[#737373]" aria-hidden="true" /> Share
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Share via a link that expires after 7 days of inactivity.</TooltipContent>
+                </Tooltip>
+              </>
+            )}
           </div>
           {shareError && (
             <p className="text-[11px] text-[#ea580c]" role="alert">

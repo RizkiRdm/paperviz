@@ -78,7 +78,14 @@ func handleIngestDocument(ctx context.Context, srv *MCPServer, args IngestDocume
 		return errResult(fmt.Errorf("invalid reading_level %q: must be simplified or eli5", readingLevel)), IngestDocumentResult{}, nil
 	}
 
-	intake, _, err := services.ValidateAndInsert(srv.db, readingLevel, false, nil, args.Text, nil)
+	// On the remote transport the ingested document is owned by the
+	// authenticated user; stdio stays unscoped (nil owner, as before).
+	var owner *string
+	if srv.scopedMode() {
+		owner = &srv.userID
+	}
+
+	intake, _, err := services.ValidateAndInsert(srv.db, readingLevel, false, nil, args.Text, owner)
 	if err != nil {
 		return errResult(err), IngestDocumentResult{}, nil
 	}
@@ -110,7 +117,15 @@ func handleSearchDocuments(ctx context.Context, srv *MCPServer, args SearchDocum
 		limit = 10
 	}
 
-	docs, err := repository.NewDocumentRepo(srv.db).SearchByTitle(args.Query, limit)
+	// Remote search is owner-scoped; stdio keeps the documented global
+	// behavior (parity split in docs/mcp-parity.md).
+	var docs []repository.Document
+	var err error
+	if srv.scopedMode() {
+		docs, err = repository.NewDocumentRepo(srv.db).SearchByTitleForUser(args.Query, srv.userID, limit)
+	} else {
+		docs, err = repository.NewDocumentRepo(srv.db).SearchByTitle(args.Query, limit)
+	}
 	if err != nil {
 		return errResult(err), SearchDocumentsResult{}, nil
 	}
@@ -151,7 +166,8 @@ func handleGetDocument(ctx context.Context, srv *MCPServer, args GetDocumentInpu
 		return errResult(ErrRateLimited), GetDocumentResult{}, nil
 	}
 
-	doc, err := getDocumentOrError(srv.db, args.DocumentID)
+	// Remote reads only ever see the caller's own documents.
+	doc, err := srv.fetchDocument(args.DocumentID)
 	if err != nil {
 		return errResult(err), GetDocumentResult{}, nil
 	}
@@ -210,7 +226,7 @@ func handleGetFigures(ctx context.Context, srv *MCPServer, args DocIDInput) (*mc
 		return errResult(ErrRateLimited), FiguresResult{}, nil
 	}
 
-	if _, err := getDocumentOrError(srv.db, args.DocumentID); err != nil {
+	if _, err := srv.fetchDocument(args.DocumentID); err != nil {
 		return errResult(err), FiguresResult{}, nil
 	}
 
@@ -230,7 +246,7 @@ func handleGetEvidence(ctx context.Context, srv *MCPServer, args DocIDInput) (*m
 		return errResult(ErrRateLimited), EvidenceResult{}, nil
 	}
 
-	if _, err := getDocumentOrError(srv.db, args.DocumentID); err != nil {
+	if _, err := srv.fetchDocument(args.DocumentID); err != nil {
 		return errResult(err), EvidenceResult{}, nil
 	}
 
@@ -496,6 +512,21 @@ func parseInclude(include string) map[string]bool {
 		}
 	}
 	return set
+}
+
+// fetchDocument loads a document, enforcing owner scope on the remote
+// transport: a document owned by someone else is indistinguishable from a
+// missing one, so its existence never leaks across users.
+func (srv *MCPServer) fetchDocument(docID string) (*repository.Document, error) {
+	doc, err := getDocumentOrError(srv.db, docID)
+	if err != nil {
+		return nil, err
+	}
+	if srv.scopedMode() && (doc.UserID == nil || *doc.UserID != srv.userID) {
+		// Same error as a genuinely missing document: existence never leaks.
+		return nil, fmt.Errorf("document %s: %w", docID, repository.ErrNotFound)
+	}
+	return doc, nil
 }
 
 // getDocumentOrError fetches a document or returns a user-facing error.

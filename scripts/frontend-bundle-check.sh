@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Guard against shipping a frontend bundle with no inlined Clerk publishable
 # key. Vite inlines VITE_* at build time, so a bundle built without
 # VITE_CLERK_PUBLISHABLE_KEY renders the App.jsx "key is not set" screen on
@@ -6,7 +6,9 @@
 # build now fails loud instead of shipping a silently broken SPA.
 #
 # Usage: frontend-bundle-check.sh [dist-dir]   (default: frontend/dist)
-set -euo pipefail
+# POSIX sh, not bash: the frontend image stage is node:24-alpine (no bash).
+# No pipefail: an empty grep just yields count 0, caught by the guard below.
+set -eu
 
 DIST="${1:-frontend/dist}"
 ASSETS="$DIST/assets"
@@ -27,7 +29,7 @@ if [ "$count" -eq 0 ]; then
   echo "public landing page) would render 'VITE_CLERK_PUBLISHABLE_KEY is not set'." >&2
   echo "" >&2
   echo "Fix: set VITE_CLERK_PUBLISHABLE_KEY in the build environment, or use" >&2
-  echo "'make frontend/dist' (local, exports $ENV_FILE) instead of a bare" >&2
+  echo "'make frontend/dist' (local, exports ${ENV_FILE:-.env.development}) instead of a bare" >&2
   echo "'npm run build'. See .env.example." >&2
   exit 1
 fi
