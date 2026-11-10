@@ -18,14 +18,14 @@ test.describe('Agents Page', () => {
     // points at /api/mcp hands users an endpoint the router does not serve.
     await expect(page.locator('body')).not.toContainText('/api/mcp')
     await expect(page.locator('pre')).toContainText('paperviz-mcp')
-    await expect(page.locator('pre')).toContainText('GEMINI_API_KEY')
+    await expect(page.locator('pre')).toContainText('PAPERVIZ_API_KEY')
   })
 
   test('tells the user ChatGPT has no hosted endpoint', async ({ page }) => {
     await page.goto('/agents')
     await page.waitForLoadState('networkidle')
     await page.locator('[role="tab"]', { hasText: 'ChatGPT' }).click()
-    await expect(page.locator('[role="tabpanel"]')).toContainText('does not expose a hosted MCP endpoint')
+    await expect(page.locator('[role="tabpanel"]')).toContainText('no hosted MCP endpoint')
   })
 
   test('switching tabs updates config panel', async ({ page }) => {
