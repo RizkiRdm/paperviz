@@ -181,6 +181,7 @@ func TestHTTP_RejectsOversizedBody(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+keyA)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("Accept", "application/json, text/event-stream")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("post: %v", err)
