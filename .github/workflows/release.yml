@@ -66,6 +66,30 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build and deploy SPA to Cloudflare (static assets)
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_API_BASE_URL: https://paperviz-z4ne.onrender.com
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+          ../scripts/frontend-bundle-check.sh dist
+
+      - name: Deploy SPA to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+          workingDirectory: .
+
       - name: Deploy release to Render production
         uses: ./.github/actions/render-deploy
         with:

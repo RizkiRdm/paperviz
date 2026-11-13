@@ -8,6 +8,16 @@
 - MUST run tests before marking any task complete.
 - MUST only inspect files directly related to task given. Do not scan the entire repository, do not read files in `@.gitignore`, do not inspect unrelated documents.
 
+## Browser Automation
+
+Use `agent-browser` for web automation. Run `agent-browser --help` for all commands.
+
+Core workflow:
+1. `agent-browser open <url>` - Navigate to page
+2. `agent-browser snapshot -i` - Get interactive elements with refs (@e1, @e2)
+3. `agent-browser click @e1` / `fill @e2 "text"` - Interact using refs
+4. Re-snapshot after page changes
+
 ## Design System Rules
 For any task that modifies or generates UI, styling, layout, or components:
 1. Read `@DESIGN.md` completely before implementation.
@@ -23,7 +33,7 @@ PaperViz converts academic papers (PDF/pasted text/DOI/URL) into simplified-lang
 - LLM: provider-agnostic HTTP client with one backend per vendor. Keys are supplied per request (BYOK) from the user's own stored credential; the server holds no model vendor account.
 - PDF processing: Go-native text/image extraction libraries (pinned exact versions in `go.mod`).
 - No Docker/orchestration requirement for MVP — single binary + SQLite file.
-- Backend is a headless REST API (no static file serving). The SPA is deployed separately (Cloudflare Pages) and reaches the API cross-origin: `ALLOWED_ORIGINS` allowlists its origin, `VITE_API_BASE_URL` is inlined at build time. Local dev runs two processes (`make dev` + `make frontend-dev`, Vite proxies `/api`). Never re-add a FileServer/SPA fallback to the router.
+- Backend is a headless REST API (no static file serving). The SPA is deployed separately (Cloudflare Workers static assets, `wrangler deploy` from root `wrangler.jsonc`) and reaches the API cross-origin: `ALLOWED_ORIGINS` allowlists its origin, `VITE_API_BASE_URL` is inlined at build time. Local dev runs two processes (`make dev` + `make frontend-dev`, Vite proxies `/api`). Never re-add a FileServer/SPA fallback to the router. Pushes to `main`/version tags auto-deploy backend to Render and frontend SPA to Cloudflare via `.github/workflows/go-ci.yml` (gated on CI). Manual SPA deploy: `make deploy-frontend` with Wrangler auth and production `VITE_*` inlined.
 - Agent access: `internal/mcp` (stdio MCP server, `cmd/mcp`), stateless text intake and research-data retrieval, separate interface sharing services/data with REST. See `docs/mcp-parity.md`.
 
 ## graphify

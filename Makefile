@@ -18,12 +18,17 @@ build:
 # "up-to-date" and skipped the build — which is how a stale, keyless bundle got
 # deployed. It now rebuilds every time, then asserts the key is actually
 # inlined.
+#
+# For a production deploy, build with production VITE_* inlined (at minimum
+# VITE_CLERK_PUBLISHABLE_KEY and VITE_API_BASE_URL pointing at the prod API),
+# e.g. via ENV_FILE or exported env vars, then run the bundle guard before ship.
 frontend/dist:
 	cd frontend && npm ci && export $$(grep -v '^#' $(CURDIR)/$(ENV_FILE) | xargs) && npm run build
 	./scripts/frontend-bundle-check.sh frontend/dist
 
-# Manual Cloudflare SPA deploy. Build (guarded) first, then ship — never deploy
-# a dist that skipped the key check.
+# Manual Cloudflare Workers SPA deploy (static assets). Build (guarded) first,
+# then ship — never deploy a dist that skipped the key check. Requires Wrangler
+# auth (CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID or `wrangler login`).
 deploy-frontend: frontend/dist
 	npx wrangler deploy
 
