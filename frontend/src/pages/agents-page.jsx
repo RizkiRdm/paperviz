@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Copy, Check } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
 
 // PaperViz ships a stdio MCP server (cmd/mcp). It runs on the user's own
@@ -70,10 +71,13 @@ export function AgentsPage() {
 
   return (
     <AppShell active="agents">
-      <div className="page-intro">
-        <p className="eyebrow">AGENTS / MCP</p>
-        <h1>Add PaperViz to your agent</h1>
-        <p className="muted">PaperViz ships a local stdio MCP server. Setup is intentionally explicit because the repository exposes no hosted MCP transport — a StreamableHTTP remote exists only when you run cmd/mcp with MCP_HTTP_ADDR.</p>
+      <div className="mb-8">
+        <h1 className="font-['Satoshi',sans-serif] text-2xl md:text-3xl font-medium tracking-tight text-[#0a0a0a]">
+          Add PaperViz to your agent
+        </h1>
+        <p className="mt-2 text-sm text-[#525252] leading-relaxed max-w-2xl">
+          PaperViz ships a local stdio MCP server with five deterministic tools (`ingest_document`, `search_documents`, `get_document`, `get_evidence`, `get_figures`). Setup runs directly on your machine against your local research database.
+        </p>
       </div>
 
         <div className="rounded-[12px] border border-[#e5e5e5] bg-white">
@@ -101,14 +105,25 @@ export function AgentsPage() {
               <>
                 <p className="mb-3 text-xs text-[#737373]">{activeClient.destination}</p>
                 <div className="relative">
-                  <pre className="rounded-[6px] bg-[#f5f5f5] border border-[#e5e5e5] p-4 text-xs font-mono text-[#171717] overflow-x-auto whitespace-pre-wrap">
+                  <pre className="rounded-[6px] bg-[#f5f5f5] border border-[#e5e5e5] p-4 text-xs font-mono text-[#171717] overflow-x-auto whitespace-pre-wrap pr-24">
                     {STDIO_CONFIG}
                   </pre>
                   <button
                     onClick={copyToClipboard}
-                    className="absolute top-2 right-2 rounded-[6px] border border-[#e5e5e5] bg-white px-3 py-1 text-xs font-medium text-[#737373] hover:bg-[#f5f5f5] transition-colors"
-              >
-                {copied ? "Copied!" : "Copy"}
+                    aria-label={copied ? "Copied configuration" : "Copy configuration"}
+                    className="absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 rounded-[6px] border border-[#e5e5e5] bg-white px-2.5 py-1 text-xs font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors shadow-2xs"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-[#16a34a]" />
+                        <span>Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5 text-[#737373]" />
+                        <span>Copy</span>
+                      </>
+                    )}
                   </button>
                 </div>
                 {copyError && (

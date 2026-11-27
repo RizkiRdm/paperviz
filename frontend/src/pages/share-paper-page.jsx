@@ -68,18 +68,25 @@ export function SharePaperPage() {
 
   if (error === "network") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <h1 className="text-4xl font-semibold text-[#0a0a0a]">Offline</h1>
-          <p className="mt-2 text-sm text-[#737373]">
-            Something went wrong loading this summary. Check your connection and try again.
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <div className="max-w-md w-full text-center py-16">
+          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#ea580c] bg-[#fff7ed] px-2.5 py-1 rounded-[4px] border border-[#ffedd5]">
+            Connection Error
+          </span>
+          <h1 className="mt-4 font-display text-3xl sm:text-4xl font-medium tracking-tight text-[#0a0a0a]">
+            Unable to load summary
+          </h1>
+          <p className="mt-3 text-sm text-[#737373] leading-relaxed">
+            Something went wrong connecting to PaperViz. Check your network connection and try again.
           </p>
-          <Link
-            to={`/?ref=${shareToken}`}
-            className="mt-6 inline-block text-sm text-[#2563eb] hover:underline"
-          >
-            Analyze your own paper
-          </Link>
+          <div className="mt-8 flex justify-center">
+            <Link
+              to={`/?ref=${shareToken}`}
+              className="inline-flex items-center gap-2 rounded-[8px] bg-[#0a0a0a] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#171717] transition-colors shadow-2xs"
+            >
+              <span>Analyze your own paper</span>
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -87,18 +94,25 @@ export function SharePaperPage() {
 
   if (error || !paper) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <h1 className="text-4xl font-semibold text-[#0a0a0a]">404</h1>
-          <p className="mt-2 text-sm text-[#737373]">
-            Summary not found or link expired
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <div className="max-w-md w-full text-center py-16">
+          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#737373] bg-[#f5f5f5] px-2.5 py-1 rounded-[4px] border border-[#e5e5e5]">
+            Error 404
+          </span>
+          <h1 className="mt-4 font-display text-3xl sm:text-4xl font-medium tracking-tight text-[#0a0a0a]">
+            Summary not found
+          </h1>
+          <p className="mt-3 text-sm text-[#737373] leading-relaxed">
+            This research summary could not be found or its public share link has expired.
           </p>
-          <Link
-            to={`/?ref=${shareToken}`}
-            className="mt-6 inline-block text-sm text-[#2563eb] hover:underline"
-          >
-            Analyze your own paper
-          </Link>
+          <div className="mt-8 flex justify-center">
+            <Link
+              to={`/?ref=${shareToken}`}
+              className="inline-flex items-center gap-2 rounded-[8px] bg-[#0a0a0a] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#171717] transition-colors shadow-2xs"
+            >
+              <span>Analyze your own paper</span>
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -110,23 +124,31 @@ export function SharePaperPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-[#e5e5e5]">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
+      <header className="border-b border-[#e5e5e5] bg-white sticky top-0 z-10">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <Link
+              to={`/?ref=${shareToken}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#737373] hover:text-[#0a0a0a] transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>PaperViz</span>
+            </Link>
+            <span className="text-[#d4d4d4]">/</span>
+            <span className="text-xs text-[#737373]">Shared Paper</span>
+          </div>
           <Link
             to={`/?ref=${shareToken}`}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#737373] hover:text-[#0a0a0a] transition-colors"
+            className="text-xs font-medium text-[#2563eb] hover:text-[#1e40af] transition-colors"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            PaperViz
+            Analyze another paper &rarr;
           </Link>
-          <span className="text-[#e5e5e5]">·</span>
-          <span className="text-xs text-[#737373]">Shared paper</span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-8">
         <div className="mb-8">
-          <h1 className="font-satoshi text-xl sm:text-2xl font-medium leading-tight text-[#0a0a0a]">
+          <h1 className="font-display text-2xl sm:text-3xl font-medium leading-tight text-[#0a0a0a]">
             {paper.title || "Research Paper Summary"}
           </h1>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -140,27 +162,26 @@ export function SharePaperPage() {
             )}
           </div>
           <p className="mt-3 text-xs leading-relaxed text-[#737373]">
-            Simplified interpretation generated by PaperViz — see the original
-            paper for the research itself.
+            Simplified interpretation generated by PaperViz — grounded in the original source document.
           </p>
         </div>
 
         {sections ? (
           <div className="flex flex-col gap-4">
             {sections.map((section) => (
-              <article key={section.title} className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
-                <h2 className="font-satoshi text-base font-medium text-[#0a0a0a] mb-3">
+              <article key={section.title} className="rounded-[12px] border border-[#e5e5e5] bg-white p-6 sm:p-7 shadow-2xs">
+                <h2 className="font-display text-base font-medium text-[#0a0a0a] mb-3">
                   {section.title}
                 </h2>
-                <div className="prose prose-neutral max-w-none break-words text-sm text-[#404040] leading-relaxed font-inter">
+                <div className="prose prose-neutral max-w-none break-words text-sm text-[#404040] leading-relaxed font-sans">
                   <ReactMarkdown>{section.content}</ReactMarkdown>
                 </div>
               </article>
             ))}
           </div>
         ) : (
-          <article className="rounded-[16px] border border-[#e5e5e5] bg-white p-6 sm:p-8 shadow-[rgba(0,0,0,0.05)_0px_1px_2px_0px]">
-            <div className="prose prose-neutral max-w-none break-words text-sm text-[#404040] leading-relaxed font-inter">
+          <article className="rounded-[12px] border border-[#e5e5e5] bg-white p-6 sm:p-7 shadow-2xs">
+            <div className="prose prose-neutral max-w-none break-words text-sm text-[#404040] leading-relaxed font-sans">
               <ReactMarkdown>{paper.simplified_text}</ReactMarkdown>
             </div>
           </article>
@@ -169,7 +190,7 @@ export function SharePaperPage() {
         <section className="mt-10">
           <div className="flex items-center gap-2 mb-4">
             <BarChart2 className="h-4 w-4 text-[#2563eb]" />
-            <h2 className="font-satoshi text-lg font-medium text-[#0a0a0a]">
+            <h2 className="font-display text-lg font-medium text-[#0a0a0a]">
               Charts & Visualizations
             </h2>
           </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
+import { Home, Bot, User, Menu, X } from "lucide-react"
 
 export function AppShell({ active, children }) {
   const [open, setOpen] = useState(false)
@@ -14,11 +15,11 @@ export function AppShell({ active, children }) {
   }, [open])
 
   const nav = [
-    { id: "home", label: "Home", to: "/", icon: "⌂" },
-    { id: "agents", label: "Agents", to: "/agents", icon: "⌘" },
+    { id: "home", label: "Home", to: "/", icon: Home },
+    { id: "agents", label: "Agents", to: "/agents", icon: Bot },
   ]
   const account = [
-    { id: "account", label: "Account", to: "/account", icon: "◎" },
+    { id: "account", label: "Account", to: "/account", icon: User },
   ]
 
   return (
@@ -29,24 +30,32 @@ export function AppShell({ active, children }) {
         </div>
         <nav id="app-sidebar-nav" className="sidebar__nav" aria-label="Application">
           <span className="nav-label">Workspace</span>
-          {nav.map((item) => (
-            <Link key={item.id} to={item.to} className={`side-item ${active === item.id ? "is-active" : ""}`} aria-current={active === item.id ? "page" : undefined} onClick={() => setOpen(false)}>
-              <span aria-hidden="true">{item.icon}</span>{item.label}
-            </Link>
-          ))}
+          {nav.map((item) => {
+            const Icon = item.icon
+            return (
+              <Link key={item.id} to={item.to} className={`side-item ${active === item.id ? "is-active" : ""}`} aria-current={active === item.id ? "page" : undefined} onClick={() => setOpen(false)}>
+                <Icon className="h-4 w-4 shrink-0 text-[#737373]" aria-hidden="true" />
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
           <span className="nav-label nav-label--spaced">Account</span>
-          {account.map((item) => (
-            <Link key={item.id} to={item.to} className={`side-item ${active === item.id ? "is-active" : ""}`} aria-current={active === item.id ? "page" : undefined} onClick={() => setOpen(false)}>
-              <span aria-hidden="true">{item.icon}</span>{item.label}
-            </Link>
-          ))}
+          {account.map((item) => {
+            const Icon = item.icon
+            return (
+              <Link key={item.id} to={item.to} className={`side-item ${active === item.id ? "is-active" : ""}`} aria-current={active === item.id ? "page" : undefined} onClick={() => setOpen(false)}>
+                <Icon className="h-4 w-4 shrink-0 text-[#737373]" aria-hidden="true" />
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
         </nav>
-        <div className="sidebar__bottom"><span className="mono muted">v0.x · demo shell</span></div>
+        <div className="sidebar__bottom"><span className="mono muted">v0.x · PaperViz</span></div>
       </aside>
       <div className="app-main">
         <header className="mobile-header">
           <button className="icon-btn" type="button" aria-label={open ? "Close navigation" : "Open navigation"} aria-expanded={open} aria-controls="app-sidebar-nav" onClick={() => setOpen((v) => !v)}>
-            <span aria-hidden="true">☰</span>
+            {open ? <X className="h-5 w-5 text-[#171717]" aria-hidden="true" /> : <Menu className="h-5 w-5 text-[#171717]" aria-hidden="true" />}
           </button>
           <span className="brand brand--compact"><span className="brand__mark">PV</span><span>PaperViz</span></span>
         </header>

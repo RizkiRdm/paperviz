@@ -65,23 +65,12 @@ export function AccountPage() {
 
   return (
     <AppShell active="account">
-      <div className="page-intro">
-        <p className="eyebrow">ACCOUNT</p>
-        <h1>Account</h1>
-        <p className="muted">{user.email}</p>
+      <div className="mb-8">
+        <h1 className="font-satoshi text-2xl font-medium text-[#0a0a0a]">Account</h1>
+        <p className="text-sm text-[#737373] mt-1">{user.email}</p>
       </div>
-      <div className="stack">
-          <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-[#0a0a0a] text-white font-mono text-xs font-bold">
-              PV
-            </div>
-            <span className="font-mono text-sm font-semibold tracking-tight text-[#0a0a0a]">PaperViz</span>
-          </Link>
-          <h1 className="font-satoshi text-2xl font-medium text-[#0a0a0a]">Account</h1>
-          <p className="text-sm text-[#737373]">{user.email}</p>
-        </div>
 
-        <div className="space-y-6">
+      <div className="space-y-6">
           <CredentialsCard
             credentials={credentials}
             savingCred={savingCred}
