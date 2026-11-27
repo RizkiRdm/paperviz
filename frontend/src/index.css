@@ -39,7 +39,9 @@
 
   /* Typography */
   --font-satoshi: "Satoshi", "Inter", system-ui, sans-serif;
+  --font-display: var(--font-satoshi);
   --font-inter: "Inter", system-ui, sans-serif;
+  --font-sans: var(--font-inter);
   --font-geist-mono: "Geist Mono", "JetBrains Mono", monospace;
   --font-ui: var(--font-inter);
   --font-reading: var(--font-inter);

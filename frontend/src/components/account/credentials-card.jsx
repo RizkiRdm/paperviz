@@ -101,7 +101,7 @@ export function CredentialsCard({ credentials, savingCred, onAdd, onMakeDefault,
             value={provider}
             onChange={(e) => setProvider(e.target.value)}
             disabled={savingCred}
-            className="w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+            className="w-full rounded-[6px] border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#171717] focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/10"
           >
             {PROVIDERS.map((p) => (
               <option key={p.value} value={p.value}>
@@ -121,7 +121,7 @@ export function CredentialsCard({ credentials, savingCred, onAdd, onMakeDefault,
             onChange={(e) => setModel(e.target.value)}
             placeholder="Provider default"
             disabled={savingCred}
-            className="w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+            className="w-full rounded-[6px] border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/10"
           />
         </div>
         <div>
@@ -136,7 +136,7 @@ export function CredentialsCard({ credentials, savingCred, onAdd, onMakeDefault,
             onChange={(e) => setApiKeyInput(e.target.value)}
             placeholder="Paste your provider key"
             disabled={savingCred}
-            className="w-full rounded-[6px] border border-[#000000] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+            className="w-full rounded-[6px] border border-[#e5e5e5] bg-white px-3 py-2 text-sm text-[#171717] placeholder:text-[#a3a3a3] focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/10"
           />
         </div>
         <Button type="submit" disabled={savingCred}>

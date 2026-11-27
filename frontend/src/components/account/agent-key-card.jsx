@@ -1,5 +1,6 @@
 // Agent API key card — create/replace the MCP agent key and reveal it once.
 import { useState } from "react"
+import { Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function AgentKeyCard({ keyConfigured, revealedKey, busy, onIssue, onError }) {
@@ -23,15 +24,25 @@ export function AgentKeyCard({ keyConfigured, revealedKey, busy, onIssue, onErro
       {revealedKey ? (
         <>
           <div className="relative">
-            <pre className="rounded-[6px] bg-[#f5f5f5] border border-[#e5e5e5] p-3 text-xs text-[#171717] font-mono overflow-x-auto whitespace-pre-wrap break-all">
+            <pre className="rounded-[6px] bg-[#f5f5f5] border border-[#e5e5e5] p-3 text-xs text-[#171717] font-mono overflow-x-auto whitespace-pre-wrap break-all pr-20">
               {revealedKey}
             </pre>
             <button
               onClick={copyToClipboard}
-              aria-label={copied ? "Copied" : "Copy API key"}
-              className="absolute top-2 right-2 rounded-[6px] border border-[#e5e5e5] bg-white px-2 py-1 text-xs font-medium text-[#737373] hover:bg-[#f5f5f5] transition-colors"
+              aria-label={copied ? "Copied to clipboard" : "Copy API key"}
+              className="absolute top-2 right-2 inline-flex items-center gap-1.5 rounded-[6px] border border-[#e5e5e5] bg-white px-2.5 py-1 text-xs font-medium text-[#171717] hover:bg-[#f5f5f5] transition-colors shadow-2xs"
             >
-              {copied ? "Copied!" : "Copy"}
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-[#16a34a]" />
+                  <span>Copied</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5 text-[#737373]" />
+                  <span>Copy</span>
+                </>
+              )}
             </button>
           </div>
           <p className="mt-3 text-xs text-[#737373]">

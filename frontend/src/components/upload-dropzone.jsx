@@ -74,7 +74,7 @@ export function UploadDropzone({ file, text, mode, onFileChange, onTextChange })
             onChange={(e) => onTextChange(e.target.value)}
             placeholder="Paste raw academic paper text here…"
             rows={8}
-            className="w-full rounded-[6px] border border-[#000000] bg-white p-4 text-sm text-[#171717] placeholder-[#737373] focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
+            className="w-full rounded-[6px] border border-[#e5e5e5] bg-white p-4 text-sm text-[#171717] placeholder-[#a3a3a3] transition-colors focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
           />
         </>
       )}

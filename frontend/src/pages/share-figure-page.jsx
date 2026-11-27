@@ -49,18 +49,25 @@ export function ShareFigurePage() {
   // an expired link (mirrors SharePaperPage's offline branch).
   if (error === "network") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <h1 className="text-4xl font-semibold text-[#0a0a0a]">Offline</h1>
-          <p className="mt-2 text-sm text-[#737373]">
-            Something went wrong loading this figure. Check your connection and try again.
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <div className="max-w-md w-full text-center py-16">
+          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#ea580c] bg-[#fff7ed] px-2.5 py-1 rounded-[4px] border border-[#ffedd5]">
+            Connection Error
+          </span>
+          <h1 className="mt-4 font-display text-3xl sm:text-4xl font-medium tracking-tight text-[#0a0a0a]">
+            Unable to load figure
+          </h1>
+          <p className="mt-3 text-sm text-[#737373] leading-relaxed">
+            Something went wrong connecting to PaperViz. Check your network connection and try again.
           </p>
-          <Link
-            to={`/?ref=${shareToken}`}
-            className="mt-6 inline-block text-sm text-[#2563eb] hover:underline"
-          >
-            Analyze your own paper
-          </Link>
+          <div className="mt-8 flex justify-center">
+            <Link
+              to={`/?ref=${shareToken}`}
+              className="inline-flex items-center gap-2 rounded-[8px] bg-[#0a0a0a] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#171717] transition-colors shadow-2xs"
+            >
+              <span>Analyze your own paper</span>
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -68,18 +75,25 @@ export function ShareFigurePage() {
 
   if (error || !figure) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <h1 className="text-4xl font-semibold text-[#0a0a0a]">404</h1>
-          <p className="mt-2 text-sm text-[#737373]">
-            Figure not found or link expired
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <div className="max-w-md w-full text-center py-16">
+          <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#737373] bg-[#f5f5f5] px-2.5 py-1 rounded-[4px] border border-[#e5e5e5]">
+            Error 404
+          </span>
+          <h1 className="mt-4 font-display text-3xl sm:text-4xl font-medium tracking-tight text-[#0a0a0a]">
+            Figure not found
+          </h1>
+          <p className="mt-3 text-sm text-[#737373] leading-relaxed">
+            This research figure could not be found or its public share link has expired.
           </p>
-          <Link
-            to={`/?ref=${shareToken}`}
-            className="mt-6 inline-block text-sm text-[#2563eb] hover:underline"
-          >
-            Analyze your own paper
-          </Link>
+          <div className="mt-8 flex justify-center">
+            <Link
+              to={`/?ref=${shareToken}`}
+              className="inline-flex items-center gap-2 rounded-[8px] bg-[#0a0a0a] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#171717] transition-colors shadow-2xs"
+            >
+              <span>Analyze your own paper</span>
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -87,26 +101,34 @@ export function ShareFigurePage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-[#e5e5e5]">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
+      <header className="border-b border-[#e5e5e5] bg-white sticky top-0 z-10">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <Link
+              to={`/?ref=${shareToken}`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#737373] hover:text-[#0a0a0a] transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>PaperViz</span>
+            </Link>
+            <span className="text-[#d4d4d4]">/</span>
+            <span className="text-xs text-[#737373]">Shared Figure</span>
+          </div>
           <Link
             to={`/?ref=${shareToken}`}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#737373] hover:text-[#0a0a0a] transition-colors"
+            className="text-xs font-medium text-[#2563eb] hover:text-[#1e40af] transition-colors"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            PaperViz
+            Analyze another paper &rarr;
           </Link>
-          <span className="text-[#e5e5e5]">·</span>
-          <span className="text-xs text-[#737373]">Shared figure</span>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-lg font-semibold text-[#0a0a0a]">
+          <h1 className="font-display text-xl sm:text-2xl font-medium tracking-tight text-[#0a0a0a]">
             {figure.source_paper_title || "Research Figure"}
           </h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {figure.page_number > 0 && (
               <span className="inline-flex items-center rounded-full border border-[#e5e5e5] bg-white px-2.5 py-0.5 text-[11px] font-medium text-[#737373]">
                 Page {figure.page_number}
